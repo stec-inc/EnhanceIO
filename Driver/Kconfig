@@ -1,0 +1,20 @@
+#
+# EnhanceIO caching solution by STEC INC.
+#
+
+config ENHANCEIO
+	tristate "Enable EnhanceIO"
+	default m
+	---help---
+	Based on Facebook's open source Flashcache project developed by
+	Mohan Srinivasan and hosted at "http://github.com", EnhanceIO is
+	a collection of (currently three) loadable kernel modules for
+	using SSDs as cache devices for traditional rotating hard disk
+
+	The caching engine is a loadable kernel module ("enhanceio.ko")
+	implemented as a device mapper target.	The cache replacement
+	policies are implemented as loadable kernel modules
+	("enhanceio_fifo.ko", "enhanceio_lru.ko") that register with
+	the caching engine module.
+
+	If unsure, say N.

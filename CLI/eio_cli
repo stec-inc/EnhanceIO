@@ -1,0 +1,268 @@
+#!/usr/bin/python
+#
+# Copyright (C) 2012 STEC, Inc. All rights not specifically granted
+# under a license included herein are reserved
+# Wrote a python based CLI for admistration of Enhanceio Driver
+# Sanoj Unnikrishnan <sunnikrishnan@stec-inc.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; under version 2 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+from ctypes import *
+from fcntl import *
+from argparse import ArgumentParser
+import sys,struct
+import subprocess
+import os
+
+#TBD : Change ioctl numbers to comply with linux kernel convention
+EIODEV = '/dev/eiodev'
+EIO_IOC_CREATE = 0x4500 
+EIO_IOC_DELETE = 0x4501
+EIO_IOC_ENABLE = 0x4502
+EIO_IOC_EDIT = 0x4504 
+EIO_IOC_NCACHES = 0x4505 
+EIO_IOC_CACHE_LIST = 0x4506
+EIO_IOC_SSD_ADD = 0x4507 
+EIO_IOC_SRC_ADD = 0x4509
+IOC_BLKGETSIZE64 = 0x80081272
+IOC_SECTSIZE = 0x1268
+
+def run_cmd(cmd):
+	#Utility function that runs a command
+	process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,shell=True)
+	output = process.stdout.read()
+	ret = process.wait()
+	status = Status(output,ret)
+	return status
+
+
+def get_caches_list():
+	
+	#Utility function that obtains cache list 
+	cache_list = [f for f in os.listdir('/proc/enhanceio/')]
+	for name in cache_list:
+		if name == "version":
+			cache_list.remove(name)
+	return cache_list	
+
+# Class that represents cache. Also used to pass ioctl to driver 
+class Cache_rec(Structure):
+	_fields_ = [
+	("name", c_char * 33),
+	("src_name", c_char * 129),
+	("ssd_name", c_char * 129),
+        ("src_size", c_ulong),	
+	("ssd_size", c_ulong),
+        ("src_sector_size", c_int),
+        ("ssd_sector_size", c_int),
+	("flags", c_int),
+        ("policy", c_byte),
+        ("mode", c_byte),
+        ("persistence", c_int, 1),
+        ("blksize", c_ulong),
+        ("assosc", c_ulong)
+	]
+	def __init__(self, name, src_name="", ssd_name="", src_size=0, ssd_size=0, src_sector_size=0, ssd_sector_size=0, flags=0, policy="", mode="", persistence=0, blksize="", assosc=""): 
+	
+		modes = {"wt":3,"wb":1,"ro":2,"":0}
+		policies = {"rand":3,"fifo":1, "lru":2,"":0}
+		blksizes = {"4096":4096, "2048":2048, "8192":8192,"":0}	
+		assosciativity = {2048:128, 4096:256, 8192:512,"":0}
+		
+		self.name = name
+		self.src_name =src_name
+		self.ssd_name = ssd_name
+		self.src_size = src_size	
+		self.src_sector_size = src_sector_size
+		self.ssd_size = ssd_size
+		self.ssd_sector_size = ssd_sector_size
+		self.flags = flags
+		self.policy = policies[policy] 
+		self.mode = modes[mode]
+		self.persistence = persistence
+		self.blksize = blksizes[blksize]
+		self.assosc = assosciativity[assosc]		 
+	
+	def print_info(self):
+	
+		# Display Cache info 
+		modes = {3:"Write Through", 1:"Write Back", 2:"Read Only",0:"N/A"}
+		policies = {3:"rand", 1:"fifo", 2:"lru", 0:"N/A"}
+
+		print ""
+		print "Cache Name       : " + self.name 
+		print "Source Device    : " + self.src_name 
+		print "SSD Device       : " + self.ssd_name
+		print "Policy           : " + policies[self.policy] 
+		print "Mode             : " + modes[self.mode]
+
+		pass
+
+	def do_eio_ioctl(self,IOC_TYPE):
+		#send ioctl to driver
+		fd = open(EIODEV, "r")
+		fmt = ''
+		
+		try:	
+			if ioctl(fd, IOC_TYPE, addressof(self)):
+				print "ioctl failed"
+		except Exception as e:
+			print e
+		
+	def clean(self):
+		#do sysctl corresponding to clean
+		cmd = "/sbin/sysctl dev.enhanceio." + self.name + ".do_clean=1"
+		print cmd
+		run_cmd(cmd)	
+		pass
+	
+	def get_cache_info(self):
+		#function to extract information from /proc/enhanceio
+		status = Status()
+		
+		if os.path.exists("/proc/enhanceio/" + self.name):
+				
+			cmd = "cat /proc/enhanceio/" + self.name + "/config" + " | grep src_name" 
+			status = run_cmd(cmd)
+			self.src_name =  status.output.split()[1]
+
+			cmd = "cat /proc/enhanceio/" + self.name + "/config" + " | grep ssd_name"
+			status = run_cmd(cmd)
+			self.ssd_name = status.output.split()[1]
+	
+			cmd = "cat /proc/enhanceio/" + self.name + "/config" + " | grep mode"
+			status = run_cmd(cmd)
+			self.mode = int(status.output.split()[1])
+
+			cmd = "cat /proc/enhanceio/" + self.name + "/config" + " | grep eviction"
+			status = run_cmd(cmd)
+			self.policy = int(status.output.split()[1])
+
+						
+	
+class Status:
+	output = ""
+	ret = 0
+
+	def __init__(self, outstr="", outret=0):
+		self.output = outstr
+		self.ret = outret			
+		pass
+
+#Block Device class 
+class Dev_info:
+		
+	dev_size = 0 	
+	dev_sect_size = 0
+
+	def get_device_size_info(self,name):
+		fd = open(name,"r")
+		
+		buf = ' ' * 8
+
+		buf = ioctl(fd, IOC_BLKGETSIZE64, buf)
+		bytes = struct.unpack('L', buf)
+		self.dev_size = int(bytes[0])
+
+		buf = ioctl(fd, IOC_SECTSIZE, buf)
+		bytes = struct.unpack('L', buf)
+		self.dev_sect_size = int(bytes[0])
+
+		pass
+		
+def main():
+	
+	
+	mainparser = ArgumentParser()
+	parser = mainparser.add_subparsers()		
+
+	parser_delete = parser.add_parser('delete', help='used to delete cache')
+	parser_delete.add_argument("-c", action="store", dest= "cache",required=True)
+	
+	parser_edit = parser.add_parser('edit', help='used to edit cache policy or mode or both')
+	parser_edit.add_argument("-c", action="store",  dest="cache",required=True)
+	parser_edit.add_argument("-m", action="store", dest="mode", choices=["wb","wt","ro"], help="cache mode",default="wt")
+	parser_edit.add_argument("-p", action="store", dest="policy", choices=["rand","fifo","lru"], help="cache replacement policy",default="lru")
+	
+	parser_info = parser.add_parser('info', help='displays information about currently create caches')
+
+	parser_clean = parser.add_parser('clean', help='clean the drity blocks in the cache (Applicable only to writeback caches)')
+	parser_clean.add_argument("-c", action="store", dest="cache",required=True)
+	
+	parser_create = parser.add_parser('create', help="create")
+	parser_create.add_argument("-d", action="store", dest="hdd", required=True, help="name of the source device")
+	parser_create.add_argument("-s", action="store", dest="ssd", required=True, help="name of the ssd device")
+	parser_create.add_argument("-p", action="store", dest="policy", choices=["rand","fifo","lru"], help="cache replacement policy",default="lru")
+	parser_create.add_argument("-m", action="store", dest="mode", choices=["wb","wt","ro"], help="cache mode",default="wt")
+	parser_create.add_argument("-b", action="store", dest="blksize", choices=["2048","4096","8192"], default="4096" ,help="block size for cache")
+	parser_create.add_argument("-c", action="store", dest="cache", required=True)
+
+	args = mainparser.parse_args()
+	
+	if sys.argv[1] == "create":
+		cache = Cache_rec(name = args.cache, src_name = args.hdd, ssd_name = args.ssd, policy = args.policy, mode = args.mode, blksize = args.blksize)
+
+		src_sz = Dev_info() 
+		src_sz.get_device_size_info(cache.src_name)
+		cache.src_size = src_sz.dev_size
+		cache.src_sector_size = src_sz.dev_sect_size
+
+		ssd_sz = Dev_info()
+		ssd_sz.get_device_size_info(cache.ssd_name)
+		cache.ssd_size = ssd_sz.dev_size
+		cache.ssd_sector_size = ssd_sz.dev_sect_size
+
+		cache.do_eio_ioctl(EIO_IOC_CREATE)
+		pass
+	elif sys.argv[1] == "info":
+		cache_list = get_caches_list()
+		
+		if not cache_list:		
+			print "No caches Found"
+		else:
+			for cache_name in cache_list:
+				cache = Cache_rec(name = cache_name)
+				cache.get_cache_info()
+				cache.print_info()
+
+			print "\nFor more information look at /proc/enhanceio/<cache_name>/config"
+
+		pass
+	elif sys.argv[1] == "edit":
+		cache = Cache_rec(name = args.cache, policy = args.policy, mode = args.mode)
+		cache.do_eio_ioctl(EIO_IOC_EDIT)
+		pass
+	elif sys.argv[1] == "delete":
+		cache = Cache_rec(name = args.cache)
+		cache.do_eio_ioctl(EIO_IOC_DELETE)
+		pass
+	elif sys.argv[1] == "clean":
+		cache = Cache_rec(name = args.cache)
+		cache.clean()
+		pass
+	elif sys.argv[1] == "enable":
+		# This command will be fired by udev rule on SSD/Source addition
+		cache = Cache_rec(name = args.cache, persistence = 1)
+		cache.do_eio_ioctl(EIO_IOC_ENABLE)
+	elif sys.argv[1] == "notify":
+		# This command will be fired by udev rule on SSD/Source addition
+		cache = Cache_rec(name = args.cache, )
+		cache.do_eio_ioctl(EIO_IOC_ENABLE)
+		cache = Cache_rec(name = args.cache)
+		pass
+
+
+if __name__ == '__main__':
+	main()
+

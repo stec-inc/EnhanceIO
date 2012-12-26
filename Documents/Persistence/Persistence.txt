@@ -1,0 +1,11 @@
+How to create persistent cache
+==============================
+
+Use the 94-Enhanceio-template file to create a per cache udev-rule file named /etc/udev/rules.d/94-enhancio-<cache_name>.rules
+
+1) Change <cache_match_expr> to ENV{ID_SERIAL}=="<ID SERIAL OF YOUR CACHE DEVICE>", ENV{DEVTYPE}==<DEVICE TYPE OF YOUR CACHE DEVICE>
+
+2) Change <source_match_expr> to ENV{ID_SERIAL}=="<ID SERIAL OF YOUR HARD DISK>", ENV{DEVTYPE}==<DEVICE TYPE OF YOUR SOURCE DEVICE>
+
+3) Replace all instances of <cache_name> with the name of your cache
+    	

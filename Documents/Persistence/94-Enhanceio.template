@@ -1,0 +1,33 @@
+ACTION!="add|change", GOTO="EIO_EOF"
+SUBSYSTEM!="block", GOTO="EIO_EOF"
+
+<cache_match_expr>, GOTO="EIO_CACHE"
+
+<source_match_expr>, GOTO="EIO_SOURCE"
+
+# If none of the rules above matched then it isn't an EnhanceIO device so ignore it.
+GOTO="EIO_EOF"
+
+# If we just found the cache device and the source already exists then we can setup
+LABEL="EIO_CACHE"
+	TEST!="/dev/enhanceio/<cache_name>", PROGRAM="/bin/mkdir -p /dev/enhanceio/<cache_name>"
+	PROGRAM="/bin/sh -c 'echo $kernel > /dev/enhanceio/<cache_name>/.ssd_name'"
+
+	TEST=="/dev/enhanceio/<cache_name>/.disk_name", GOTO="EIO_SETUP"
+GOTO="EIO_EOF"
+
+# If we just found the source device and the cache already exists then we can setup
+LABEL="EIO_SOURCE"
+	TEST!="/dev/enhanceio/<cache_name>", PROGRAM="/bin/mkdir -p /dev/enhanceio/<cache_name>"
+	PROGRAM="/bin/sh -c 'echo $kernel > /dev/enhanceio/<cache_name>/.disk_name'"
+	
+	TEST=="/dev/enhanceio/<cache_name>/.ssd_name", GOTO="EIO_SETUP"
+GOTO="EIO_EOF"
+
+LABEL="EIO_SETUP"
+	PROGRAM="/bin/sh -c 'cat /dev/enhanceio/<cache_name>/.ssd_name'", ENV{ssd_name}="%c"
+	PROGRAM="/bin/sh -c 'cat /dev/enhanceio/<cache_name>/.disk_name'", ENV{disk_name}="%c"
+
+	TEST!="/proc/enhanceio/<cache_name>", RUN+="/sbin/eio_cli enable -d /dev/$env{disk_name} -s /dev/$env{ssd_name} <cache_name>"
+LABEL="EIO_EOF"
+
