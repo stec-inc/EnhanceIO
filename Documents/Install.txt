@@ -1,11 +1,14 @@
 Installation steps
 -------------------
 
+Requirements
+Kernel version 3.7 onwards
+python 2.6.6 onwards
+
 1) eio_cli installation
    > cp cli/eio_cli /sbin/
    > chmod 700 cli/eio_cli	
   
-   Note: python 2.6.6 version must be installed on the system 
 
 2) Man page
    copy the  eio_cli.gz file under the man8 subdirectory of man directory (/usr/share/man/man8/)
