@@ -5,35 +5,33 @@ Requirements
 Kernel version 3.7 onwards
 python 2.6.6 onwards
 
+Run following commands as root
+
 1) eio_cli installation
    > cp cli/eio_cli /sbin/
    > chmod 700 cli/eio_cli	
   
 
 2) Man page
-   copy the  eio_cli.gz file under the man8 subdirectory of man directory (/usr/share/man/man8/)
+   Copy the  eio_cli.gz file under the man8 subdirectory of man directory (/usr/share/man/man8/).
 
 
 3) Driver installation
 
-   1. Copy enhanceio dir under $(KERNEL_SRC)/drivers/block.
+   1. Copy Driver/enhanceio dir under $(KERNEL_SRC)/drivers/block
+      Apply config patch
+      patch -p0 < <pathto Driver directory> config.patch
 
-   2. To compile:
+   2. Regenerate config file
+      Run make menuconfig and save the configuration
+
+   3. To compile:
       > cd $(KERNEL_SRC)
-      > make M=drivers/block/enhanceio
+      > make modules
 
-   3. To install it on the system /lib/module/`uname -r`/extra/
-      > make M=drivers/block/enhanceio modules_install
+   4. To install modules
+      > make modules_install
 
-   Alternatively, to install by hand, first insmod enhanceio.ko
-   The policy modules, enhanceio_lru.ko and enhanceio_fifo.ko
-   can be installed in any order only after enhanceio.ko has been
-   installed.
-
-   While removing the modules, the policy modules have to be
-   removed first, before removing enhanceio.ko
-
-4) Persistence Handling
-   Create udev rule files as described in persistence.txt file.
-   
-	
+4) You can now create enhanceio caches using the utility eio_cli. Please refer
+   to Documents/Persistence.txt for information about making a cache
+   configuration persistent across reboot.
