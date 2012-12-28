@@ -1,0 +1,18 @@
+--- drivers/block/Kconfig.orig	2012-12-22 06:49:00.000000000 +0530
++++ drivers/block/Kconfig	2012-12-28 13:15:18.285601643 +0530
+@@ -544,4 +544,6 @@
+ 
+ 	  If unsure, say N.
+ 
++source "drivers/block/enhanceio/Kconfig"
++
+ endif # BLK_DEV
+--- drivers/block/Makefile.orig	2012-12-22 06:49:00.000000000 +0530
++++ drivers/block/Makefile	2012-12-28 13:15:18.405601636 +0530
+@@ -40,5 +40,6 @@
+ obj-$(CONFIG_BLK_DEV_DRBD)     += drbd/
+ obj-$(CONFIG_BLK_DEV_RBD)     += rbd.o
+ obj-$(CONFIG_BLK_DEV_PCIESSD_MTIP32XX)	+= mtip32xx/
++obj-$(CONFIG_ENHANCEIO)		+= enhanceio/
+ 
+ swim_mod-y	:= swim.o swim_asm.o
