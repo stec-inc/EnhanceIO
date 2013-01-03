@@ -55,6 +55,7 @@ typedef enum eio_ioc {
 	EIO_IOC_SRC_ADD,
 	EIO_IOC_SRC_REMOVE,
 	EIO_IOC_NOTIFY_REBOOT,
+	EIO_IOC_SET_WARM_BOOT,
 	EIO_IOC_UNUSED
 } eio_ioc_t;
 
@@ -62,6 +63,7 @@ typedef struct cache_rec_short {
 	char		cr_name[CACHE_NAME_SZ];
 	char		cr_src_devname[NAME_SZ];
 	char		cr_ssd_devname[NAME_SZ];
+	char		cr_ssd_uuid[NAME_SZ];
 	uint64_t	cr_src_dev_size;
 	uint64_t	cr_ssd_dev_size;
 	int		cr_src_sector_size;
@@ -70,6 +72,7 @@ typedef struct cache_rec_short {
 	char 		cr_policy;
 	char		cr_mode;
 	char 		cr_persistence;
+	char		cr_cold_boot;
 	unsigned long	cr_blksize;
 	unsigned long	cr_assoc;
 } cache_rec_short_t;

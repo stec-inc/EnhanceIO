@@ -138,6 +138,13 @@ typedef u_int64_t sector_t;
 #define	EIO_CLEAN_START		0x00000001
 #define	EIO_CLEAN_KEEP		0x00000002
 
+/* EIO magic number */
+#define EIO_MAGIC		0xE10CAC6E
+#define EIO_BAD_MAGIC		0xBADCAC6E
+
+/* EIO version */
+#define EIO_SB_VERSION		3	/* kernel superblock version */
+#define EIO_SB_MAGIC_VERSION	3	/* version in which magic number was introduced */
 
 typedef union eio_superblock {
 	struct superblock_fields {
@@ -154,6 +161,13 @@ typedef union eio_superblock {
 		u_int32_t mode;
 		u_int32_t repl_policy;
 		u_int32_t cache_flags;
+		/*
+		 * Version 1.1 superblock ends here.
+		 * Don't modify any of the above fields.
+		 */
+		u_int32_t magic;		/* Has to be the 1st field afer 1.1 superblock */
+		u_int32_t cold_boot;		/* cache to be started as cold after boot */
+		char ssd_uuid[DEV_PATHLEN];
 		sector_t cache_md_start_sect;	/* cache metadata start (8K aligned)*/
 		sector_t cache_data_start_sect;	/* cache data start (8K aligned) */
 		u_int32_t dirty_high_threshold;
@@ -314,7 +328,12 @@ struct flash_cacheblock {
 					 CACHE_FLAGS_FAILED |		\
 					 CACHE_FLAGS_SHUTDOWN_INPROG |	\
 					 CACHE_FLAGS_MOD_INPROG |	\
+					 CACHE_FLAGS_STALE |		\
 					 CACHE_FLAGS_DELETED) 	/* need a proper definition */
+
+/* flags that govern cold/warm enable after reboot */
+#define BOOT_FLAG_COLD_ENABLE		(1 << 0)	/* enable the cache as cold */
+#define BOOT_FLAG_FORCE_WARM		(1 << 1)	/* override the cold enable flag */
 
 typedef enum dev_notifier {
 	NOTIFY_INITIALIZER,
@@ -603,13 +622,19 @@ struct eio_stats {
 
 #define EIO_QUEUE_IO_TO_THREAD	1
 
+/* Structure representing a sequence of sets(first to last set index) */
+struct set_seq {
+	index_t first_set;
+	index_t last_set;
+	struct set_seq *next;
+};
+
 /* EIO system control variables(tunables) */
 struct eio_sysctl {
  	volatile uint32_t	error_inject;
         volatile int32_t	fast_remove;
         volatile int32_t	zerostats;
         volatile int32_t	do_clean;
-	volatile int32_t	stop_clean;
         volatile uint32_t	dirty_high_threshold;
         volatile uint32_t	dirty_low_threshold;
         volatile uint32_t	dirty_set_high_threshold;
@@ -702,18 +727,19 @@ struct cache_c {
 	u_int32_t		consecutive_shift;	/* Consecutive blocks size in bits */
 	u_int32_t		persistence;		/* Create | Force create | Reload */
 	u_int32_t		mode;			/* CACHE_MODE_{WB, RO, WT} */
+	u_int32_t		cold_boot;		/* Cache should be started as cold after boot */
 	u_int32_t		bio_nr_pages;		/* number of hardware sectors supported by SSD in terms of PAGE_SIZE */
 
 	spinlock_t		cache_spin_lock;
 	long unsigned int	cache_spin_lock_flags;	/* See comments above SPIN_LOCK_IRQSAVE_FLAGS */
 	atomic_t		nr_jobs;		/* Number of I/O jobs */
-	atomic_t		fast_remove_in_prog;
 
 	volatile u_int32_t	cache_flags;
 	u_int32_t		sb_state;		/* Superblock state */
+	u_int32_t		sb_version;		/* Superblock version */
 
+	u_int32_t		sb_version;		/* Superblock version */
 	int			readfill_in_prog;
-
 	struct eio_stats	eio_stats;		/* Run time stats */
 	struct eio_errors	eio_errors;		/* Error stats */
 	int			max_clean_ios_set;	/* Max cleaning IOs per set */
@@ -735,6 +761,7 @@ struct cache_c {
 	char			cache_name[DEV_PATHLEN];
 	char			cache_gendisk_name[DEV_PATHLEN]; /* Used for SSD failure checks */
 	char			cache_srcdisk_name[DEV_PATHLEN]; /* Used for SRC failure checks */
+	char			cache_srcdisk_name[DEV_PATHLEN]; /* Used for SRC failure checks */
 
 	struct cacheblock_md8	*cache_md8;
 	sector_t		cache_size;		/* Cache size passed to ctr(), used by dmsetup info */
@@ -749,12 +776,12 @@ struct cache_c {
 	u_int32_t		random;			/* Use for random replacement policy */
 	void			*sp_cache_blk;		/* Per cache-block data structure */
 	void			*sp_cache_set;		/* Per cache-set data structure */
-	void			*sp_cache;		/* Per cache data structure */
 	struct lru_ls		*dirty_set_lru;		/* lru for dirty sets : lru_list_t */
 	spinlock_t		dirty_set_lru_lock;	/* spinlock for dirty set lru */
 	struct delayed_work	clean_aged_sets_work;	/* work item for clean_aged_sets */
 	int			is_clean_aged_sets_sched; /* to know whether clean aged sets is scheduled */
 	struct workqueue_struct *mdupdate_q;		/* Workqueue to handle md updates */
+	struct workqueue_struct *callback_q;		/* Workqueue to handle io callbacks */
 };
 
 #define EIO_CACHE_IOSIZE		0
@@ -844,6 +871,8 @@ struct bio_container {
 	struct eio_bio *bc_mdlist;	/* ebios waiting for md update */
 	int bc_mdwait;			/* count of ebios that will do md update */
 	struct mdupdate_request *mdreqs; /* mdrequest structures required for md update */
+	struct set_seq *bc_setspan;	/* sets spanned by the bc(used only for wb) */		
+	struct set_seq bc_singlesspan;	/* used(by wb) if bc spans a single set sequence */
 	enum eio_io_dir bc_dir;		/* bc I/O direction */
 	int bc_error;			/* error encountered during processing bc */
 	unsigned long bc_iotime;	/* maintains i/o time in jiffies */
@@ -858,6 +887,7 @@ struct sync_io_context {
 
 struct kcached_job {
 	struct list_head list;
+	struct work_struct work;
 	struct cache_c *dmc;
 	struct eio_bio *ebio;
 	struct job_io_regions job_io_regions;
@@ -906,6 +936,7 @@ void eio_md_write_kickoff(struct kcached_job *job);
 void eio_do_readfill(struct work_struct *work);
 void eio_comply_dirty_thresholds(struct cache_c *dmc, index_t set);
 void eio_clean_all(struct cache_c *dmc);
+void eio_clean_for_reboot(struct cache_c *dmc);
 void eio_clean_aged_sets(struct work_struct *work);
 void eio_comply_dirty_thresholds(struct cache_c *dmc, index_t set);
 #ifndef	SSDCACHE
@@ -999,6 +1030,24 @@ extern void eio_unplug_cache_device(struct cache_c *dmc);
 extern void eio_put_cache_device(struct cache_c *dmc);
 extern void eio_suspend_caching(struct cache_c *dmc, dev_notifier_t note);
 extern void eio_resume_caching(struct cache_c *dmc, char *dev);
+
+static __inline__ int64_t
+atomic64_dec_if_positive(atomic64_t *v)
+{
+	int64_t cmp, old, dec;
+	cmp = ATOMIC_READ(v);
+	for (;;) {
+		dec = cmp - 1;
+		if (unlikely(dec < 0))
+			break;
+		old = ATOMIC_CMPXCHG((v), cmp, dec);
+		if (likely(old == cmp))
+			break;
+		cmp = old;
+	}
+	return dec;
+}
+
 static __inline__ void
 EIO_DBN_SET(struct cache_c *dmc, u_int64_t index, sector_t dbn)
 {
@@ -1056,6 +1105,7 @@ EIO_CACHE_STATE_ON(struct cache_c *dmc, index_t index, u_int8_t bitmask)
 	EIO_CACHE_STATE_SET(dmc, index, cache_state);
 }
 
+void eio_set_warm_boot(void);
 #endif /* defined(__KERNEL__) */
 
 #endif /* !EIO_INC_H */

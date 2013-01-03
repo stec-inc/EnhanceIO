@@ -48,14 +48,16 @@ struct rw_semaphore	eio_ttc_lock[EIO_HASHTBL_SIZE];
 static struct list_head	eio_ttc_list[EIO_HASHTBL_SIZE];
 
 int eio_reboot_notified = 0;
+extern int eio_force_warm_boot;
 
 extern long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg);
 extern long eio_compact_ioctl(struct file *filp, unsigned cmd, unsigned long arg);
 
 extern mempool_t *_io_pool;
 extern mempool_t *_dmc_bio_pool;
+extern struct eio_control_s *eio_control;
 
-static void eio_make_request_fn(struct request_queue *, struct bio *);
+static int eio_make_request_fn(struct request_queue *, struct bio *);
 static void eio_cache_rec_fill(struct cache_c *, cache_rec_short_t *);
 static void eio_enqueue_io(struct eio_barrier_q *, struct cache_c *, struct bio *, int);
 static void eio_wq_work(struct work_struct *);
@@ -63,14 +65,17 @@ static void eio_process_barrier(struct eio_barrier_q *, struct cache_c *, struct
 static void eio_io_uncached_partition(struct eio_barrier_q *, struct bio *);
 static void eio_bio_end_empty_barrier(struct bio *, int);
 static void eio_issue_empty_barrier_flush(struct block_device *, struct bio *,
-				    int , struct eio_barrier_q *, int rw_flags);
+	 			    int , struct eio_barrier_q *, int rw_flags);
 static int eio_finish_nrdirty(struct cache_c *);
 static int eio_mode_switch(struct cache_c *, u_int32_t);
 static int eio_policy_switch(struct cache_c *, u_int32_t);
 static struct eio_barrier_q * eio_barrier_q_alloc_init(void);
 static void eio_barrier_q_free(struct eio_barrier_q *);
 
-
+static int eio_overlap_split_bio(struct request_queue *, struct bio *);
+static struct bio * eio_split_new_bio(struct bio *, struct bio_container *,
+				      unsigned *, unsigned *, sector_t);
+static void eio_split_endio(struct bio *, int);
 
 static int
 eio_open(struct inode *ip, struct file *filp)
@@ -507,9 +512,20 @@ re_lookup:
 		}
 	}
 
-	if (overlap) {
-		/* overlapping I/O not supported */
-		bio_endio(bio, -EOPNOTSUPP);
+	if (unlikely(overlap)) {
+		/* unlock ttc lock */
+		if (barrier)
+			up_write(&eio_ttc_lock[index]);
+		else
+			up_read(&eio_ttc_lock[index]);
+
+		if (bio_rw_flagged(bio, BIO_RW_DISCARD)) {
+			EIOERR("eio_mfn: Overlap I/O with Discard flag received."
+				" Discard flag is not supported.\n");
+			bio_endio(bio, -EOPNOTSUPP);
+		} else {
+			ret = eio_overlap_split_bio(q, bio);
+		}
 	} else if (enqueue || barrier) {
 		VERIFY(bq != NULL);
 		eio_enqueue_io(bq, dmc, bio, barrier);
@@ -532,14 +548,15 @@ re_lookup:
 		}
 	}
 
-	if (barrier)
-		up_write(&eio_ttc_lock[index]);
-	else
-		up_read(&eio_ttc_lock[index]);
-
-	if (overlap || enqueue || barrier || dmc){
-		return;
+	if (!overlap) {
+		if (barrier)
+			up_write(&eio_ttc_lock[index]);
+		else
+			up_read(&eio_ttc_lock[index]);
 	}
+
+	if (overlap || enqueue || barrier || dmc)
+		return;
 
 	/*
 	 * Race condition:-
@@ -1301,6 +1318,13 @@ eio_finish_nrdirty(struct cache_c *dmc)
 {
 	int			index;
 	int			ret = 0;
+	int			retry_count;
+
+	/*
+	 * Due to any transient errors, finish_nr_dirty may not drop
+	 * to zero. Retry the clean operations for FINISH_NRDIRTY_RETRY_COUNT.
+	 */
+	retry_count = FINISH_NRDIRTY_RETRY_COUNT;
 
 	index = EIO_HASH_BDEV(dmc->disk_dev->bdev->bd_contains->bd_dev);
 	down_write(&eio_ttc_lock[index]);
@@ -1312,7 +1336,6 @@ eio_finish_nrdirty(struct cache_c *dmc)
 	}
 	VERIFY(!(dmc->sysctl_active.do_clean & EIO_CLEAN_START));
 
-	VERIFY(!(dmc->sysctl_active.do_clean & EIO_CLEAN_START));
 	dmc->sysctl_active.do_clean |= EIO_CLEAN_KEEP | EIO_CLEAN_START;
 	up_write(&eio_ttc_lock[index]);
 
@@ -1334,7 +1357,13 @@ eio_finish_nrdirty(struct cache_c *dmc)
 	} while (!dmc->sysctl_active.fast_remove && (ATOMIC_READ(&dmc->nr_dirty) > 0)
 		 && (!(dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG)));
 	dmc->sysctl_active.do_clean &= ~EIO_CLEAN_START;
-	if ((dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG) &&
+
+	/*
+	 * If all retry_count exhausted and nr_dirty is still not zero.
+	 * Return error.
+	 */
+	if (((dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG) ||
+		(retry_count == 0)) &&
 		(ATOMIC_READ(&dmc->nr_dirty) > 0)) {
 		ret = -EINVAL;
 	}
@@ -1352,6 +1381,8 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 	int		index;
 	struct cache_c	*dmc;
 	uint32_t        old_time_thresh = 0;
+	int		restart_async_task = 0;
+	int		ret;
 
 	VERIFY((mode != 0) || (policy != 0));
 
@@ -1363,6 +1394,13 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 
 	if ((dmc->mode == mode) && (dmc->req_policy == policy))
 		return 0;
+
+	if (unlikely(CACHE_FAILED_IS_SET(dmc)) || unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
+		EIOERR("cache_edit: Cannot proceed with edit for cache \"%s\"."
+			" Cache is in failed or degraded state.",
+			dmc->cache_name);
+		return -EINVAL;
+	}
 
 	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 	if (dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG) {
@@ -1381,23 +1419,35 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 	SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 	old_time_thresh = dmc->sysctl_active.time_based_clean_interval;
 
+	if (dmc->mode == CACHE_MODE_WB) {
+		if (CACHE_FAILED_IS_SET(dmc)) {
+			EIOERR("cache_edit:  Can not proceed with edit for Failed cache \"%s\".",
+				dmc->cache_name);
+			error = -EINVAL;
+			goto out;
+		}
+		eio_stop_async_tasks(dmc);
+		restart_async_task = 1;
+	}
+
 	/* Wait for nr_dirty to drop to zero */
 	if (dmc->mode == CACHE_MODE_WB && mode != CACHE_MODE_WB) {
 		if (CACHE_FAILED_IS_SET(dmc)) {
 			EIOERR("cache_edit:  Can not proceed with edit for Failed cache \"%s\".",
 				dmc->cache_name);
+			error = -EINVAL;
 			goto out;
 		}
 
-		eio_stop_async_tasks(dmc);
 		error = eio_finish_nrdirty(dmc);
 		/* This error can mostly occur due to Device removal */
 		if (unlikely(error)) {
 			EIOERR("cache_edit: nr_dirty FAILED to finish for cache \"%s\".",
 				dmc->cache_name);
-			dmc->cache_flags |= CACHE_FLAGS_STALE;
 			goto out;
 		}
+		VERIFY((dmc->sysctl_active.do_clean & EIO_CLEAN_KEEP) &&
+			!(dmc->sysctl_active.do_clean & EIO_CLEAN_START));
 		VERIFY(dmc->sysctl_active.fast_remove || (ATOMIC_READ(&dmc->nr_dirty) == 0));
 	}
 
@@ -1418,6 +1468,8 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 	if ((policy != 0) && (policy != dmc->req_policy)) {
 		error = eio_policy_switch(dmc, policy);
 		if (error) {
+
+			up_write(&eio_ttc_lock[index]);
 			goto out;
 		}
 	}
@@ -1426,6 +1478,8 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 	if ((mode != 0) && (mode != dmc->mode)) {
 		error = eio_mode_switch(dmc, mode);
 		if (error) {
+
+			up_write(&eio_ttc_lock[index]);
 			goto out;
 		}
 	}
@@ -1447,7 +1501,31 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 
 out:
 	dmc->sysctl_active.time_based_clean_interval = old_time_thresh;
+
+	/*
+	 * Resetting EIO_CLEAN_START and EIO_CLEAN_KEEP flags.
+	 * EIO_CLEAN_START flag should be restored if eio_stop_async_tasks()
+	 * is not called in future.
+	 */
+
 	dmc->sysctl_active.do_clean &= ~(EIO_CLEAN_START | EIO_CLEAN_KEEP);
+
+	/* Restart async-task for "WB" cache. */
+	if ((dmc->mode == CACHE_MODE_WB) && (restart_async_task == 1)) {
+		EIODEBUG("cache_edit: Restarting the clean_thread.\n");
+		VERIFY(dmc->clean_thread == NULL);
+		ret = eio_start_clean_thread(dmc);
+		if (ret) {
+			error = ret;
+			EIOERR("cache_edit: Failed to restart async tasks. error=%d.\n", ret);
+		}
+		if (dmc->sysctl_active.time_based_clean_interval &&
+		    ATOMIC_READ(&dmc->nr_dirty)) {
+			schedule_delayed_work(&dmc->clean_aged_sets_work,
+					      dmc->sysctl_active.time_based_clean_interval * 60 * HZ);
+			dmc->is_clean_aged_sets_sched = 1;
+		}
+	}
 	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 	dmc->cache_flags &= ~CACHE_FLAGS_MOD_INPROG;
 	SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
@@ -1462,6 +1540,8 @@ eio_mode_switch(struct cache_c *dmc, u_int32_t mode)
 	u_int32_t	orig_mode;
 
 	VERIFY(dmc->mode != mode);
+	EIODEBUG("eio_mode_switch: mode switch from %u to %u\n",
+		 dmc->mode, mode);
 
 	if (mode == CACHE_MODE_WB) {
 		orig_mode = dmc->mode;
@@ -1472,12 +1552,13 @@ eio_mode_switch(struct cache_c *dmc, u_int32_t mode)
 			dmc->mode = orig_mode;
 			goto out;
 		}
-		EIODEBUG("eio_mode_switch: Switched from %d mode to WB\n", orig_mode);
 	} else if (dmc->mode == CACHE_MODE_WB) {
-		eio_stop_async_tasks(dmc);
 		eio_free_wb_resources(dmc);
 		dmc->mode = mode;
-		EIODEBUG("eio_mode_switch: Switched from WB to %d mode\n", mode);
+	} else {	/* (RO -> WT) or (WT -> RO) */
+		VERIFY(((dmc->mode == CACHE_MODE_RO) && (mode == CACHE_MODE_WT)) ||
+		       ((dmc->mode == CACHE_MODE_WT) && (mode == CACHE_MODE_RO)));
+		dmc->mode = mode;
 	}
 
 out:
@@ -1499,10 +1580,14 @@ eio_policy_switch(struct cache_c *dmc, u_int32_t policy)
 
 	VERIFY(dmc->req_policy != policy);
 
+
 	eio_policy_free(dmc);
 
 	dmc->req_policy = policy;
-	eio_policy_init(dmc);
+	error = eio_policy_init(dmc);
+	if (error) {
+		goto out;
+	}
 
 	error = eio_repl_blk_init(dmc->policy_ops);
 	if (error) {
@@ -1517,12 +1602,12 @@ eio_policy_switch(struct cache_c *dmc, u_int32_t policy)
 	}
 
 	eio_policy_lru_pushblks(dmc->policy_ops);
+	return 0;
 
 out:
-	if (error) {
-		eio_policy_free(dmc);
-	}
-	EIODEBUG("eio_policy_switch: policy switch\n");
+	eio_policy_free(dmc);
+	dmc->req_policy = CACHE_REPL_RANDOM;
+	(void)eio_policy_init(dmc);
 	return error;
 }
 
@@ -1767,6 +1852,22 @@ eio_reboot_handling(void)
 {
 	struct cache_c		*dmc, *tempdmc = NULL;
 	int			i, error;
+	uint32_t		old_time_thresh;
+
+	if (eio_reboot_notified == EIO_REBOOT_HANDLING_DONE) {
+		return 0;
+	}
+
+	(void)wait_on_bit_lock((void *)&eio_control->synch_flags, EIO_HANDLE_REBOOT,
+		eio_wait_schedule, TASK_UNINTERRUPTIBLE);
+	if (eio_reboot_notified == EIO_REBOOT_HANDLING_DONE) {
+		clear_bit(EIO_HANDLE_REBOOT, (void *)&eio_control->synch_flags);
+		smp_mb__after_clear_bit();
+		wake_up_bit((void *)&eio_control->synch_flags, EIO_HANDLE_REBOOT);
+		return 0;
+	}
+	VERIFY(eio_reboot_notified == 0);
+	eio_reboot_notified = EIO_REBOOT_HANDLING_INPROG;
 
 	for (i = 0; i < EIO_HASHTBL_SIZE; i++) {
 		down_write(&eio_ttc_lock[i]);
@@ -1819,21 +1920,31 @@ eio_reboot_handling(void)
 				tempdmc = dmc;
 				continue;
 			}
-
+			old_time_thresh = dmc->sysctl_active.time_based_clean_interval;
 			eio_stop_async_tasks(dmc);
+			dmc->sysctl_active.time_based_clean_interval = old_time_thresh;
+
+			dmc->cache_rdonly = 1;
+			EIOINFO("Cache \"%s\" marked read only\n", dmc->cache_name);
+			up_write(&eio_ttc_lock[i]);
+
+			if (dmc->cold_boot && ATOMIC_READ(&dmc->nr_dirty) && !eio_force_warm_boot) {
+				EIOINFO("Cold boot set for cache %s: Draining dirty blocks: %ld",
+						dmc->cache_name, ATOMIC_READ(&dmc->nr_dirty));
+				eio_clean_for_reboot(dmc);
+			}
+
 			error = eio_md_store(dmc);
 			if (error) {
 				EIOERR("Cannot mark cache \"%s\" read only\n",
 					dmc->cache_name);
-				continue;
 			}
 
-			dmc->cache_rdonly = 1;
-			EIOINFO("Cache \"%s\" marked read only\n",
-				dmc->cache_name);
 			SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 			dmc->cache_flags &= ~CACHE_FLAGS_SHUTDOWN_INPROG;
 			SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+
+			down_write(&eio_ttc_lock[i]);
 		}
 		if (tempdmc) {
 			kfree(tempdmc);
@@ -1842,8 +1953,119 @@ eio_reboot_handling(void)
 		up_write(&eio_ttc_lock[i]);
 	}
 
-	VERIFY(eio_reboot_notified == 0);
-	eio_reboot_notified = 1;
+	eio_reboot_notified = EIO_REBOOT_HANDLING_DONE;
+	clear_bit(EIO_HANDLE_REBOOT, (void *)&eio_control->synch_flags);
+	smp_mb__after_clear_bit();
+	wake_up_bit((void *)&eio_control->synch_flags, EIO_HANDLE_REBOOT);
 	return 0;
+}
+
+static int
+eio_overlap_split_bio(struct request_queue *q, struct bio *bio)
+{
+	int			i, nbios, ret;
+	void			**bioptr;
+	sector_t		snum;
+	struct bio_container	*bc;
+	unsigned		bvec_idx;
+	unsigned		bvec_consumed;
+
+	nbios = bio->bi_size >> SECTOR_SHIFT;
+	snum = bio->bi_sector;
+
+	bioptr = kmalloc(nbios * (sizeof (void *)), GFP_KERNEL);
+	if (!bioptr) {
+		bio_endio(bio, -ENOMEM);
+		return 0;
+	}
+	bc = kmalloc(sizeof (struct bio_container), GFP_NOWAIT);
+	if (!bc) {
+		bio_endio(bio, -ENOMEM);
+		kfree(bioptr);
+		return 0;
+	}
+
+	atomic_set(&bc->bc_holdcount, nbios);
+	bc->bc_bio = bio;
+	bc->bc_error = 0;
+
+	bvec_idx = bio->bi_idx;
+	bvec_consumed = 0;
+	for (i = 0; i < nbios; i++) {
+		bioptr[i] = eio_split_new_bio(bio, bc, &bvec_idx, &bvec_consumed, snum);
+		if (!bioptr[i]) {
+			break;
+		}
+		snum++;
+	}
+
+	/* Error: cleanup */
+	if (i < nbios) {
+		for (i--; i >= 0; i--)
+			bio_put(bioptr[i]);
+		bio_endio(bio, -ENOMEM);
+		kfree(bc);
+		goto out;
+	}
+
+	for (i = 0; i < nbios; i++) {
+		ret = eio_make_request_fn(q, bioptr[i]);
+		if (ret)
+			bio_endio(bioptr[i], -EIO);
+	}
+
+out:
+	kfree(bioptr);
+	return 0;
+}
+
+static struct bio *
+eio_split_new_bio(struct bio *bio, struct bio_container *bc,
+		  unsigned *bvec_idx, unsigned *bvec_consumed, sector_t snum)
+{
+	struct bio	*cbio;
+	unsigned	iosize = 1 << SECTOR_SHIFT;
+
+	cbio = bio_alloc(GFP_NOIO, 1);
+	if (!cbio)
+		return NULL;
+
+	VERIFY(bio->bi_io_vec[*bvec_idx].bv_len >= iosize);
+
+	if (bio->bi_io_vec[*bvec_idx].bv_len <= *bvec_consumed) {
+		VERIFY(bio->bi_io_vec[*bvec_idx].bv_len == *bvec_consumed);
+		(*bvec_idx)++;
+		VERIFY(bio->bi_vcnt > *bvec_idx);
+		*bvec_consumed = 0;
+	}
+
+	cbio->bi_io_vec[0].bv_page = bio->bi_io_vec[*bvec_idx].bv_page;
+	cbio->bi_io_vec[0].bv_offset = bio->bi_io_vec[*bvec_idx].bv_offset + *bvec_consumed;
+	cbio->bi_io_vec[0].bv_len = iosize;
+	*bvec_consumed += iosize;
+
+	cbio->bi_sector = snum;
+	cbio->bi_size = iosize;
+	cbio->bi_bdev = bio->bi_bdev;
+	cbio->bi_rw = bio->bi_rw;
+	cbio->bi_vcnt = 1;
+	cbio->bi_idx = 0;
+	cbio->bi_end_io = eio_split_endio;
+	cbio->bi_private = bc;
+	return cbio;
+}
+
+static void
+eio_split_endio(struct bio *bio, int error)
+{
+	struct bio_container	*bc = bio->bi_private;
+	if (error)
+		bc->bc_error = error;
+	bio_put(bio);
+	if (atomic_dec_and_test(&bc->bc_holdcount)) {
+		bio_endio(bc->bc_bio, bc->bc_error);
+		kfree(bc);
+	}
+	return;
 }
 

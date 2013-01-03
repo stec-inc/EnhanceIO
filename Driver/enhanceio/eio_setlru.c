@@ -72,9 +72,11 @@ lru_add(lru_list_t *llist, index_t index, u_int64_t key)
 	if (llist->ll_tail != LRU_NULL) {
 		llist->ll_elem[llist->ll_tail].le_next = index;
 	} else {
+		VERIFY(llist->ll_head == LRU_NULL);
 		llist->ll_head = index; 
 	}
 	llist->ll_tail = index;
+	llist->ll_size++;
 
 	return 0;
 }
@@ -85,6 +87,26 @@ lru_rem(lru_list_t *llist, index_t index)
 {
 	if (!llist || (index >= llist->ll_max) || (index == LRU_NULL)) {
 		return -EINVAL;
+	}
+
+	if (llist->ll_head == LRU_NULL && llist->ll_tail == LRU_NULL) {
+
+		/*
+		 * No element in the list.
+		 */
+
+		return -EINVAL;
+	}
+
+	if (llist->ll_elem[index].le_prev == LRU_NULL &&
+	    llist->ll_elem[index].le_next == LRU_NULL &&
+	    llist->ll_head != index && llist->ll_tail != index) {
+
+		/*
+		 * Element not in list.
+		 */
+
+		return 0;
 	}
 
 	if (llist->ll_elem[index].le_prev != LRU_NULL) {
@@ -102,6 +124,11 @@ lru_rem(lru_list_t *llist, index_t index)
 	if (llist->ll_tail == index) {
 		llist->ll_tail = llist->ll_elem[index].le_prev;
 	}
+
+	llist->ll_elem[index].le_prev = LRU_NULL;
+	llist->ll_elem[index].le_next = LRU_NULL;
+	VERIFY(llist->ll_size != 0);
+	llist->ll_size--;
 
 	return 0;
 }

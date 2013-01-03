@@ -101,6 +101,13 @@ typedef enum eio_cache_state {
 #define bio_barrier(bio)	((bio)->bi_rw & (1 << BIO_RW_BARRIER))
 
 /*
+ * Reboot status flags.
+ */
+
+#define EIO_REBOOT_HANDLING_INPROG	0x01
+#define EIO_REBOOT_HANDLING_DONE	0x02
+
+/*
  * kernel function prototypes.
  */
 
@@ -116,7 +123,7 @@ extern int	eio_ttc_deactivate(struct cache_c *, int);
 extern void	eio_ttc_init(void);
 
 extern int	eio_cache_create(cache_rec_short_t *);
-extern int	eio_cache_delete(char *);
+extern int	eio_cache_delete(char *, int);
 extern uint64_t	eio_get_cache_count(void);
 extern int	eio_get_cache_list(unsigned long *);
 
@@ -131,8 +138,9 @@ extern void	eio_free_wb_resources(struct cache_c *);
 extern int	eio_cache_edit(char *, u_int32_t, u_int32_t);
 
 extern void	eio_stop_async_tasks(struct cache_c *dmc);
+extern int	eio_start_clean_thread(struct cache_c *dmc);
 
-extern void	eio_policy_init(struct cache_c *);
+extern int	eio_policy_init(struct cache_c *);
 extern void	eio_policy_free(struct cache_c *);
 extern int 	eio_alloc_wb_pages(struct page **pages, int max);
 extern void 	eio_free_wb_pages(struct page **pages, int allocated);

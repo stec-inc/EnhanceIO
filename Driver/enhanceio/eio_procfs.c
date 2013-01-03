@@ -223,28 +223,33 @@ eio_clean_sysctl(ctl_table *table, int write, void __user *buffer, size_t *lengt
 
 		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
 
-		dmc->sysctl_active.do_clean = dmc->sysctl_pending.do_clean;	
-	
-		if (dmc->sysctl_active.do_clean) {
-			dmc->sysctl_active.stop_clean = 0;
-			atomic_set(&dmc->clean_index, 0);
-			dmc->sysctl_active.do_clean |= EIO_CLEAN_START;
+		if (dmc->cache_flags & CACHE_FLAGS_MOD_INPROG) {
 			SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
-
-			/* 
-			 * Wake up the clean thread.
-			 * Sync thread will do the clean and once complete
-			 * will reset the clean_start flag.
-			 * The clean_keep flag will remain set(unless reset
-			 * by user) and will prevent new I/Os from making
-			 * the blocks dirty.
-			 */
-
-			spin_lock_irqsave(&dmc->clean_sl, flags);
-			EIO_SET_EVENT_AND_UNLOCK(&dmc->clean_event,
-						 &dmc->clean_sl, flags);
+			EIOERR("do_clean called while cache modification in progress");
+			return -EBUSY;
 		} else {
-			SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+			dmc->sysctl_active.do_clean = dmc->sysctl_pending.do_clean;	
+
+			if (dmc->sysctl_active.do_clean) {
+				atomic_set(&dmc->clean_index, 0);
+				dmc->sysctl_active.do_clean |= EIO_CLEAN_START;
+				SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+
+				/* 
+				 * Wake up the clean thread.
+				 * Sync thread will do the clean and once complete
+				 * will reset the clean_start flag.
+				 * The clean_keep flag will remain set(unless reset
+				 * by user) and will prevent new I/Os from making
+				 * the blocks dirty.
+				 */
+
+				SPIN_LOCK_IRQSAVE(&dmc->clean_sl, flags);
+				EIO_SET_EVENT_AND_UNLOCK(&dmc->clean_event,
+						&dmc->clean_sl, flags);
+			} else {
+				SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+			}
 		}
 	}
 
@@ -626,7 +631,7 @@ eio_autoclean_threshold_sysctl(ctl_table *table, int write, void __user *buffer,
 		if (error) {
 			/* restore back the old value and return error */
 			SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
-			dmc->sysctl_active.dirty_high_threshold = old_value;	
+			dmc->sysctl_active.autoclean_threshold = old_value;	
 			SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
 
 			return error;

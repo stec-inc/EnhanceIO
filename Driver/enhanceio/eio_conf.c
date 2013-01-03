@@ -42,9 +42,6 @@
 #define KMEM_DMC_BIO_PAIR	"eio-dmc-bio-pair"
 /* #define KMEM_CACHE_PENDING_JOB	"eio-pending-jobs" */
 
-/* Bit offsets for wait_on_bit_lock() */
-#define EIO_UPDATE_LIST		0
-
 struct cache_c *cache_list_head = NULL;
 struct work_struct _kcached_wq;
 
@@ -63,11 +60,9 @@ LIST_HEAD(ssd_rm_list);
 int ssd_rm_list_not_empty;
 spinlock_t ssd_rm_list_lock;
 
-struct eio_control_s {
-	long unsigned int synch_flags;
-};
 struct eio_control_s *eio_control;
 
+int eio_force_warm_boot;
 static int eio_notify_reboot(struct notifier_block *nb, unsigned long action, void *x);
 void eio_stop_async_tasks(struct cache_c *dmc);
 static int eio_notify_ssd_rm(struct notifier_block *nb, unsigned long action, void *x);
@@ -94,7 +89,7 @@ static struct notifier_block eio_ssd_rm_notifier = {
 };
 
 
-static int
+int
 eio_wait_schedule(void *unused)
 {
 	EIO_SIM_PR1();
@@ -149,9 +144,12 @@ eio_thread_exit(long exit_code)
 }
 
 
-inline void
+
+inline int 
 eio_policy_init(struct cache_c *dmc)
 {
+	int	error = 0;
+
 	EIO_SIM_PR1();
 
 	if (dmc->req_policy == 0)
@@ -165,6 +163,7 @@ eio_policy_init(struct cache_c *dmc)
 		if (dmc->policy_ops == NULL) {
 			dmc->req_policy = CACHE_REPL_RANDOM;
 			EIOERR("policy_init: Cannot find requested policy, defaulting to random");
+			error = -ENOMEM;
 		} else {
 			/* Back pointer to reference dmc from policy_ops */
 			dmc->policy_ops->sp_dmc = dmc;
@@ -172,6 +171,7 @@ eio_policy_init(struct cache_c *dmc)
 				dmc->policy_ops->sp_name);
 		}
 	}
+	return error;
 }
 
 static int
@@ -262,7 +262,6 @@ eio_kcached_init(struct cache_c *dmc)
 
 	/* init_waitqueue_head(&dmc->destroyq); */
 	atomic_set(&dmc->nr_jobs, 0);
-	atomic_set(&dmc->fast_remove_in_prog, 0);
 	return 0;
 }
 
@@ -319,9 +318,10 @@ eio_sb_store(struct cache_c *dmc)
 	sb->sbf.cache_data_start_sect = dmc->md_sectors;
 	STRNCPY(sb->sbf.disk_devname, dmc->disk_devname, DEV_PATHLEN);
 	STRNCPY(sb->sbf.cache_devname, dmc->cache_devname, DEV_PATHLEN);
+	STRNCPY(sb->sbf.ssd_uuid, dmc->ssd_uuid, DEV_PATHLEN - 1);
 	sb->sbf.cache_devsize = to_sector(eio_get_device_size(dmc->cache_dev));
 	sb->sbf.disk_devsize = to_sector(eio_get_device_size(dmc->disk_dev));
-	sb->sbf.cache_version = EIO_SB_VERSION;
+	sb->sbf.cache_version = dmc->sb_version;
 	STRNCPY(sb->sbf.cache_name, dmc->cache_name, DEV_PATHLEN);
 	sb->sbf.cache_name[DEV_PATHLEN-1] = '\0';
 	sb->sbf.mode = dmc->mode;
@@ -329,6 +329,16 @@ eio_sb_store(struct cache_c *dmc)
 	sb->sbf.repl_policy = dmc->req_policy;
 	sb->sbf.cache_flags = dmc->cache_flags & ~CACHE_FLAGS_INCORE_ONLY;
 	SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+	if (dmc->sb_version) {
+		sb->sbf.magic = EIO_MAGIC;
+	} else {
+		sb->sbf.magic = EIO_BAD_MAGIC;
+	}
+
+	sb->sbf.cold_boot = dmc->cold_boot;
+	if (sb->sbf.cold_boot && eio_force_warm_boot) {
+		sb->sbf.cold_boot |= BOOT_FLAG_FORCE_WARM;
+	}
 
 	sb->sbf.dirty_high_threshold = dmc->sysctl_active.dirty_high_threshold;
 	sb->sbf.dirty_low_threshold = dmc->sysctl_active.dirty_low_threshold;
@@ -389,8 +399,18 @@ eio_md_store(struct cache_c *dmc)
 	}
 
 	if (CACHE_FAST_REMOVE_IS_SET(dmc)) {
-		if (CACHE_VERBOSE_IS_SET(dmc))
+		if (CACHE_VERBOSE_IS_SET(dmc)) {
 			EIOINFO("Skipping writing out metadata to cache");
+		}
+		if (!dmc->sb_version) {
+
+			/*
+			 * Incase of delete, flush the superblock
+			 * irrespective of fast_remove being set.
+			 */
+
+			goto sb_store;
+		}
 		return 0;
 	}
 
@@ -545,11 +565,15 @@ eio_md_store(struct cache_c *dmc)
 		dmc->sb_state = CACHE_MD_STATE_UNSTABLE;
 	}
 
+sb_store:
 	error = eio_sb_store(dmc);
 	if (error) {
 		/* Harish: TBD. should we return error */
 		write_errors++;
 		EIOERR("md_store: superblock store failed(error %d)", error);
+	}
+	if (!dmc->sb_version && CACHE_FAST_REMOVE_IS_SET(dmc)) {
+		return 0;
 	}
 
 	if (write_errors == 0) {
@@ -863,6 +887,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 	}	
 
 	dmc->sb_state = CACHE_MD_STATE_DIRTY;
+	dmc->sb_version = EIO_SB_VERSION;
 	error = eio_sb_store(dmc);	
 	if (error) {
 		if (!CACHE_SSD_ADD_INPROG_IS_SET(dmc))
@@ -914,6 +939,7 @@ eio_md_load(struct cache_c *dmc)
 	int num_valid = 0;
 	int error;
 	sector_t sectors_read = 0, sectors_expected = 0;	/* Debug */
+	int force_warm_boot = 0;
 
 	struct bio_vec *header_page, *pages;
 	int nr_pages, page_count, page_index;
@@ -954,8 +980,16 @@ eio_md_load(struct cache_c *dmc)
 		       " (current: %u, ondisk: %u)", EIO_SB_VERSION,
 		       header->sbf.cache_version);
 
+		if (header->sbf.cache_version == 0) {
+			EIOERR("md_load: Can't enable cache %s. Either "\
+				"superblock version is invalid or cache has"\
+				" been deleted", header->sbf.cache_name);
+			ret = 1;
+			goto free_header;
+		}
+
 		if (header->sbf.cache_version > EIO_SB_VERSION) {
-			EIOERR("md_load: Can't enable cache %s with older "\
+			EIOERR("md_load: Can't enable cache %s with newer "\
 			      " superblock version.", header->sbf.cache_name);
 			ret = 1;
 			goto free_header;
@@ -978,6 +1012,19 @@ eio_md_load(struct cache_c *dmc)
 		}
 	}
 
+	/* check ondisk magic number */
+
+	if (header->sbf.cache_version >= EIO_SB_MAGIC_VERSION &&
+	    header->sbf.magic != EIO_MAGIC) {
+		EIOERR("md_load: Magic number mismatch in superblock detected."\
+			" (current: %u, ondisk: %u)", EIO_MAGIC,
+			header->sbf.magic);
+		ret = 1;
+		goto free_header;
+	}
+
+	dmc->sb_version = EIO_SB_VERSION;
+
 	/*
 	 * Harish: TBD
 	 * For writeback, only when the dirty blocks are non-zero
@@ -992,24 +1039,45 @@ eio_md_load(struct cache_c *dmc)
 		ret = -EINVAL;
 		goto free_header;
 	}
-	if (header->sbf.cache_sb_state == CACHE_MD_STATE_DIRTY) {
-		EIOINFO("Unclean shutdown detected");
-		EIOINFO("Only dirty blocks exist in cache");
-		clean_shutdown = 0;
-	} else if (header->sbf.cache_sb_state == CACHE_MD_STATE_CLEAN) {
-		EIOINFO("Slow (clean) shutdown detected");
-		EIOINFO("Only clean blocks exist in cache");
-		clean_shutdown = 1;
-	} else if (header->sbf.cache_sb_state == CACHE_MD_STATE_FASTCLEAN) {
-		EIOINFO("Fast (clean) shutdown detected");
-		EIOINFO("Both clean and dirty blocks exist in cache");
-		clean_shutdown = 1;
+
+	if (header->sbf.cold_boot & BOOT_FLAG_FORCE_WARM) {
+		force_warm_boot = 1;
+		header->sbf.cold_boot &= ~BOOT_FLAG_FORCE_WARM;
+	}
+
+	/* 
+	 * Determine if we can start as cold or hot cache
+	 * - if cold_boot is set(unless force_warm_boot), start as cold cache
+	 * - else if it is unclean shutdown, start as cold cache
+	 * cold cache will still treat the dirty blocks as hot
+	 */
+	if (dmc->cold_boot != header->sbf.cold_boot) {
+		DMINFO("superblock(%u) and config(%u) cold boot values do not match. Relying on config",
+		       header->sbf.cold_boot, dmc->cold_boot);
+	}
+	if (dmc->cold_boot && !force_warm_boot) {
+		DMINFO("Cold boot is set, starting as if unclean shutdown(only dirty blocks will be hot)");
+ 		clean_shutdown = 0;
 	} else {
-		/* Harish: Won't reach here, but TBD may change the previous if condition */
-		EIOINFO("cache state is %d. Treating as unclean shutdown",
-				header->sbf.cache_sb_state);
-		EIOINFO("Only dirty blocks exist in cache");
-		clean_shutdown = 0;
+		if (header->sbf.cache_sb_state == CACHE_MD_STATE_DIRTY) {
+			EIOINFO("Unclean shutdown detected");
+			EIOINFO("Only dirty blocks exist in cache");
+			clean_shutdown = 0;
+		} else if (header->sbf.cache_sb_state == CACHE_MD_STATE_CLEAN) {
+			EIOINFO("Slow (clean) shutdown detected");
+			EIOINFO("Only clean blocks exist in cache");
+			clean_shutdown = 1;
+		} else if (header->sbf.cache_sb_state == CACHE_MD_STATE_FASTCLEAN) {
+			EIOINFO("Fast (clean) shutdown detected");
+			EIOINFO("Both clean and dirty blocks exist in cache");
+			clean_shutdown = 1;
+		} else {
+			/* Harish: Won't reach here, but TBD may change the previous if condition */
+			EIOINFO("cache state is %d. Treating as unclean shutdown",
+					header->sbf.cache_sb_state);
+			EIOINFO("Only dirty blocks exist in cache");
+			clean_shutdown = 0;
+		}
 	}
 
 	if (!dmc->mode)
@@ -1020,7 +1088,7 @@ eio_md_load(struct cache_c *dmc)
 	if (!dmc->cache_flags)
 		dmc->cache_flags = header->sbf.cache_flags;
 
-	eio_policy_init(dmc);
+	(void)eio_policy_init(dmc);
 
 	dmc->block_size = header->sbf.block_size;
 	dmc->block_shift = ffs(dmc->block_size) - 1;
@@ -1237,11 +1305,9 @@ eio_policy_free(struct cache_c *dmc)
 		vfree(dmc->sp_cache_blk);
 	if (dmc->sp_cache_set != NULL)
 		vfree(dmc->sp_cache_set);
-	if (dmc->sp_cache != NULL)
-		vfree(dmc->sp_cache);
 
 	dmc->policy_ops = NULL;
-	dmc->sp_cache_blk = dmc->sp_cache_set = dmc->sp_cache = NULL;
+	dmc->sp_cache_blk = dmc->sp_cache_set = NULL;
 	return;
 }
 
@@ -1251,15 +1317,7 @@ eio_clean_thread_init(struct cache_c *dmc)
 	INIT_LIST_HEAD(&dmc->cleanq);
 	SPIN_LOCK_INIT(&dmc->clean_sl);
 	EIO_INIT_EVENT(&dmc->clean_event);
-	
-	dmc->clean_thread = eio_create_thread(eio_clean_thread_proc,
-					(void *)dmc, "eio_clean_thread");	
-
-	if (!dmc->clean_thread) {
-		return -EFAULT;
-	}
-
-	return 0;
+	return eio_start_clean_thread(dmc);
 }
 
 int
@@ -1418,8 +1476,10 @@ eio_cache_create(cache_rec_short_t *cache)
 		goto bad3;
 	}
 
-	dmc->cache_dev_start_sect = eio_get_device_start_sect(dmc->cache_dev);
 
+	STRNCPY(dmc->ssd_uuid, cache->cr_ssd_uuid, DEV_PATHLEN - 1);
+
+	dmc->cache_dev_start_sect = eio_get_device_start_sect(dmc->cache_dev);
 	error = eio_do_preliminary_checks(dmc);
 	if (error) {
 		if (error == -EINVAL)
@@ -1434,6 +1494,16 @@ eio_cache_create(cache_rec_short_t *cache)
 	eio_init_ssddev_props(dmc);
 	eio_init_srcdev_props(dmc);
 
+	/*
+	 * Initialize the io callback queue.
+	 */
+
+	dmc->callback_q = create_singlethread_workqueue("eio_callback");
+	if (!dmc->callback_q) {
+		error = -ENOMEM;
+		strerr = "Failed to initialize callback workqueue";
+		goto bad4;
+	}
 	error = eio_kcached_init(dmc);
 	if (error) {
 		strerr = "Failed to initialize kcached";
@@ -1454,7 +1524,6 @@ eio_cache_create(cache_rec_short_t *cache)
 	/* We do a kzalloc for dmc, but being extra careful here */
 	dmc->sp_cache_blk = NULL;
 	dmc->sp_cache_set = NULL;
-	dmc->sp_cache = NULL;
 	dmc->policy_ops = NULL;
 	if (cache->cr_policy) {
 		dmc->req_policy = cache->cr_policy;
@@ -1487,6 +1556,13 @@ eio_cache_create(cache_rec_short_t *cache)
 			error = -EINVAL;
 			goto bad5;
 		}
+	}
+
+	dmc->cold_boot = cache->cr_cold_boot;
+	if ((dmc->cold_boot != 0) && (dmc->cold_boot != BOOT_FLAG_COLD_ENABLE)) {
+		strerr = "Invalid cold boot option";
+		error = -EINVAL;
+		goto bad5;
 	}
 
 	if (cache->cr_persistence) {
@@ -1535,7 +1611,7 @@ eio_cache_create(cache_rec_short_t *cache)
 
 	/* eio_policy_init() is already called from within eio_md_load() */
 	if (persistence != CACHE_RELOAD)
-		eio_policy_init(dmc);
+		(void)eio_policy_init(dmc);
 
 	if (cache->cr_flags) {
 		int flags;
@@ -1706,8 +1782,7 @@ init:
 	dmc->sysctl_active.fast_remove = 0;
 	dmc->sysctl_active.zerostats = 0;
 	dmc->sysctl_active.do_clean = 0;
-	dmc->sysctl_active.stop_clean = 0;
-	
+
 	atomic_set(&dmc->clean_index, 0);
 
 	ATOMIC_SET(&dmc->nr_ios, 0);
@@ -1722,13 +1797,13 @@ init:
 
 	dmc->sysctl_active.mem_limit_pct = 75;
 
-	(void)wait_on_bit_lock(&eio_control->synch_flags, EIO_UPDATE_LIST,
+	(void)wait_on_bit_lock((void *)&eio_control->synch_flags, EIO_UPDATE_LIST,
 		eio_wait_schedule, TASK_UNINTERRUPTIBLE);
 	dmc->next_cache = cache_list_head;
 	cache_list_head = dmc;
-	clear_bit(EIO_UPDATE_LIST, &eio_control->synch_flags);
+	clear_bit(EIO_UPDATE_LIST,(void *)&eio_control->synch_flags);
 	smp_mb__after_clear_bit();
-	wake_up_bit(&eio_control->synch_flags, EIO_UPDATE_LIST);
+	wake_up_bit((void *)&eio_control->synch_flags, EIO_UPDATE_LIST);
 
 	prev_set = -1; 
 	for (i = 0 ; i < dmc->size ; i++) {
@@ -1781,7 +1856,7 @@ bad6:
 	vfree((void *)dmc->cache_sets);
 	vfree((void *)EIO_CACHE(dmc));
 
-	(void)wait_on_bit_lock(&eio_control->synch_flags, EIO_UPDATE_LIST,
+	(void)wait_on_bit_lock((void *)&eio_control->synch_flags, EIO_UPDATE_LIST,
 		eio_wait_schedule, TASK_UNINTERRUPTIBLE);
 	nodepp = &cache_list_head;
 	while (*nodepp != NULL) {
@@ -1791,9 +1866,9 @@ bad6:
 		}
 		nodepp = &((*nodepp)->next_cache);
 	}
-	clear_bit(EIO_UPDATE_LIST, &eio_control->synch_flags);
+	clear_bit(EIO_UPDATE_LIST, (void *)&eio_control->synch_flags);
 	smp_mb__after_clear_bit();
-	wake_up_bit(&eio_control->synch_flags, EIO_UPDATE_LIST);
+	wake_up_bit((void *)&eio_control->synch_flags, EIO_UPDATE_LIST);
 bad5:
 	eio_kcached_client_destroy(dmc);
 bad4:
@@ -1818,13 +1893,15 @@ bad:
  */
 
 int
-eio_cache_delete(char *cache_name)
+eio_cache_delete(char *cache_name, int do_delete)
 {
 	struct cache_c		*dmc;
 	struct cache_c		**nodepp;
-	int			ret;
+	int			ret, error;
+	int			restart_async_task;
 
 	ret = 0;
+	restart_async_task = 0;
 	EIO_SIM_PR1();
 
 	dmc = eio_cache_lookup(cache_name);
@@ -1849,11 +1926,27 @@ eio_cache_delete(char *cache_name)
 	dmc->cache_flags |= CACHE_FLAGS_MOD_INPROG;
 	SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 
-	/* Earlier attempt to delete failed */
+	/*
+	 * Earlier attempt to delete failed.
+	 * Allow force deletes only for FAILED caches.
+	 */
 	if (unlikely(CACHE_STALE_IS_SET(dmc))) {
-		EIOERR("cache_delete: Cache \"%s\" is in STALE state. Force deleting!!!",
-			dmc->cache_name);
-		goto force_delete;
+		if (likely(CACHE_FAILED_IS_SET(dmc))) {
+			EIOERR("cache_delete: Cache \"%s\" is in STALE state. Force deleting!!!",
+			        dmc->cache_name);
+			goto force_delete;
+		} else {
+			if (ATOMIC_READ(&dmc->nr_dirty) != 0) {
+				SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+				dmc->cache_flags &= ~CACHE_FLAGS_MOD_INPROG;
+				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+				EIOERR("cache_delete: Stale Cache detected with dirty blocks=%ld.\n",
+						ATOMIC_READ(&dmc->nr_dirty));
+				EIOERR("cache_delete: Cache \"%s\" wont be deleted. Deleting will result in data corruption.\n",
+						dmc->cache_name);
+				return -EINVAL;
+			}
+		}
 	}
 
 	eio_stop_async_tasks(dmc);
@@ -1870,14 +1963,19 @@ eio_cache_delete(char *cache_name)
 		/* If deactivate fails; only option is to delete cache. */
 		EIOERR("cache_delete: Failed to deactivate the cache \"%s\".",
 				dmc->cache_name);
-		EIOERR("cache_delete: Use -f option to delete the cache \"%s\".",
+		if (CACHE_FAILED_IS_SET(dmc))
+			EIOERR("cache_delete: Use -f option to delete the cache \"%s\".",
 				dmc->cache_name);
 		ret = -EPERM;
 		dmc->cache_flags |= CACHE_FLAGS_STALE;
+
+		/* Restart async tasks. */
+		restart_async_task = 1;
 		goto out;
 	}
 
-	VERIFY(dmc->sysctl_active.fast_remove || (ATOMIC_READ(&dmc->nr_dirty) == 0));
+	if (!CACHE_FAILED_IS_SET(dmc))
+		VERIFY(dmc->sysctl_active.fast_remove || (ATOMIC_READ(&dmc->nr_dirty) == 0));
 
 	/*
 	 * If ttc_deactivate succeeded... proceed with cache delete.
@@ -1919,6 +2017,12 @@ force_delete:
 	wake_up_bit(&eio_control->synch_flags, EIO_UPDATE_LIST);
 
 out:
+	if (restart_async_task) {
+		VERIFY(dmc->clean_thread == NULL);
+		error = eio_start_clean_thread(dmc);
+		if (error)
+			EIOERR("cache_delete: Failed to restart async tasks. error=%d\n", error);
+	}
 	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 	dmc->cache_flags &= ~CACHE_FLAGS_MOD_INPROG;
 	if (!ret) {
@@ -2002,7 +2106,7 @@ eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 	dmc->persistence = CACHE_FORCECREATE;
 
 	eio_policy_free(dmc);
-	eio_policy_init(dmc);
+	(void)eio_policy_init(dmc);
 
 	r = eio_md_create(dmc, /* force */1,/* cold */ (dmc->mode != CACHE_MODE_WB));
 	if (r) {
@@ -2068,6 +2172,24 @@ eio_stop_async_tasks(struct cache_c *dmc)
 	}
 }
 
+
+
+int
+eio_start_clean_thread(struct cache_c *dmc)
+{
+	VERIFY(dmc->clean_thread == NULL);
+	VERIFY(dmc->mode == CACHE_MODE_WB);
+	VERIFY(dmc->clean_thread_running == 0);
+	VERIFY(!(dmc->sysctl_active.do_clean & EIO_CLEAN_START));
+
+	dmc->clean_thread = eio_create_thread(eio_clean_thread_proc,
+					(void *)dmc, "eio_clean_thread");
+	if (!dmc->clean_thread) {
+		return -EFAULT;
+	}
+	return 0;
+}
+
 int
 eio_allocate_wb_resources(struct cache_c *dmc)
 {
@@ -2122,6 +2244,14 @@ eio_allocate_wb_resources(struct cache_c *dmc)
 	 * 3. Initialize clean thread
 	 */
 
+	/*
+	 * Reset dmc->is_clean_aged_sets_sched.
+	 * Time based clean will be enabled in eio_touch_set_lru()
+	 * only when dmc->is_clean_aged_sets_sched  is zero and
+	 * dmc->sysctl_active.time_based_clean_interval > 0.
+	 */
+
+	dmc->is_clean_aged_sets_sched = 0;
 	INIT_DELAYED_WORK(&dmc->clean_aged_sets_work, eio_clean_aged_sets);
 	dmc->dirty_set_lru = NULL;
 	ret = lru_init(&dmc->dirty_set_lru, (dmc->size >> dmc->consecutive_shift));
@@ -2202,23 +2332,43 @@ eio_notify_reboot(struct notifier_block *this,
 
 	EIO_SIM_PR1();
 
-	if (eio_reboot_notified) {
+	if (eio_reboot_notified  == EIO_REBOOT_HANDLING_DONE) {
 		return NOTIFY_DONE;
 	}
 
-	(void)wait_on_bit_lock(&eio_control->synch_flags, EIO_UPDATE_LIST,
+	(void)wait_on_bit_lock((void *)&eio_control->synch_flags, EIO_HANDLE_REBOOT,
+		eio_wait_schedule, TASK_UNINTERRUPTIBLE);
+	if (eio_reboot_notified == EIO_REBOOT_HANDLING_DONE) {
+		clear_bit(EIO_HANDLE_REBOOT, (void *)&eio_control->synch_flags);
+		smp_mb__after_clear_bit();
+		wake_up_bit((void *)&eio_control->synch_flags, EIO_HANDLE_REBOOT);
+		return NOTIFY_DONE;
+	}
+	VERIFY(eio_reboot_notified == 0);
+	eio_reboot_notified = EIO_REBOOT_HANDLING_INPROG;
+
+	(void)wait_on_bit_lock((void *)&eio_control->synch_flags, EIO_UPDATE_LIST,
 		eio_wait_schedule, TASK_UNINTERRUPTIBLE);
 	for (dmc = cache_list_head; dmc != NULL; dmc = dmc->next_cache) {
 		if (unlikely(CACHE_FAILED_IS_SET(dmc)) || unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
 			EIOERR("notify_reboot: Cannot sync in failed / degraded mode");
 			continue;
 		}
+		if (dmc->cold_boot && ATOMIC_READ(&dmc->nr_dirty) && !eio_force_warm_boot) {
+			EIOINFO("Cold boot set for cache %s: Draining dirty blocks: %ld",
+					dmc->cache_name, ATOMIC_READ(&dmc->nr_dirty));
+			eio_clean_for_reboot(dmc);
+		}
 		eio_md_store(dmc);
 	}
-	clear_bit(EIO_UPDATE_LIST, &eio_control->synch_flags);
+	clear_bit(EIO_UPDATE_LIST, (void *)&eio_control->synch_flags);
 	smp_mb__after_clear_bit();
-	wake_up_bit(&eio_control->synch_flags, EIO_UPDATE_LIST);
+	wake_up_bit((void *)&eio_control->synch_flags, EIO_UPDATE_LIST);
 
+	eio_reboot_notified = EIO_REBOOT_HANDLING_DONE;
+	clear_bit(EIO_HANDLE_REBOOT, (void *)&eio_control->synch_flags);
+	smp_mb__after_clear_bit();
+	wake_up_bit((void *)&eio_control->synch_flags, EIO_HANDLE_REBOOT);
 	return NOTIFY_DONE;
 }
 

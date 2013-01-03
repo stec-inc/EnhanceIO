@@ -37,6 +37,7 @@ eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 	cache_rec_short_t	*cache;
 	uint64_t		ncaches;
 	dev_notifier_t 		note;
+	int			do_delete = 0;
 
 	switch(cmd) {
 		case EIO_IOC_CREATE:
@@ -56,6 +57,9 @@ eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 			break;
 
 		case EIO_IOC_DELETE:
+
+			do_delete = 1;
+
 		case EIO_IOC_DISABLE:
 
 			cache = vmalloc(sizeof (cache_rec_short_t));
@@ -68,7 +72,7 @@ eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 				vfree(cache);
 				return -EFAULT;
 			}
-			error = eio_cache_delete(cache->cr_name);
+			error = eio_cache_delete(cache->cr_name, do_delete);
 			vfree(cache);
 			break;
 
@@ -100,6 +104,10 @@ eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 
 		case EIO_IOC_CACHE_LIST:
 			error = eio_get_cache_list((unsigned long *)arg);
+			break;
+
+		case EIO_IOC_SET_WARM_BOOT:
+			eio_set_warm_boot();
 			break;
 
 		case EIO_IOC_SSD_ADD:

@@ -76,7 +76,9 @@ static int eio_alloc_mdreqs(struct cache_c *, struct bio_container *);
 static void eio_check_dirty_set_thresholds(struct cache_c *dmc, index_t set);
 static void eio_check_dirty_cache_thresholds(struct cache_c *dmc);
 static void eio_post_mdupdate(struct work_struct *work);
+static void eio_post_io_callback(struct work_struct *work);
 
+extern int eio_force_warm_boot;
 
 extern struct work_struct _kcached_wq;
 
@@ -358,18 +360,32 @@ eio_uncached_read_done(struct kcached_job *job)
 void
 eio_io_callback(int error, void *context)
 {
-	/* struct kcached_job *job = (struct kcached_job *) bio->bi_private;
-	unsigned long error = (unsigned long)err; */
 	struct kcached_job *job = (struct kcached_job *)context;
-
 	struct cache_c *dmc = job->dmc;
+
+	job->error = error;
+	INIT_WORK(&job->work, eio_post_io_callback);
+	queue_work(dmc->callback_q, &job->work);
+	return;
+}
+
+static void
+eio_post_io_callback(struct work_struct *work)
+{
+	struct kcached_job *job;
+	struct cache_c *dmc;
 	struct eio_bio *ebio;
 	unsigned long flags = 0;
-	index_t index = job->index;
+	index_t index;
 	unsigned eb_cacheset;
 	u_int8_t cstate;
 	int callendio = 0;
+	int error;
 
+	job = container_of(work, struct kcached_job, work);
+	dmc = job->dmc;
+	index = job->index;
+	error = job->error;
 	EIO_SIM_PR1("job->action=%s", action_string[job->action]);
 	EIO_SIM_IN_INTERRUPT(1);
 
@@ -381,7 +397,6 @@ eio_io_callback(int error, void *context)
 		EIOERR("io_callback: io error %d block %lu action %d",
 		      error, job->job_io_regions.disk.sector, job->action);
 
-	job->error = error;
 	switch (job->action) {
 	case WRITEDISK:
 		ATOMIC_INC(&dmc->eio_stats.writedisk);
@@ -654,6 +669,8 @@ eio_clean_thread_proc(void *context)
 {
 	struct cache_c *dmc = (struct cache_c *)context;
 	unsigned long flags = 0;
+	u_int64_t systime;
+	index_t index;
 
 	/* Sync makes sense only for writeback cache */
 	VERIFY(dmc->mode == CACHE_MODE_WB);
@@ -670,43 +687,6 @@ eio_clean_thread_proc(void *context)
 		struct cache_set *set;
 
 		eio_comply_dirty_thresholds(dmc, -1);
-
-		spin_lock_irqsave(&dmc->clean_sl, flags);
-
-		if (dmc->clean_excess_dirty && (ATOMIC_READ(&dmc->clean_pendings) == 0)) {
-			dmc->clean_excess_dirty = 0;
-		}
-		
-		while (!((!list_empty(&dmc->cleanq)) || dmc->sysctl_active.fast_remove ||
-				dmc->sysctl_active.do_clean)) {
-			EIO_WAIT_EVENT(&dmc->clean_event, &dmc->clean_sl, flags);
-		}
-
-		/*
-		 * Move cleanq elements to a private list for processing.
-		 */
-
-		list_add(&setlist, &dmc->cleanq);
-		list_del(&dmc->cleanq);	
-		INIT_LIST_HEAD(&dmc->cleanq);
-
-		spin_unlock_irqrestore(&dmc->clean_sl, flags);
-
-		while (!list_empty(&setlist)) {
-			set = list_entry((&setlist)->next, struct cache_set, list);
-			list_del(&set->list);
-			if (!(dmc->sysctl_active.fast_remove ||
-					dmc->sysctl_active.do_clean)) {
-				eio_clean_set(dmc, set - dmc->cache_sets,
-						set->flags & SETFLAG_CLEAN_WHOLE, 0);
-			}
-
-			ATOMIC_DEC(&dmc->clean_pendings);
-		}
-
-		if (dmc->sysctl_active.fast_remove) {
-			break;
-		}
 
 		if (dmc->sysctl_active.do_clean) {
 			/* pause the periodic clean */
@@ -726,6 +706,55 @@ eio_clean_thread_proc(void *context)
 			spin_unlock_irqrestore(&dmc->dirty_set_lru_lock, flags);
 		}
 
+		if (dmc->sysctl_active.fast_remove) {
+			break;
+		}
+
+		spin_lock_irqsave(&dmc->clean_sl, flags);
+
+		while (!((!list_empty(&dmc->cleanq)) || dmc->sysctl_active.fast_remove ||
+				dmc->sysctl_active.do_clean)) {
+			EIO_WAIT_EVENT(&dmc->clean_event, &dmc->clean_sl, flags);
+		}
+
+		/*
+		 * Move cleanq elements to a private list for processing.
+		 */
+
+		list_add(&setlist, &dmc->cleanq);
+		list_del(&dmc->cleanq);	
+		INIT_LIST_HEAD(&dmc->cleanq);
+
+		spin_unlock_irqrestore(&dmc->clean_sl, flags);
+
+		GET_SYSTIME(&systime);
+		while (!list_empty(&setlist)) {
+			set = list_entry((&setlist)->next, struct cache_set, list);
+			list_del(&set->list);
+			index = set - dmc->cache_sets;
+			if (!(dmc->sysctl_active.fast_remove)) {
+				eio_clean_set(dmc, index,
+						set->flags & SETFLAG_CLEAN_WHOLE, 0);
+			} else {
+
+				/*
+				 * Since we are not cleaning the set, we should
+				 * put the set back in the lru list so that
+				 * it is picked up at a later point.
+				 * We also need to clear the clean inprog flag
+				 * otherwise this set would never be cleaned.
+				 */
+
+				spin_lock_irqsave(&dmc->cache_sets[index].cs_lock, flags);
+				dmc->cache_sets[index].flags &=
+					~(SETFLAG_CLEAN_INPROG | SETFLAG_CLEAN_WHOLE);
+				spin_unlock_irqrestore(&dmc->cache_sets[index].cs_lock, flags);
+				spin_lock_irqsave(&dmc->dirty_set_lru_lock, flags);
+				lru_touch(dmc->dirty_set_lru, index, systime);
+				spin_unlock_irqrestore(&dmc->dirty_set_lru_lock, flags);
+			}
+			ATOMIC_DEC(&dmc->clean_pendings);
+		}
 	}
 
 	/* notifier for cache delete that the clean thread has stopped running */
@@ -1492,7 +1521,7 @@ eio_check_dirty_cache_thresholds(struct cache_c *dmc)
 
 		/* Clean needs to be triggered on the cache */
 		required_cleans = ATOMIC_READ(&dmc->nr_dirty) -
-			((dmc->sysctl_active.dirty_low_threshold * dmc->size)/100 + ATOMIC_READ(&(dmc)->clean_pendings)); 
+			((dmc->sysctl_active.dirty_low_threshold * dmc->size)/100); 
 		enqueued_cleans = 0;
 
 		spin_lock_irqsave(&dmc->dirty_set_lru_lock, flags);
@@ -1508,6 +1537,9 @@ eio_check_dirty_cache_thresholds(struct cache_c *dmc)
 			spin_lock_irqsave(&dmc->dirty_set_lru_lock, flags);
 		} while (enqueued_cleans <= required_cleans);
 		spin_unlock_irqrestore(&dmc->dirty_set_lru_lock, flags);
+		spin_lock_irqsave(&dmc->clean_sl, flags);
+		dmc->clean_excess_dirty = 0;
+		spin_unlock_irqrestore(&dmc->clean_sl, flags);
 	}
 }
 
@@ -1542,8 +1574,7 @@ eio_comply_dirty_thresholds(struct cache_c *dmc, index_t set)
 	}
 	
 
-	if (AUTOCLEAN_THRESHOLD_CROSSED(dmc) || (dmc->mode != CACHE_MODE_WB) ||
-			atomic_read(&dmc->fast_remove_in_prog)) {
+	if (AUTOCLEAN_THRESHOLD_CROSSED(dmc) || (dmc->mode != CACHE_MODE_WB)) {
 		return;
 	}
 
@@ -1577,6 +1608,15 @@ eio_cached_read(struct cache_c *dmc, struct eio_bio* ebio, int rw_flags)
 		err = eio_io_async_bvec(dmc, &job->job_io_regions.cache, rw_flags,
 					ebio->eb_bv, ebio->eb_nbvec,
 					eio_io_callback, job, 0);
+
+		SECTOR_STATS(dmc->eio_stats.read_hits, ebio->eb_size);
+		SECTOR_STATS(dmc->eio_stats.ssd_reads, ebio->eb_size);
+		ATOMIC_INC(&dmc->eio_stats.readcache);
+		err = eio_io_async_bvec(dmc, &job->job_io_regions.cache, rw_flags,
+					ebio->eb_bv, ebio->eb_nbvec,
+					eio_io_callback, job, 0);
+		#ifdef ERROR_INJECT
+		
 	}
 	if (err) {
 		unsigned long flags;
@@ -1914,6 +1954,11 @@ eio_cached_write(struct cache_c *dmc, struct eio_bio *ebio, int rw_flags)
 		err = eio_io_async_bvec(dmc, &job->job_io_regions.cache, rw_flags,
 					ebio->eb_bv, ebio->eb_nbvec,
 					eio_io_callback, job, 0);
+
+		VERIFY((rw_flags & 1) == WRITE);
+		err = eio_io_async_bvec(dmc, &job->job_io_regions.cache, rw_flags,
+					ebio->eb_bv, ebio->eb_nbvec,
+					eio_io_callback, job, 0);
 	}
 
 	if (err) {
@@ -2121,11 +2166,63 @@ eio_get_iosize(struct cache_c *dmc, sector_t snum, unsigned int biosize)
 	return iosize;
 }
 
-/* 
- * Acquire:
- * 1. read/shared lock for the sets covering the entire I/O range 
- * 2. allocate memory that may be required during md update 
- */
+/* Insert a new set sequence in sorted order to existing set sequence list */
+static int
+insert_set_seq(struct set_seq **seq_list, index_t first_set, index_t last_set)
+{
+	struct set_seq *cur_seq = NULL;
+	struct set_seq *prev_seq = NULL;
+	struct set_seq *new_seq = NULL;
+
+	VERIFY((first_set != -1) && (last_set != -1) && (last_set >= first_set));
+
+	for (cur_seq = *seq_list; cur_seq; prev_seq = cur_seq, cur_seq = cur_seq->next) {
+		if (first_set > cur_seq->last_set) {
+			/* go for the next seq in the sorted seq list */
+			continue;
+		}
+
+		if (last_set < cur_seq->first_set) {
+			/* break here to insert the new seq to seq list at this point */
+			break;
+		}
+
+		/* 
+		 * There is an overlap of the new seq with the current seq.
+		 * Adjust the first_set field of the current seq to consume
+		 * the overlap.
+		 */
+		if (first_set < cur_seq->first_set) {
+			cur_seq->first_set = first_set;
+		}
+
+		if (last_set <= cur_seq->last_set) {
+			/* The current seq now fully encompasses the first and last sets */
+			return 0;
+		}
+
+		/* Increment the first set so as to start from, where the current seq left */
+		first_set = cur_seq->last_set + 1;
+	}
+
+	new_seq = kmalloc(sizeof(struct set_seq), GFP_NOWAIT);
+	if (new_seq == NULL) {
+		return -ENOMEM;
+	}
+	new_seq->first_set = first_set;
+	new_seq->last_set = last_set;
+	if (prev_seq) {
+		new_seq->next = prev_seq->next;
+		prev_seq->next = new_seq;
+	} else {
+		new_seq->next = *seq_list;
+		*seq_list = new_seq;
+	}
+
+	return 0;
+}
+
+/* Acquire read/shared lock for the sets covering the entire I/O range */
 static int 
 eio_acquire_set_locks(struct cache_c *dmc, struct bio_container *bc)
 {
@@ -2177,62 +2274,59 @@ static int
 eio_alloc_mdreqs(struct cache_c *dmc, struct bio_container *bc)
 {
 	index_t	i;
-	index_t	count;
-	index_t start_set;
-	index_t end_set;
 	struct mdupdate_request *mdreq;
-	struct bio *bio = bc->bc_bio;
 	int	nr_bvecs, ret;
+	struct set_seq *cur_seq;
 
-	start_set = EIO_ROUND_SET(dmc, bio->bi_sector);
-	end_set = EIO_ROUND_SET(dmc, (bio->bi_sector + to_sector(bio->bi_size)));
-	count = end_set - start_set + 1; 
-	count = count % (dmc->num_sets + 1);
 	bc->mdreqs = NULL;
 
-	for (i = 0; i < count; i++) {
-		mdreq = kzalloc(sizeof(*mdreq), GFP_NOWAIT);
-		if (mdreq) {
-			mdreq->md_size = dmc->assoc * sizeof(struct flash_cacheblock);
-			nr_bvecs = IO_BVEC_COUNT(mdreq->md_size, SECTORS_PER_PAGE);
+	for (cur_seq = bc->bc_setspan; cur_seq; cur_seq = cur_seq->next) {
+		for (i = cur_seq->first_set; i <= cur_seq->last_set; i++) {
+			mdreq = kzalloc(sizeof(*mdreq), GFP_NOWAIT);
+			if (mdreq) {
+				mdreq->md_size = dmc->assoc * sizeof(struct flash_cacheblock);
+				nr_bvecs = IO_BVEC_COUNT(mdreq->md_size, SECTORS_PER_PAGE);
 
-			mdreq->mdblk_bvecs = (struct bio_vec *)kmalloc(
+				mdreq->mdblk_bvecs = (struct bio_vec *)kmalloc(
 						sizeof(struct bio_vec) * nr_bvecs, GFP_KERNEL);
-			if(mdreq->mdblk_bvecs) {
+				if(mdreq->mdblk_bvecs) {
 
-					ret = eio_alloc_wb_bvecs(mdreq->mdblk_bvecs, nr_bvecs,
-								 SECTORS_PER_PAGE);
-				if (ret) {
-					EIOERR("eio_alloc_mdreqs: failed to allocated pages\n");
-					kfree(mdreq->mdblk_bvecs);
-					mdreq->mdblk_bvecs = NULL;
+						ret = eio_alloc_wb_bvecs(mdreq->mdblk_bvecs, nr_bvecs,
+								SECTORS_PER_PAGE);
+					if (ret) {
+						EIOERR("eio_alloc_mdreqs: failed to allocated pages\n");
+						kfree(mdreq->mdblk_bvecs);
+						mdreq->mdblk_bvecs = NULL;
+					}
+					mdreq->mdbvec_count = nr_bvecs;
 				}
-				mdreq->mdbvec_count = nr_bvecs;
 			}
-		}
 
-		if (unlikely((mdreq == NULL) || (mdreq->mdblk_bvecs == NULL))) { 
-			struct mdupdate_request *nmdreq;
+			if (unlikely((mdreq == NULL) || (mdreq->mdblk_bvecs == NULL))) { 
+				struct mdupdate_request *nmdreq;
 
-			mdreq = bc->mdreqs;
-			while (mdreq) {
-				nmdreq = mdreq->next;
-				if (mdreq->mdblk_bvecs) {
-					eio_free_wb_bvecs(mdreq->mdblk_bvecs, mdreq->mdbvec_count,
-							  SECTORS_PER_PAGE);
-					kfree(mdreq->mdblk_bvecs);
+				mdreq = bc->mdreqs;
+				while (mdreq) {
+					nmdreq = mdreq->next;
+					if (mdreq->mdblk_bvecs) {
+						eio_free_wb_bvecs(mdreq->mdblk_bvecs, mdreq->mdbvec_count,
+								SECTORS_PER_PAGE);
+						kfree(mdreq->mdblk_bvecs);
+					}
+					kfree(mdreq);
+					mdreq = nmdreq;
 				}
-				kfree(mdreq);
-				mdreq = nmdreq;
+				bc->mdreqs = NULL;
+				return -ENOMEM;
+			} else {
+				mdreq->next = bc->mdreqs;
+				bc->mdreqs = mdreq;
 			}
-			bc->mdreqs = NULL;
-			return -ENOMEM;
-		} else {
-			mdreq->next = bc->mdreqs;
-			bc->mdreqs = mdreq;
 		}
 	}
+
 	return 0;
+
 }
 
 /*
@@ -2243,37 +2337,24 @@ eio_alloc_mdreqs(struct cache_c *dmc, struct bio_container *bc)
 static int 
 eio_release_io_resources(struct cache_c *dmc, struct bio_container *bc)
 {
-	index_t start_set;
-	index_t end_set;
 	index_t i;
-	index_t count;
-	struct bio *bio = bc->bc_bio;
 	struct mdupdate_request *mdreq;
 	struct mdupdate_request *nmdreq;
+	struct set_seq *cur_seq;
+	struct set_seq *next_seq;
 
-	start_set = EIO_ROUND_SET(dmc, bio->bi_sector);
-	end_set = EIO_ROUND_SET(dmc, (bio->bi_sector + to_sector(bio->bi_size)));
-	count = end_set - start_set + 1; 
-	if (count >= dmc->num_sets) {
-		start_set = 0;
-		end_set = dmc->num_sets - 1;
-	} else {
-		start_set = hash_block(dmc, EIO_ROUND_SECTOR(dmc, bio->bi_sector));
-		end_set = hash_block(dmc, EIO_ROUND_SECTOR(dmc, (bio->bi_sector +
-										to_sector(bio->bi_size))));
+	/* Release read locks on the sets in the set span */
+	for (cur_seq = bc->bc_setspan; cur_seq; cur_seq = cur_seq->next) {
+		for (i = cur_seq->first_set; i <= cur_seq->last_set; i++) {
+			up_read(&dmc->cache_sets[i].rw_lock);
+		}
 	}
 	
-	/* Release the already acquired locks */
-	if (start_set <= end_set) {
-		for (i = start_set; i <= end_set; i++) {
-			up_read(&dmc->cache_sets[i].rw_lock);
-		}
-	} else {
-		for (i = 0; i <= end_set; i++) {
-			up_read(&dmc->cache_sets[i].rw_lock);
-		}
-		for (i = start_set; i < dmc->num_sets; i++) {
-			up_read(&dmc->cache_sets[i].rw_lock);
+	/* Free the seqs in the set span, unless it is single span */
+	if (bc->bc_setspan != &bc->bc_singlesspan) {
+		for (cur_seq = bc->bc_setspan; cur_seq; cur_seq = next_seq) {
+			next_seq = cur_seq->next;
+			kfree(cur_seq);
 		}
 	}
 
@@ -2315,7 +2396,6 @@ eio_map(struct cache_c *dmc, struct request_queue *rq,
 	struct eio_bio *ebegin = NULL;
 	struct eio_bio *eend = NULL;
 	struct eio_bio *enext = NULL;
-	
 
 	if (bio_rw_flagged(bio, BIO_RW_DISCARD)) {
 		EIODEBUG("eio_map: Discard IO received. Invalidate incore start=%lu totalsectors=%d.\n",
@@ -2681,7 +2761,8 @@ eio_write_peek(struct cache_c *dmc, struct eio_bio *ebio)
 		 * served from the cache block, which won't have the data from
 		 * 2nd write. 
 		 */
-		if (to_sector(ebio->eb_size) == dmc->block_size) {
+		if ((cstate == ALREADY_DIRTY) ||
+				(to_sector(ebio->eb_size) == dmc->block_size)) {
 			retval = 1;
 		} else {
 			retval = 0;
@@ -2917,12 +2998,12 @@ eio_clean_all(struct cache_c *dmc)
 	unsigned long flags = 0;
 
 	VERIFY(dmc->mode == CACHE_MODE_WB);
-	dmc->sysctl_active.stop_clean = 0;
 	for (atomic_set(&dmc->clean_index, 0);
 		(atomic_read(&dmc->clean_index) < (s32)(dmc->size >> dmc->consecutive_shift)) &&
 			(dmc->sysctl_active.do_clean & EIO_CLEAN_START) &&
 			(ATOMIC_READ(&dmc->nr_dirty) > 0) &&
-			(!(dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG));
+			(!(dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG) &&
+			!dmc->sysctl_active.fast_remove);
 		 atomic_inc(&dmc->clean_index)) {
 
 		if (unlikely(CACHE_FAILED_IS_SET(dmc))) {
@@ -2936,8 +3017,21 @@ eio_clean_all(struct cache_c *dmc)
 
 	SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
 	dmc->sysctl_active.do_clean &= ~EIO_CLEAN_START;
-	atomic_set(&dmc->clean_index, 0);
 	SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+}
+
+/* 
+ * Do unconditional clean of a cache.
+ * Useful for a cold enabled writeback cache.
+ */
+void
+eio_clean_for_reboot(struct cache_c *dmc)
+{
+	index_t i;
+
+	for (i = 0 ; i < (index_t)(dmc->size >> dmc->consecutive_shift) ; i++) {
+		eio_clean_set(dmc, i, /* whole */ 1, /* force */1);
+	}
 }
 
 /*
@@ -3302,11 +3396,14 @@ err_out2:
 err_out1:
 
 	/* Reset clean flags on the set */
-	spin_lock_irqsave(&dmc->cache_sets[set].cs_lock, flags);
-	dmc->cache_sets[set].flags &= ~(SETFLAG_CLEAN_INPROG | SETFLAG_CLEAN_WHOLE);
-	spin_unlock_irqrestore(&dmc->cache_sets[set].cs_lock, flags);
 
-	if (!whole && !force) {
+	if (!force) {
+		spin_lock_irqsave(&dmc->cache_sets[set].cs_lock, flags);
+		dmc->cache_sets[set].flags &= ~(SETFLAG_CLEAN_INPROG | SETFLAG_CLEAN_WHOLE);
+		spin_unlock_irqrestore(&dmc->cache_sets[set].cs_lock, flags);
+	}
+
+	if (dmc->cache_sets[set].nr_dirty) {
 		/* 
 		 * Lru touch the set, so that it can be picked
 		 * up for whole set clean by clean thread later
@@ -3354,16 +3451,16 @@ eio_clean_aged_sets(struct work_struct *work)
 	/* Use the set LRU list to pick up the most aged sets. */
 	SPIN_LOCK_IRQSAVE(&dmc->dirty_set_lru_lock, flags);
 	do {
-		lru_rem_head(dmc->dirty_set_lru, &set_index, &set_time);
+		lru_read_head(dmc->dirty_set_lru, &set_index, &set_time);
 		if (set_index == LRU_NULL) {
 			break;	
 		}
 		
 		if ((CONV_SYSTIME_TO_SECS(cur_time - set_time) <
 				(dmc->sysctl_active.time_based_clean_interval * 60))) {
-			lru_touch(dmc->dirty_set_lru, set_index, set_time);
 			break;
 		}
+		lru_rem(dmc->dirty_set_lru, set_index);
 
 		if (dmc->cache_sets[set_index].nr_dirty > 0) {
 			SPIN_UNLOCK_IRQRESTORE(&dmc->dirty_set_lru_lock, flags);
@@ -3375,8 +3472,7 @@ eio_clean_aged_sets(struct work_struct *work)
 	
 	/* Re-schedule the aged set clean, unless the clean has to stop now */
 
-	if (atomic_read(&dmc->fast_remove_in_prog) || dmc->sysctl_active.stop_clean ||
-			(dmc->sysctl_active.time_based_clean_interval == 0)) {
+	if (dmc->sysctl_active.time_based_clean_interval == 0) {
 		goto out;
 	}	
 

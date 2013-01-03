@@ -66,6 +66,15 @@
 #define EIO_CACHE_STATE_OFF(dmc, index, bitmask)	ssdcache_cache_state_off(dmc, index, bitmask)
 #define EIO_CACHE_STATE_ON(dmc, index, bitmask)	ssdcache_cache_state_on(dmc, index, bitmask)
 
+/* Bit offsets for wait_on_bit_lock() */
+#define EIO_UPDATE_LIST		0
+#define EIO_HANDLE_REBOOT	1
+
+struct eio_control_s {
+	volatile unsigned long synch_flags;
+};
+
+int eio_wait_schedule(void *unused);
 
 
 #include "linux_os.h"
