@@ -47,10 +47,8 @@ struct work_struct _kcached_wq;
 
 struct kmem_cache *_job_cache;
 struct kmem_cache *_io_cache; /* cache of eio_context objects */
-struct kmem_cache *_dmc_bio_cache;
 mempool_t *_job_pool;
 mempool_t *_io_pool; /* pool of eio_context object */
-mempool_t *_dmc_bio_pool;
 
 atomic_t nr_cache_jobs;
 
@@ -179,8 +177,8 @@ eio_jobs_init(void)
 {
 	EIO_SIM_PR1();
 
-	_job_cache = _io_cache = _dmc_bio_cache = NULL;
-	_job_pool = _io_pool = _dmc_bio_pool = NULL;
+	_job_cache = _io_cache = NULL;
+	_job_pool = _io_pool = NULL;
 
 	_job_cache = kmem_cache_create(KMEM_CACHE_JOB,
 	                               sizeof(struct kcached_job),
@@ -206,24 +204,9 @@ eio_jobs_init(void)
 	if (!_io_pool)
 		goto out;
 
-	_dmc_bio_cache = kmem_cache_create(KMEM_DMC_BIO_PAIR,
-					   sizeof (struct eio_bio_item),
-					   0, 0, NULL);
-	if (!_dmc_bio_cache)
-		goto out;
-
-	_dmc_bio_pool = mempool_create(MIN_DMC_BIO_PAIR, mempool_alloc_slab,
-					mempool_free_slab, _dmc_bio_cache);
-	if (!_dmc_bio_pool)
-		goto out;
-
 	return 0;
 
 out:
-	if (_dmc_bio_pool)
-		mempool_destroy(_dmc_bio_pool);
-	if (_dmc_bio_cache)
-		kmem_cache_destroy(_dmc_bio_cache);
 	if (_io_pool)
 		mempool_destroy(_io_pool);
 	if (_io_cache)
@@ -233,8 +216,8 @@ out:
 	if (_job_cache)
 		kmem_cache_destroy(_job_cache);
 
-	_dmc_bio_pool = _job_pool = _io_pool = NULL;
-	_dmc_bio_cache = _job_cache = _io_cache = NULL;
+	_job_pool = _io_pool = NULL;
+	_job_cache = _io_cache = NULL;
 	return -ENOMEM;
 }
 
@@ -243,15 +226,13 @@ eio_jobs_exit(void)
 {
 	EIO_SIM_PR1();
 
-	mempool_destroy(_dmc_bio_pool);
 	mempool_destroy(_io_pool);
 	mempool_destroy(_job_pool);
-	kmem_cache_destroy(_dmc_bio_cache);
 	kmem_cache_destroy(_io_cache);
 	kmem_cache_destroy(_job_cache);
 
-	_dmc_bio_pool = _job_pool = _io_pool = NULL;
-	_dmc_bio_cache = _job_cache = _io_cache = NULL;
+	_job_pool = _io_pool = NULL;
+	_job_cache = _io_cache = NULL;
 }
 
 

@@ -54,23 +54,16 @@ extern long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg);
 extern long eio_compact_ioctl(struct file *filp, unsigned cmd, unsigned long arg);
 
 extern mempool_t *_io_pool;
-extern mempool_t *_dmc_bio_pool;
 extern struct eio_control_s *eio_control;
 
 static int eio_make_request_fn(struct request_queue *, struct bio *);
 static void eio_cache_rec_fill(struct cache_c *, cache_rec_short_t *);
-static void eio_enqueue_io(struct eio_barrier_q *, struct cache_c *, struct bio *, int);
-static void eio_wq_work(struct work_struct *);
-static void eio_process_barrier(struct eio_barrier_q *, struct cache_c *, struct bio *);
-static void eio_io_uncached_partition(struct eio_barrier_q *, struct bio *);
 static void eio_bio_end_empty_barrier(struct bio *, int);
 static void eio_issue_empty_barrier_flush(struct block_device *, struct bio *,
-	 			    int , struct eio_barrier_q *, int rw_flags);
+	 			    int , make_request_fn *, int rw_flags);
 static int eio_finish_nrdirty(struct cache_c *);
 static int eio_mode_switch(struct cache_c *, u_int32_t);
 static int eio_policy_switch(struct cache_c *, u_int32_t);
-static struct eio_barrier_q * eio_barrier_q_alloc_init(void);
-static void eio_barrier_q_free(struct eio_barrier_q *);
 
 static int eio_overlap_split_bio(struct request_queue *, struct bio *);
 static struct bio * eio_split_new_bio(struct bio *, struct bio_container *,
@@ -201,7 +194,6 @@ eio_ttc_activate(struct cache_c *dmc)
 	struct request_queue	*rq;
 	make_request_fn		*origmfn;
 	struct cache_c		*dmc1;
-	struct eio_barrier_q	*bq;
 	int			wholedisk;
 	int			error;
 	int			index;
@@ -227,10 +219,8 @@ eio_ttc_activate(struct cache_c *dmc)
 		 " sector_start: %llu, end: %llu\n",
 		 (uint64_t)dmc->dev_start_sect, (uint64_t)dmc->dev_end_sect);
 
-retry:
 	error = 0;
 	origmfn = NULL;
-	bq = NULL;
 	index = EIO_HASH_BDEV(bdev->bd_contains->bd_dev);
 
 	down_write(&eio_ttc_lock[index]);
@@ -246,13 +236,6 @@ retry:
 		}
 
 		/* some partition of same device already cached */
-		bq = dmc1->barrier_q;
-		if (!list_empty(&bq->deferred_list)) {
-			up_write(&eio_ttc_lock[index]);
-			schedule_timeout(msecs_to_jiffies(100));
-			EIODEBUG("ttc_activate: Device queue not empty, retrying...\n");
-			goto retry;
-		}
 		VERIFY(dmc1->dev_info == EIO_DEV_PARTITION);
 		origmfn = dmc1->origmfn;
 		break;
@@ -263,24 +246,10 @@ retry:
 	 */
 
 	if (origmfn) {
-		bq->ref_count++;
-		dmc->barrier_q = bq;
 		dmc->origmfn = origmfn;
 		dmc->dev_info = EIO_DEV_PARTITION;
 		VERIFY(wholedisk == 0);
-		VERIFY(origmfn == bq->origmfn);
 	} else {
-		/* Allocate eio_barrier_q */
-		bq = eio_barrier_q_alloc_init();
-		if (!bq) {
-			error = -ENOMEM;
-			up_write(&eio_ttc_lock[index]);
-			goto out;
-		}
-		bq->ttc_lock_index = index;
-		dmc->barrier_q = bq;
-		bq->ref_count++;
-		bq->origmfn = rq->make_request_fn;
 		dmc->origmfn = rq->make_request_fn;
 		rq->make_request_fn = eio_make_request_fn;
 		dmc->dev_info = (wholedisk) ? EIO_DEV_WHOLE_DISK : EIO_DEV_PARTITION;
@@ -296,7 +265,7 @@ retry:
 	msleep(1);
 	SET_BARRIER_FLAGS(rw_flags);
 	eio_issue_empty_barrier_flush(dmc->disk_dev->bdev, NULL,
-				EIO_HDD_DEVICE, dmc->barrier_q, rw_flags);
+				EIO_HDD_DEVICE, dmc->origmfn, rw_flags);
 	up_write(&eio_ttc_lock[index]);
 
 out:
@@ -315,13 +284,11 @@ eio_ttc_deactivate(struct cache_c *dmc, int force)
 	struct block_device	*bdev;
 	struct request_queue	*rq;
 	struct cache_c		*dmc1;
-	struct eio_barrier_q	*bq;
 	int			found_partitions;
 	int			index;
 	int			ret;
 
 	ret = 0;
-	bq = dmc->barrier_q;
 	bdev = dmc->disk_dev->bdev;
 	rq = bdev->bd_disk->queue;
 
@@ -353,17 +320,7 @@ deactivate:
 	found_partitions = 0;
 
 	/* check if barrier QUEUE is empty or not */
-retry:
 	down_write(&eio_ttc_lock[index]);
-	spin_lock_irq(&bq->deferred_lock);
-	if (!list_empty(&bq->deferred_list)) {
-		spin_unlock_irq(&bq->deferred_lock);
-		up_write(&eio_ttc_lock[index]);
-		EIOINFO("ttc_deactivate: Waiting for device barrier/flush queue to drain\n");
-		schedule_timeout(msecs_to_jiffies(100));
-		goto retry;
-	}
-	spin_unlock_irq(&bq->deferred_lock);
 
 	if (dmc->dev_info != EIO_DEV_WHOLE_DISK) {
 		list_for_each_entry(dmc1, &eio_ttc_list[index], cachelist) {
@@ -387,12 +344,8 @@ retry:
 
 	if ((dmc->dev_info == EIO_DEV_WHOLE_DISK) || (found_partitions == 0)) {
 		rq->make_request_fn = dmc->origmfn;
-		VERIFY(bq->ref_count == 1);
-		bq->ref_count--;
 		dmc->barrier_q = NULL;
-		eio_barrier_q_free(bq);
 	} else {
-		bq->ref_count--;
 		dmc->barrier_q = NULL;
 	}
 
@@ -442,42 +395,26 @@ eio_make_request_fn(struct request_queue *q, struct bio *bio)
 {
 	int			ret;
 	int			overlap;
-	int			barrier;
-	int			enqueue;
 	int			index;
 	make_request_fn		*origmfn;
 	struct cache_c		*dmc, *dmc1;
-	struct eio_barrier_q	*bq;
 	struct block_device	*bdev;
 
-	barrier = 0;
 	bdev = bio->bi_bdev;
 
 
 re_lookup:
 	dmc = NULL;
 	origmfn = NULL;
-	bq = NULL;
-	overlap = enqueue = ret = 0;
+	overlap = ret = 0;
 
 	index = EIO_HASH_BDEV(bdev->bd_contains->bd_dev);
 
-	if (barrier)
-		down_write(&eio_ttc_lock[index]);
-	else
-		down_read(&eio_ttc_lock[index]);
+	down_read(&eio_ttc_lock[index]);
 
 	list_for_each_entry(dmc1, &eio_ttc_list[index], cachelist) {
 		if (dmc1->disk_dev->bdev->bd_contains != bdev->bd_contains) {
 			continue;
-		}
-
-		/* For uncached partitions, check if IO needs to be enqueued */
-		if (!enqueue) {
-			if (barrier || (dmc1->barrier_q->queue_flags == EIO_QUEUE_IO_TO_THREAD)) {
-				enqueue = 1;
-				bq = dmc1->barrier_q;
-			}
 		}
 
 		if (dmc1->dev_info == EIO_DEV_WHOLE_DISK) {
@@ -513,11 +450,7 @@ re_lookup:
 	}
 
 	if (unlikely(overlap)) {
-		/* unlock ttc lock */
-		if (barrier)
-			up_write(&eio_ttc_lock[index]);
-		else
-			up_read(&eio_ttc_lock[index]);
+		up_read(&eio_ttc_lock[index]);
 
 		if (bio_rw_flagged(bio, BIO_RW_DISCARD)) {
 			EIOERR("eio_mfn: Overlap I/O with Discard flag received."
@@ -526,9 +459,6 @@ re_lookup:
 		} else {
 			ret = eio_overlap_split_bio(q, bio);
 		}
-	} else if (enqueue || barrier) {
-		VERIFY(bq != NULL);
-		eio_enqueue_io(bq, dmc, bio, barrier);
 	} else if (dmc) {	/* found cached partition or device */
 
 		/*
@@ -549,13 +479,10 @@ re_lookup:
 	}
 
 	if (!overlap) {
-		if (barrier)
-			up_write(&eio_ttc_lock[index]);
-		else
-			up_read(&eio_ttc_lock[index]);
+		up_read(&eio_ttc_lock[index]);
 	}
 
-	if (overlap || enqueue || barrier || dmc)
+	if (overlap || dmc)
 		return;
 
 	/*
@@ -987,294 +914,21 @@ int eio_do_io(struct cache_c *dmc, struct eio_io_region *where, int rw,
 	return eio_async_io(dmc, where, rw, io_req);
 }
 
-/**********************************************************************************
-		 ****** BARRIER I/O and Deferred bio Handling ******
- *********************************************************************************/
-
-static struct eio_barrier_q *
-eio_barrier_q_alloc_init(void)
-{
-	struct eio_barrier_q	*bq;
-
-	bq = (struct eio_barrier_q *)KZALLOC(sizeof(*bq), GFP_KERNEL);
-	if (bq == NULL) {
-		EIOERR("wq_alloc: Failed to allocate memory for barrier/flush queue\n");
-		return NULL;
-	}
-
-	/*
-	 * BARRIER I/O handling through workqueue.
-	 */
-
-	INIT_LIST_HEAD(&bq->deferred_list);
-	INIT_WORK(&bq->barrier_defer_work, eio_wq_work);
-	spin_lock_init(&bq->deferred_lock);
-	bq->barrier_wq = create_singlethread_workqueue("eio-queue");
-	if (!bq->barrier_wq) {
-		EIOERR("wq_alloc: Failed to create workqueue\n");
-		kfree(bq);
-		return NULL;
-	}
-	return bq;
-}
-
-static void
-eio_barrier_q_free(struct eio_barrier_q *bq)
-{
-
-	VERIFY(bq->ref_count == 0);
-	VERIFY(bq->queue_flags == 0);
-	VERIFY(bq->barrier_cnt == 0);
-	VERIFY(list_empty(&bq->deferred_list));
-	destroy_workqueue(bq->barrier_wq);
-	kfree(bq);
-	return;
-}
-
-static void
-eio_enqueue_io(struct eio_barrier_q *bq, struct cache_c *dmc,
-		struct bio *bio, int barrier)
-{
-	struct eio_bio_item	*item;
-
-	item = mempool_alloc(_dmc_bio_pool, GFP_NOIO);
-	if (!item) {
-		/* XXX: Error handling */
-	}
-	item->bio = bio;
-	item->dmc = dmc;
-	INIT_LIST_HEAD(&item->bio_list1);
-
-	spin_lock_irq(&bq->deferred_lock);
-	if (barrier)
-		bq->barrier_cnt++;
-	list_add_tail(&item->bio_list1, &bq->deferred_list);
-	spin_unlock_irq(&bq->deferred_lock);
-
-	if (bq->queue_flags != EIO_QUEUE_IO_TO_THREAD) {
-		VERIFY(bq->queue_flags == 0);
-		VERIFY(barrier == 1);
-		bq->queue_flags = EIO_QUEUE_IO_TO_THREAD;
-		EIODEBUG("eio_enqueue_io: set enqueue flag\n");
-		queue_work(bq->barrier_wq, &bq->barrier_defer_work);
-	}
-	return;
-}
-
-/*
- * Process the deferred bios
- */
-
-static void
-eio_wq_work(struct work_struct *work)
-{
-	struct eio_barrier_q	*bq;
-	struct eio_bio_item	*item;
-
-	struct cache_c		*dmc;
-	struct bio		*bio;
-	int			ret;
-	int			write_lock;
-	int			index;
-
-	bq = container_of(work, struct eio_barrier_q, barrier_defer_work);
-	write_lock = 0;
-	index = bq->ttc_lock_index;
-
-retry:
-	if (write_lock) {
-		down_write(&eio_ttc_lock[index]);
-		spin_lock_irq(&bq->deferred_lock);
-		if ((!bq->barrier_cnt) &&
-		    (bq->queue_flags == EIO_QUEUE_IO_TO_THREAD)) {
-			bq->queue_flags = 0;
-			EIODEBUG("eio_enqueue_io: reset enqueue flag\n");
-		}
-		spin_unlock_irq(&bq->deferred_lock);
-		up_write(&eio_ttc_lock[index]);
-	}
-
-	while (1) {
-		down_read(&eio_ttc_lock[index]);
-		spin_lock_irq(&bq->deferred_lock);
-		if ((!bq->barrier_cnt) &&
-		    (bq->queue_flags == EIO_QUEUE_IO_TO_THREAD)) {
-			spin_unlock_irq(&bq->deferred_lock);
-			up_read(&eio_ttc_lock[index]);
-			write_lock = 1;
-			goto retry;
-		}
-
-		if (list_empty(&bq->deferred_list)) {
-			VERIFY(bq->queue_flags == 0);
-			VERIFY(bq->barrier_cnt == 0);
-			spin_unlock_irq(&bq->deferred_lock);
-			up_read(&eio_ttc_lock[index]);
-			break;
-		}
-
-		item = list_entry(bq->deferred_list.next, struct eio_bio_item, bio_list1);
-		list_del(&item->bio_list1);
-
-		bio = item->bio;
-		dmc = item->dmc;
-		if (unlikely(bio_rw_flagged(bio, BIO_RW_BARRIER))) {
-			bq->barrier_cnt--;
-			VERIFY(bq->barrier_cnt >= 0);
-		}
-		spin_unlock_irq(&bq->deferred_lock);
-		mempool_free(item, _dmc_bio_pool);
-
-		if (bio_rw_flagged(bio, BIO_RW_BARRIER)) {
-			eio_process_barrier(bq, dmc, bio);
-		} else {
-			if (dmc) {	/* I/O on cached partition or device */
-				if (bio->bi_sector) {
-					VERIFY(bio->bi_sector >= dmc->dev_start_sect);
-					bio->bi_sector -= dmc->dev_start_sect;
-				}
-
-				do {
-					ret = eio_map(dmc, bdev_get_queue(bio->bi_bdev), bio);
-					VERIFY(ret == 0);
-				} while (ret != 0);
-			} else {	/* I/O on uncached partition */
-				eio_io_uncached_partition(bq, bio);
-			}
-		}
-		up_read(&eio_ttc_lock[index]);
-	}
-	return;
-}
-
-static void
-eio_io_uncached_partition(struct eio_barrier_q *bq, struct bio *bio)
-{
-	struct block_device	*bdev;
-
-	bdev = bio->bi_bdev;
-	bq->origmfn(bdev_get_queue(bdev), bio);
-	return;
-}
-
 void
 eio_process_zero_size_bio(struct cache_c *dmc, struct bio *origbio)
 {
-	struct eio_barrier_q *bq;
 	unsigned long rw_flags = 0;
 
 	/* Extract bio flags from original bio */
-	bq = dmc->barrier_q;
 	rw_flags = origbio->bi_rw;
 
 	VERIFY(origbio->bi_size == 0);
-	VERIFY(bq && rw_flags != 0);
+	VERIFY(rw_flags != 0);
 
 	eio_issue_empty_barrier_flush(dmc->cache_dev->bdev, NULL,
 					EIO_SSD_DEVICE, NULL, rw_flags);
 	eio_issue_empty_barrier_flush(dmc->disk_dev->bdev, origbio,
-					EIO_HDD_DEVICE, bq, rw_flags);
-}
-
-/*
- * Barrier I/O handling:-
- * Empty Barrier I/O:
- *	- Wait for pending I/Os (I/Os issued before this barrier)
- *	  to complete.
- *	- call eio_issue_empty_barrier_flush() on to issue
- *	  barrier I/O on both HDD and SSD.
- *
- * Non-Empty Barrier I/O:
- *	- Wait for pending I/Os (I/Os issued before this barrier)
- *	  to complete.
- *	- call eio_map().
- *	- call eio_issue_empty_barrier_flush() on both HDD and SSD.
- */
-
-static void
-eio_process_barrier(struct eio_barrier_q *bq, struct cache_c *dmc,
-		    struct bio *bio)
-{
-	int			ret;
-	int			index;
-	struct cache_c		*dmc1;
-	struct block_device	*ssd_bdev[16];
-	int			i, cnt;
-	int			rw_flags = 0;
-
-	/* cache on entier device */
-	if (dmc && (dmc->dev_info == EIO_DEV_WHOLE_DISK)) {
-		while (ATOMIC_READ(&dmc->nr_ios) != 0) {
-			schedule_timeout(msecs_to_jiffies(1));
-		}
-		if (!bio_empty_barrier(bio)) {
-			if (bio->bi_sector) {
-				VERIFY(bio->bi_sector >= dmc->dev_start_sect);
-				bio->bi_sector -= dmc->dev_start_sect;
-			}
-
-			do {
-				ret = eio_map(dmc, bdev_get_queue(bio->bi_bdev), bio);
-				VERIFY(ret == 0);
-			} while (ret != 0);
-		}
-		SET_BARRIER_FLAGS(rw_flags);
-		eio_issue_empty_barrier_flush(dmc->cache_dev->bdev, NULL,
-					EIO_SSD_DEVICE, NULL, rw_flags);
-		if (bio_empty_barrier(bio))	// call bio_endio()
-			eio_issue_empty_barrier_flush(dmc->disk_dev->bdev, bio,
-						EIO_HDD_DEVICE, bq, rw_flags);
-		else
-			eio_issue_empty_barrier_flush(dmc->disk_dev->bdev, NULL,
-						EIO_HDD_DEVICE, bq, rw_flags);
-		return;
-	}
-
-	/* partition handlling */
-	cnt = 0;
-	index = bq->ttc_lock_index;
-	list_for_each_entry(dmc1, &eio_ttc_list[index], cachelist) {
-		if (dmc1->disk_dev->bdev->bd_contains != bio->bi_bdev->bd_contains)
-			continue;
-		while (ATOMIC_READ(&dmc1->nr_ios) != 0) {
-			schedule_timeout(msecs_to_jiffies(1));
-		}
-		if (cnt < 16)
-			ssd_bdev[cnt++] = dmc1->cache_dev->bdev;
-	}
-
-	if (!bio_empty_barrier(bio)) {
-		if (dmc) {
-			VERIFY((bio->bi_sector >= dmc->dev_start_sect) &&
-				((bio->bi_sector + to_sector(bio->bi_size) - 1) <= dmc->dev_end_sect));
-
-			if (bio->bi_sector) {
-				VERIFY(bio->bi_sector >= dmc->dev_start_sect);
-				bio->bi_sector -= dmc->dev_start_sect;
-			}
-
-			do {
-				ret = eio_map(dmc, bdev_get_queue(bio->bi_bdev), bio);
-				VERIFY(ret == 0);
-			} while (ret != 0);
-		} else {
-			eio_io_uncached_partition(bq, bio);
-		}
-	}
-
-	SET_BARRIER_FLAGS(rw_flags);
-	/* Issue empty barrier on SSDs of all cached partitions of HDD device */
-	for (i = 0; i < cnt; i++)
-		eio_issue_empty_barrier_flush(ssd_bdev[i], NULL, EIO_SSD_DEVICE,
-					NULL, rw_flags);
-
-	if (bio_empty_barrier(bio))	// need to call bio_endio()
-		eio_issue_empty_barrier_flush(bio->bi_bdev->bd_contains, bio,
-					EIO_HDD_DEVICE, bq, rw_flags);
-	else
-		eio_issue_empty_barrier_flush(bio->bi_bdev->bd_contains, NULL,
-					EIO_HDD_DEVICE, bq, rw_flags);
-	return;
+					EIO_HDD_DEVICE, dmc->origmfn, rw_flags);
 }
 
 static void
@@ -1288,7 +942,7 @@ eio_bio_end_empty_barrier(struct bio *bio, int err)
 
 static void
 eio_issue_empty_barrier_flush(struct block_device *bdev, struct bio *orig_bio,
-			int device, struct eio_barrier_q *bq, int rw_flags)
+			int device, make_request_fn *origmfn, int rw_flags)
 {
 	struct bio		*bio;
 
@@ -1304,7 +958,7 @@ eio_issue_empty_barrier_flush(struct block_device *bdev, struct bio *orig_bio,
 
 	bio_get(bio);
 	if (device == EIO_HDD_DEVICE) {
-		bq->origmfn(bdev_get_queue(bio->bi_bdev), bio);
+		origmfn(bdev_get_queue(bio->bi_bdev), bio);
 
 	} else {
 		submit_bio(0, bio);

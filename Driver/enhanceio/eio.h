@@ -616,11 +616,6 @@ struct eio_stats {
 #define MIN_EIO_IO				4096
 #define MIN_DMC_BIO_PAIR			8192
 
-/*
- * dmc->barrier_q->queue_flags
- */
-
-#define EIO_QUEUE_IO_TO_THREAD	1
 
 /* Structure representing a sequence of sets(first to last set index) */
 struct set_seq {
@@ -663,24 +658,6 @@ struct eio_io_region {
 	sector_t		count;	/* If zero the region is ignored*/
 };
 
-struct eio_bio_item {
-	struct bio		*bio;
-	struct cache_c		*dmc;
-	struct list_head	bio_list1;
-};
-
-struct eio_barrier_q {
-	int			ref_count;		/* no of cached partitions */
-	int	 		queue_flags;		/* protected by eio_ttc_lock */
-	int			ttc_lock_index;
-	int			barrier_cnt;		/* protected by deferred_lock */
-	struct list_head	deferred_list;		/* protected by deferred_lock */
-	spinlock_t		deferred_lock;
-	struct work_struct	barrier_defer_work;
-	struct workqueue_struct	*barrier_wq;		/* processing queue (barriers) */
-	make_request_fn		*origmfn;
-};
-
 /*
  * Cache context
  */
@@ -688,9 +665,6 @@ struct cache_c {
 	struct list_head	cachelist;
 	make_request_fn		*origmfn;
 	char			dev_info;		/* partition or whole device */
-
-/* Barrier I/O Handling */
-	struct eio_barrier_q	*barrier_q;
 
 	sector_t		dev_start_sect;
 	sector_t		dev_end_sect;

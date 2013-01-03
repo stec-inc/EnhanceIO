@@ -2455,7 +2455,6 @@ eio_map(struct cache_c *dmc, struct request_queue *rq,
 	 * to both HDD and SSD.
 	 */
 	if (bio->bi_size == 0) {
-		VERIFY(!bio_rw_flagged(bio, BIO_RW_BARRIER));
 		eio_process_zero_size_bio(dmc, bio);
 		return DM_MAPIO_SUBMITTED;
 	}

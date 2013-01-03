@@ -98,7 +98,6 @@ typedef enum eio_cache_state {
 #define EIO_HASH_BDEV(dev)	\
 	((MAJOR(dev) * EIO_MAGIC + MINOR(dev)) % EIO_HASHTBL_SIZE)
 
-#define bio_barrier(bio)	((bio)->bi_rw & (1 << BIO_RW_BARRIER))
 
 /*
  * Reboot status flags.
