@@ -1983,7 +1983,7 @@ force_delete:
 	vfree((void *)dmc->cache_sets);
 	eio_ttc_put_device(&dmc->disk_dev);
 	eio_put_cache_device(dmc);
-	(void)wait_on_bit_lock(&eio_control->synch_flags, EIO_UPDATE_LIST,
+	(void)wait_on_bit_lock((void *)&eio_control->synch_flags, EIO_UPDATE_LIST,
 		eio_wait_schedule, TASK_UNINTERRUPTIBLE);
 	nodepp = &cache_list_head;
 	while (*nodepp != NULL) {
@@ -1995,7 +1995,7 @@ force_delete:
 	}
 	clear_bit(EIO_UPDATE_LIST, &eio_control->synch_flags);
 	smp_mb__after_clear_bit();
-	wake_up_bit(&eio_control->synch_flags, EIO_UPDATE_LIST);
+	wake_up_bit((void *)&eio_control->synch_flags, EIO_UPDATE_LIST);
 
 out:
 	if (restart_async_task) {

@@ -31,19 +31,6 @@
 #include <linux/miscdevice.h>
 #include "os.h"
 #include "eio_ttc.h"
-/*
-#define BIO_RW_BARRIER		REQ_FLUSH
-#define BIO_RW_DISCARD 		REQ_DISCARD
-#define WRITE_BARRIER   (WRITE | ((unsigned long)1 << BIO_RW_BARRIER))
-#define BIO_RW_UNPLUG		REQ_FLUSH
-#define BIO_RW_SYNCIO		REQ_SYNC
-static inline bool bio_rw_flagged(struct bio *bio, int flag)
-{
-        return (bio->bi_rw & (1 << flag)) != 0;
-}
-
-#define bio_empty_barrier(bio)  (bio_rw_flagged(bio, BIO_RW_BARRIER) && !bio_has_data(bio) && !bio_rw_flagged(bio, BIO_RW_DISCARD))
-*/
 struct rw_semaphore	eio_ttc_lock[EIO_HASHTBL_SIZE];
 static struct list_head	eio_ttc_list[EIO_HASHTBL_SIZE];
 
@@ -56,7 +43,7 @@ extern long eio_compact_ioctl(struct file *filp, unsigned cmd, unsigned long arg
 extern mempool_t *_io_pool;
 extern struct eio_control_s *eio_control;
 
-static int eio_make_request_fn(struct request_queue *, struct bio *);
+static void eio_make_request_fn(struct request_queue *, struct bio *);
 static void eio_cache_rec_fill(struct cache_c *, cache_rec_short_t *);
 static void eio_bio_end_empty_barrier(struct bio *, int);
 static void eio_issue_empty_barrier_flush(struct block_device *, struct bio *,
@@ -344,9 +331,7 @@ deactivate:
 
 	if ((dmc->dev_info == EIO_DEV_WHOLE_DISK) || (found_partitions == 0)) {
 		rq->make_request_fn = dmc->origmfn;
-		dmc->barrier_q = NULL;
 	} else {
-		dmc->barrier_q = NULL;
 	}
 
 	list_del_init(&dmc->cachelist);
@@ -452,7 +437,7 @@ re_lookup:
 	if (unlikely(overlap)) {
 		up_read(&eio_ttc_lock[index]);
 
-		if (bio_rw_flagged(bio, BIO_RW_DISCARD)) {
+		if (bio_rw_flagged(bio, REQ_DISCARD)) {
 			EIOERR("eio_mfn: Overlap I/O with Discard flag received."
 				" Discard flag is not supported.\n");
 			bio_endio(bio, -EOPNOTSUPP);
@@ -869,7 +854,7 @@ int eio_sync_io(struct cache_c *dmc, struct eio_io_region *where,
 	io.callback = NULL;
 	io.context = NULL;
 
-	/* For synchronous I/Os pass SYNC & UNPLUG. */
+	/* For synchronous I/Os pass SYNC */
 	rw |= REQ_SYNC;
 
 	switch(req->mtype) {
@@ -1617,7 +1602,7 @@ eio_reboot_handling(void)
 static int
 eio_overlap_split_bio(struct request_queue *q, struct bio *bio)
 {
-	int			i, nbios, ret;
+	int			i, nbios;
 	void			**bioptr;
 	sector_t		snum;
 	struct bio_container	*bc;
@@ -1663,9 +1648,7 @@ eio_overlap_split_bio(struct request_queue *q, struct bio *bio)
 	}
 
 	for (i = 0; i < nbios; i++) {
-		ret = eio_make_request_fn(q, bioptr[i]);
-		if (ret)
-			bio_endio(bioptr[i], -EIO);
+		eio_make_request_fn(q, bioptr[i]);
 	}
 
 out:

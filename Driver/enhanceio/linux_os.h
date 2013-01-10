@@ -81,6 +81,7 @@ struct eio_event {
 #ifdef VERIFY
 #undef VERIFY
 #endif
+#define ENABLE_VERIFY
 #ifdef ENABLE_VERIFY
 /* Like ASSERT() but always compiled in */
 #define VERIFY(x) do { \

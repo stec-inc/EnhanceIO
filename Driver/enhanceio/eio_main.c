@@ -392,13 +392,20 @@ eio_post_io_callback(struct work_struct *work)
 	VERIFY(index != -1 || job->action == WRITEDISK || job->action == READDISK);
 	ebio = job->ebio;
 	VERIFY(ebio != NULL);
+	VERIFY(ebio->eb_bc);
+	
 	eb_cacheset = ebio->eb_cacheset;
 	if (error)
 		EIOERR("io_callback: io error %d block %lu action %d",
 		      error, job->job_io_regions.disk.sector, job->action);
+	
+	cstate = EIO_CACHE_STATE_GET(dmc, index);
+        printk(KERN_ERR"cache state : %u",cstate);	
 
 	switch (job->action) {
 	case WRITEDISK:
+
+		printk(KERN_ERR"write disk");
 		ATOMIC_INC(&dmc->eio_stats.writedisk);
 		if (unlikely(error))
 			dmc->eio_errors.disk_write_errors++;
@@ -413,6 +420,8 @@ eio_post_io_callback(struct work_struct *work)
 		return;
 
 	case READDISK:
+
+		printk(KERN_ERR"readdisk");
 		if (unlikely(error) || unlikely(ebio->eb_iotype & EB_INVAL)
 			|| CACHE_DEGRADED_IS_SET(dmc)) {
 			if (error)
@@ -429,6 +438,8 @@ eio_post_io_callback(struct work_struct *work)
 		return;
 
 	case READCACHE:
+
+		printk(KERN_ERR"readcache");
 		//ATOMIC_INC(&dmc->eio_stats.readcache);
 		//SECTOR_STATS(dmc->eio_stats.ssd_reads, ebio->eb_size);
 		VERIFY(EIO_DBN_GET(dmc, index) == EIO_ROUND_SECTOR(dmc,ebio->eb_sector));
@@ -456,6 +467,8 @@ eio_post_io_callback(struct work_struct *work)
 		break;
 
 	case READFILL:
+		
+		printk(KERN_ERR"readfill");
 		//ATOMIC_INC(&dmc->eio_stats.readfill);
 		//SECTOR_STATS(dmc->eio_stats.ssd_writes, ebio->eb_size);
 		VERIFY(EIO_DBN_GET(dmc, index) == ebio->eb_sector);
@@ -469,6 +482,8 @@ eio_post_io_callback(struct work_struct *work)
 		break;
 
 	case WRITECACHE:
+		
+		printk(KERN_ERR"writecache");
 		//SECTOR_STATS(dmc->eio_stats.ssd_writes, ebio->eb_size);
 		//ATOMIC_INC(&dmc->eio_stats.writecache);
 		cstate = EIO_CACHE_STATE_GET(dmc, index);
@@ -1033,6 +1048,12 @@ find_reclaim_dbn(struct cache_c *dmc, index_t start_index, index_t *index)
 		eio_find_reclaim_dbn(dmc->policy_ops, start_index, index);
 }
 
+void
+eio_set_warm_boot(void)
+{
+        eio_force_warm_boot = 1;
+        return;
+}
 
 /*
  * dbn is the starting sector.
@@ -1256,10 +1277,10 @@ eio_do_mdupdate(struct work_struct *work)
 		atomic_inc(&mdreq->holdcount);
 
 		/*
-	 	 * Set SYNC and UNPLUG flags for making metadata
+	 	 * Set SYNC for making metadata
 		 * writes as high priority.
 		 */
-		rw_flags = WRITE | BIO_RW_SYNCIO | BIO_RW_UNPLUG;
+		rw_flags = WRITE | REQ_SYNC ;
 		error = eio_io_async_bvec(dmc, &region, rw_flags,
 						&mdreq->mdblk_bvecs[i], 1,
 				 		eio_mdupdate_callback, work, 0);
@@ -1400,11 +1421,11 @@ eio_post_mdupdate(struct work_struct *work)
 static void 
 eio_enq_mdupdate(struct bio_container *bc)
 {
-	unsigned long flags;
+	unsigned long flags = 0;
 	index_t set_index;
 	struct eio_bio *ebio;
 	struct cache_c *dmc = bc->bc_dmc;
-	struct cache_set *set;
+	struct cache_set *set = 0;
 	struct mdupdate_request *mdreq;
 	int	do_schedule;
 
@@ -1511,7 +1532,7 @@ eio_check_dirty_cache_thresholds(struct cache_c *dmc)
 		unsigned long 	flags;
 
 		spin_lock_irqsave(&dmc->clean_sl, flags);
-		if (dmc->clean_excess_dirty) {
+		if (ATOMIC_READ(&dmc->clean_pendings) || dmc->clean_excess_dirty) {
 			/* Already excess dirty block cleaning is in progress */
 			spin_unlock_irqrestore(&dmc->clean_sl, flags);
 			return;
@@ -1615,7 +1636,6 @@ eio_cached_read(struct cache_c *dmc, struct eio_bio* ebio, int rw_flags)
 		err = eio_io_async_bvec(dmc, &job->job_io_regions.cache, rw_flags,
 					ebio->eb_bv, ebio->eb_nbvec,
 					eio_io_callback, job, 0);
-		#ifdef ERROR_INJECT
 		
 	}
 	if (err) {
@@ -1955,10 +1975,6 @@ eio_cached_write(struct cache_c *dmc, struct eio_bio *ebio, int rw_flags)
 					ebio->eb_bv, ebio->eb_nbvec,
 					eio_io_callback, job, 0);
 
-		VERIFY((rw_flags & 1) == WRITE);
-		err = eio_io_async_bvec(dmc, &job->job_io_regions.cache, rw_flags,
-					ebio->eb_bv, ebio->eb_nbvec,
-					eio_io_callback, job, 0);
 	}
 
 	if (err) {
@@ -2226,50 +2242,100 @@ insert_set_seq(struct set_seq **seq_list, index_t first_set, index_t last_set)
 static int 
 eio_acquire_set_locks(struct cache_c *dmc, struct bio_container *bc)
 {
-	index_t start_set;
-	index_t end_set;
-	index_t	i;
 	struct bio *bio = bc->bc_bio;
-	index_t count;
-	int error = 0;
-
-	start_set = EIO_ROUND_SET(dmc, bio->bi_sector);
-	end_set = EIO_ROUND_SET(dmc, (bio->bi_sector + to_sector(bio->bi_size)));
-	count = end_set - start_set + 1; 
-	if (count >= dmc->num_sets) {
-		start_set = 0;
-		end_set = dmc->num_sets - 1;
-	} else {
-		start_set = hash_block(dmc, EIO_ROUND_SECTOR(dmc, bio->bi_sector));
-		end_set = hash_block(dmc, EIO_ROUND_SECTOR(dmc, (bio->bi_sector +
-										to_sector(bio->bi_size))));
-	}
-	bc->mdreqs = NULL;
+	sector_t round_sector;
+	sector_t end_sector;
+	sector_t set_size;
+	index_t cur_set;
+	index_t first_set;
+	index_t last_set;
+	index_t i;
+	struct set_seq *cur_seq;
+	struct set_seq *next_seq;
+	int error;
 
 	/*
-	 * Acquire read lock on each of the sets one by one.
+	 * Find first set using start offset of the I/O and lock it.
+	 * Find next sets by adding the set offsets to the previous set
+	 * Identify all the sequences of set numbers that need locking.
+	 * Keep the sequences in sorted list.
+	 * For each set in each sequence
+	 * - acquire read lock on the set.
 	 */
 
-	if (start_set <= end_set) {
-		for (i = start_set; i <= end_set; i++) {
-			down_read(&dmc->cache_sets[i].rw_lock);
+	round_sector = EIO_ROUND_SET_SECTOR(dmc, bio->bi_sector);
+	set_size = dmc->block_size * dmc->assoc;
+	end_sector = bio->bi_sector + to_sector(bio->bi_size);
+	first_set = -1;
+	last_set = -1;
+	bc->bc_setspan = NULL;
+
+	while (round_sector < end_sector) {
+		cur_set = hash_block(dmc, round_sector);	
+		if (first_set == -1) {
+			first_set = cur_set;
+			last_set = cur_set;
+		} else if (cur_set == (last_set + 1)) {
+			last_set = cur_set;
+		} else {
+			/* 
+			 * Add the seq of start, end set to sorted (first, last) seq list 
+			 * and reinit the first and last set
+			 */
+			error = insert_set_seq(&bc->bc_setspan, first_set, last_set);
+			if (error) {
+				goto err_out;
+			}
+			first_set = cur_set;
+			last_set = cur_set;
 		}
+
+		round_sector += set_size;
+	}
+	
+	/* Add the remaining first, last set sequence */
+
+	VERIFY((first_set != -1) && (last_set == cur_set));
+
+	if (bc->bc_setspan == NULL) {
+		/* No sequence was added, can use singlespan */
+		cur_seq = &bc->bc_singlesspan;
+		cur_seq->first_set = first_set;
+		cur_seq->last_set = last_set;
+		cur_seq->next = NULL;
+		bc->bc_setspan = cur_seq; 
 	} else {
-		for (i = 0; i <= end_set; i++) {
-			down_read(&dmc->cache_sets[i].rw_lock);
+		error = insert_set_seq(&bc->bc_setspan, first_set, last_set);	
+		if (error) {
+			goto err_out;
 		}
-		for (i = start_set; i < dmc->num_sets; i++) {
+	}
+
+	/* Acquire read locks on the sets in the set span */
+	for (cur_seq = bc->bc_setspan; cur_seq; cur_seq = cur_seq->next) {
+		for (i = cur_seq->first_set; i <= cur_seq->last_set; i++) {
 			down_read(&dmc->cache_sets[i].rw_lock);
 		}
 	}
 
+	return 0;
+
+err_out:
+
+	/* Free the seqs in the seq list, unless it is just the local seq */
+	if (bc->bc_setspan != &bc->bc_singlesspan) {
+		for (cur_seq = bc->bc_setspan; cur_seq; cur_seq = next_seq) {
+			next_seq = cur_seq->next;
+			kfree(cur_seq);
+		}
+	}
 	return error;
 }
+
 
 /*
  * Allocate mdreq and md_blocks for each set.
  */
-
 static int
 eio_alloc_mdreqs(struct cache_c *dmc, struct bio_container *bc)
 {
@@ -2397,7 +2463,8 @@ eio_map(struct cache_c *dmc, struct request_queue *rq,
 	struct eio_bio *eend = NULL;
 	struct eio_bio *enext = NULL;
 
-	if (bio_rw_flagged(bio, BIO_RW_DISCARD)) {
+	VERIFY(bio->bi_idx == 0);
+	if (bio_rw_flagged(bio, REQ_DISCARD)) {
 		EIODEBUG("eio_map: Discard IO received. Invalidate incore start=%lu totalsectors=%d.\n",
 				(unsigned long)bio->bi_sector, (int)to_sector(bio->bi_size));
 		bio_endio(bio, 0);
@@ -2849,29 +2916,19 @@ eio_read(struct cache_c *dmc, struct bio_container *bc,
 		 * Pass all orig bio flags except UNPLUG.
 		 * Unplug in the end if flagged.
 		 */
-		int unplug, rw_flags;
+		int rw_flags;
 
-		unplug = 0;
 		rw_flags = 0;
 
 		bc->bc_dir = CACHED_READ;
 		ebio = ebegin;
 
 		VERIFY_BIO_FLAGS(ebio);
-		unplug = bio_rw_flagged(ebio->eb_bc->bc_bio, BIO_RW_UNPLUG);
-
-		/* Supress unplug in the beginning. */
-		if (unlikely(unplug))
-			rw_flags = (GET_BIO_FLAGS(ebio) & (~BIO_RW_UNPLUG));
 
 		VERIFY((rw_flags & 1) == READ);
 		while (ebio) {
 			enext = ebio->eb_next;
 			ebio->eb_iotype = EB_MAIN_IO;
-
-			/* last i/o issue unplug as well */
-			if (enext == NULL && unlikely(unplug))
-				rw_flags |= BIO_RW_UNPLUG;
 
 			eio_cached_read(dmc, ebio, rw_flags);
 			ebio = enext;
@@ -2922,8 +2979,7 @@ eio_write(struct cache_c *dmc, struct bio_container *bc,
 	} else {
 		/* Cached write. Start writes to SSD blocks */
 
-		int unplug, rw_flags;
-		unplug = 0;
+		int rw_flags;
 		rw_flags = 0;
 
 		bc->bc_dir = CACHED_WRITE;
@@ -2943,19 +2999,12 @@ eio_write(struct cache_c *dmc, struct bio_container *bc,
 		 */
 		ebio = ebegin;
 		VERIFY_BIO_FLAGS(ebio);
-		unplug = bio_rw_flagged(ebio->eb_bc->bc_bio, BIO_RW_UNPLUG);
-
-		/* Supress unplug in the beginning. */
-		if (unplug)
-			rw_flags |= (GET_BIO_FLAGS(ebio) & (~BIO_RW_UNPLUG));
 
 		while (ebio) {
 			enext = ebio->eb_next;
 			ebio->eb_iotype = EB_MAIN_IO;
 
 			if (!error) {
-				if (enext == NULL && unplug)
-					rw_flags |= BIO_RW_UNPLUG;
 
 				eio_cached_write(dmc, ebio, WRITE | rw_flags);
 
@@ -3294,7 +3343,7 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 
 			SECTOR_STATS(dmc->eio_stats.disk_writes, to_bytes(where.count));
 			down_read(&sioc.sio_lock);	
-			error = eio_io_async_bvec(dmc, &where, WRITE | BIO_RW_SYNCIO,
+			error = eio_io_async_bvec(dmc, &where, WRITE | REQ_SYNC,
 						bvecs, nr_bvecs, eio_sync_io_callback,
 						&sioc, 1);
 

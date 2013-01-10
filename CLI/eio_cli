@@ -106,6 +106,7 @@ class Cache_rec(Structure):
 		print "SSD Device       : " + self.ssd_name
 		print "Policy           : " + policies[self.policy] 
 		print "Mode             : " + modes[self.mode]
+		print "assoc		: " + self.assoc	
 
 		pass
 
@@ -222,6 +223,8 @@ def main():
 		ssd_sz.get_device_size_info(cache.ssd_name)
 		cache.ssd_size = ssd_sz.dev_size
 		cache.ssd_sector_size = ssd_sz.dev_sect_size
+
+		
 
 		cache.do_eio_ioctl(EIO_IOC_CREATE)
 		pass

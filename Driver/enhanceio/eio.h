@@ -712,7 +712,6 @@ struct cache_c {
 	u_int32_t		sb_state;		/* Superblock state */
 	u_int32_t		sb_version;		/* Superblock version */
 
-	u_int32_t		sb_version;		/* Superblock version */
 	int			readfill_in_prog;
 	struct eio_stats	eio_stats;		/* Run time stats */
 	struct eio_errors	eio_errors;		/* Error stats */
@@ -735,7 +734,7 @@ struct cache_c {
 	char			cache_name[DEV_PATHLEN];
 	char			cache_gendisk_name[DEV_PATHLEN]; /* Used for SSD failure checks */
 	char			cache_srcdisk_name[DEV_PATHLEN]; /* Used for SRC failure checks */
-	char			cache_srcdisk_name[DEV_PATHLEN]; /* Used for SRC failure checks */
+	char                    ssd_uuid[DEV_PATHLEN];	
 
 	struct cacheblock_md8	*cache_md8;
 	sector_t		cache_size;		/* Cache size passed to ctr(), used by dmsetup info */
@@ -761,7 +760,7 @@ struct cache_c {
 #define EIO_CACHE_IOSIZE		0
 
 #define EIO_ROUND_SECTOR(dmc, sector) (sector& (~(unsigned)(dmc->block_size - 1)))
-#define EIO_ROUND_SET(dmc, sector) (sector& (~(unsigned)((dmc->block_size * dmc->assoc) - 1)))
+#define EIO_ROUND_SET_SECTOR(dmc, sector) (sector& (~(unsigned)((dmc->block_size * dmc->assoc) - 1)))
 
 /*
  * The bit definitions are exported to the user space and are in the very beginning of the file.
@@ -1004,23 +1003,6 @@ extern void eio_unplug_cache_device(struct cache_c *dmc);
 extern void eio_put_cache_device(struct cache_c *dmc);
 extern void eio_suspend_caching(struct cache_c *dmc, dev_notifier_t note);
 extern void eio_resume_caching(struct cache_c *dmc, char *dev);
-
-static __inline__ int64_t
-atomic64_dec_if_positive(atomic64_t *v)
-{
-	int64_t cmp, old, dec;
-	cmp = ATOMIC_READ(v);
-	for (;;) {
-		dec = cmp - 1;
-		if (unlikely(dec < 0))
-			break;
-		old = ATOMIC_CMPXCHG((v), cmp, dec);
-		if (likely(old == cmp))
-			break;
-		cmp = old;
-	}
-	return dec;
-}
 
 static __inline__ void
 EIO_DBN_SET(struct cache_c *dmc, u_int64_t index, sector_t dbn)

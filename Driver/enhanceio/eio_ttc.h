@@ -24,19 +24,10 @@
 #include <stdint.h>
 #endif	/* __KERNEL__ */
 
-
-
-#define BIO_RW_BARRIER		REQ_FLUSH
-#define BIO_RW_DISCARD 		REQ_DISCARD
-#define WRITE_BARRIER   (WRITE | ((unsigned long)1 << BIO_RW_BARRIER))
-#define BIO_RW_UNPLUG		REQ_FLUSH
-#define BIO_RW_SYNCIO		REQ_SYNC
 static inline bool bio_rw_flagged(struct bio *bio, int flag)
 {
-        return (bio->bi_rw & (1 << flag)) != 0;
+        return (bio->bi_rw & flag) != 0;
 }
-
-#define bio_empty_barrier(bio)  (bio_rw_flagged(bio, BIO_RW_BARRIER) && !bio_has_data(bio) && !bio_rw_flagged(bio, BIO_RW_DISCARD))
 
 /*
  * Whether the cached (source) device is a partition or a whole device.
@@ -93,7 +84,13 @@ typedef enum eio_cache_state {
 #ifdef __KERNEL__
 
 #define EIO_HASHTBL_SIZE	1024
-#define EIO_MAGIC		1031	/* some prime number > EIO_HASHTBL_SIZE */
+
+/*
+ * In case of i/o errors while eio_clean_all, retry for
+ * finish_nrdirty_retry count.
+ */
+#define FINISH_NRDIRTY_RETRY_COUNT      2
+
 
 #define EIO_HASH_BDEV(dev)	\
 	((MAJOR(dev) * EIO_MAGIC + MINOR(dev)) % EIO_HASHTBL_SIZE)
