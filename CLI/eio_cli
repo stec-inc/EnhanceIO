@@ -62,6 +62,7 @@ class Cache_rec(Structure):
 	("name", c_char * 33),
 	("src_name", c_char * 129),
 	("ssd_name", c_char * 129),
+	("ssd_uuid", c_char * 129),
         ("src_size", c_ulong),	
 	("ssd_size", c_ulong),
         ("src_sector_size", c_int),
@@ -69,11 +70,12 @@ class Cache_rec(Structure):
 	("flags", c_int),
         ("policy", c_byte),
         ("mode", c_byte),
-        ("persistence", c_int, 1),
-        ("blksize", c_int),
-        ("assoc", c_uint)
+        ("persistence", c_byte),
+        ("cold_boot", c_byte),
+        ("blksize", c_ulong),
+        ("assoc", c_ulong)
 	]
-	def __init__(self, name, src_name="", ssd_name="", src_size=0, ssd_size=0, src_sector_size=0, ssd_sector_size=0, flags=0, policy="", mode="", persistence=0, blksize="", assoc=""): 
+	def __init__(self, name, src_name="", ssd_name="", src_size=0, ssd_size=0, src_sector_size=0, ssd_sector_size=0, flags=0, policy="", mode="", persistence=0, cold_boot="", blksize="", assoc=""): 
 	
 		modes = {"wt":3,"wb":1,"ro":2,"":0}
 		policies = {"rand":3,"fifo":1, "lru":2,"":0}
@@ -106,8 +108,8 @@ class Cache_rec(Structure):
 		print "SSD Device       : " + self.ssd_name
 		print "Policy           : " + policies[self.policy] 
 		print "Mode             : " + modes[self.mode]
-		print "block size	: " + str(self.blksize)	
-		print "assoc		: " + str(self.assoc)	
+		print "block size       : " + str(self.blksize)	
+		print "assocativity     : " + str(self.assoc)	
 
 		pass
 
@@ -134,6 +136,8 @@ class Cache_rec(Structure):
 		status = Status()
 		
 		if os.path.exists("/proc/enhanceio/" + self.name):
+
+			associativity = {2048:128, 4096:256, 8192:512,0:0}
 				
 			cmd = "cat /proc/enhanceio/" + self.name + "/config" + " | grep src_name" 
 			status = run_cmd(cmd)
@@ -150,6 +154,13 @@ class Cache_rec(Structure):
 			cmd = "cat /proc/enhanceio/" + self.name + "/config" + " | grep eviction"
 			status = run_cmd(cmd)
 			self.policy = int(status.output.split()[1])
+
+			cmd = "cat /proc/enhanceio/" + self.name + "/config" + " | grep block_size"
+			status = run_cmd(cmd)
+			self.blksize = int(status.output.split()[1])
+
+			self.assoc = associativity[self.blksize]		 
+
 
 						
 	
