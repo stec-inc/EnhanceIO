@@ -393,19 +393,15 @@ eio_post_io_callback(struct work_struct *work)
 	ebio = job->ebio;
 	VERIFY(ebio != NULL);
 	VERIFY(ebio->eb_bc);
-	
+
 	eb_cacheset = ebio->eb_cacheset;
 	if (error)
 		EIOERR("io_callback: io error %d block %lu action %d",
 		      error, job->job_io_regions.disk.sector, job->action);
-	
-	cstate = EIO_CACHE_STATE_GET(dmc, index);
-        printk(KERN_ERR"cache state : %u",cstate);	
 
 	switch (job->action) {
 	case WRITEDISK:
 
-		printk(KERN_ERR"write disk");
 		ATOMIC_INC(&dmc->eio_stats.writedisk);
 		if (unlikely(error))
 			dmc->eio_errors.disk_write_errors++;
@@ -421,7 +417,6 @@ eio_post_io_callback(struct work_struct *work)
 
 	case READDISK:
 
-		printk(KERN_ERR"readdisk");
 		if (unlikely(error) || unlikely(ebio->eb_iotype & EB_INVAL)
 			|| CACHE_DEGRADED_IS_SET(dmc)) {
 			if (error)
@@ -439,7 +434,6 @@ eio_post_io_callback(struct work_struct *work)
 
 	case READCACHE:
 
-		printk(KERN_ERR"readcache");
 		//ATOMIC_INC(&dmc->eio_stats.readcache);
 		//SECTOR_STATS(dmc->eio_stats.ssd_reads, ebio->eb_size);
 		VERIFY(EIO_DBN_GET(dmc, index) == EIO_ROUND_SECTOR(dmc,ebio->eb_sector));
@@ -468,7 +462,6 @@ eio_post_io_callback(struct work_struct *work)
 
 	case READFILL:
 		
-		printk(KERN_ERR"readfill");
 		//ATOMIC_INC(&dmc->eio_stats.readfill);
 		//SECTOR_STATS(dmc->eio_stats.ssd_writes, ebio->eb_size);
 		VERIFY(EIO_DBN_GET(dmc, index) == ebio->eb_sector);
@@ -483,7 +476,6 @@ eio_post_io_callback(struct work_struct *work)
 
 	case WRITECACHE:
 		
-		printk(KERN_ERR"writecache");
 		//SECTOR_STATS(dmc->eio_stats.ssd_writes, ebio->eb_size);
 		//ATOMIC_INC(&dmc->eio_stats.writecache);
 		cstate = EIO_CACHE_STATE_GET(dmc, index);
@@ -825,6 +817,7 @@ eio_do_readfill(struct work_struct *work)
 	struct cache_c *dmc = container_of(work, struct cache_c, readfill_wq);
 
 	EIO_SIM_PR1();
+
 
 	SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
 	if (dmc->readfill_in_prog)
@@ -1630,12 +1623,6 @@ eio_cached_read(struct cache_c *dmc, struct eio_bio* ebio, int rw_flags)
 					ebio->eb_bv, ebio->eb_nbvec,
 					eio_io_callback, job, 0);
 
-		SECTOR_STATS(dmc->eio_stats.read_hits, ebio->eb_size);
-		SECTOR_STATS(dmc->eio_stats.ssd_reads, ebio->eb_size);
-		ATOMIC_INC(&dmc->eio_stats.readcache);
-		err = eio_io_async_bvec(dmc, &job->job_io_regions.cache, rw_flags,
-					ebio->eb_bv, ebio->eb_nbvec,
-					eio_io_callback, job, 0);
 		
 	}
 	if (err) {
@@ -2122,6 +2109,7 @@ eio_disk_io(struct cache_c *dmc, struct bio *bio,
 	ebio->eb_next = anchored_bios; //Anchor the ebio list to this super bio
 	job = eio_new_job(dmc, ebio, -1);
 
+
 	if (unlikely(job == NULL)) {
 		error = -ENOMEM;
 		goto errout;
@@ -2147,6 +2135,7 @@ eio_disk_io(struct cache_c *dmc, struct bio *bio,
 					GET_BIO_FLAGS(ebio),
 					ebio->eb_bv, ebio->eb_nbvec,
 					eio_io_callback, job, 1);
+
 	if (error) {
 		job->ebio = NULL;
 		eio_free_cache_job(job);

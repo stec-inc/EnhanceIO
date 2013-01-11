@@ -70,15 +70,15 @@ class Cache_rec(Structure):
         ("policy", c_byte),
         ("mode", c_byte),
         ("persistence", c_int, 1),
-        ("blksize", c_ulong),
-        ("assosc", c_ulong)
+        ("blksize", c_int),
+        ("assoc", c_uint)
 	]
-	def __init__(self, name, src_name="", ssd_name="", src_size=0, ssd_size=0, src_sector_size=0, ssd_sector_size=0, flags=0, policy="", mode="", persistence=0, blksize="", assosc=""): 
+	def __init__(self, name, src_name="", ssd_name="", src_size=0, ssd_size=0, src_sector_size=0, ssd_sector_size=0, flags=0, policy="", mode="", persistence=0, blksize="", assoc=""): 
 	
 		modes = {"wt":3,"wb":1,"ro":2,"":0}
 		policies = {"rand":3,"fifo":1, "lru":2,"":0}
 		blksizes = {"4096":4096, "2048":2048, "8192":8192,"":0}	
-		assosciativity = {2048:128, 4096:256, 8192:512,"":0}
+		associativity = {2048:128, 4096:256, 8192:512,0:0}
 		
 		self.name = name
 		self.src_name =src_name
@@ -92,7 +92,7 @@ class Cache_rec(Structure):
 		self.mode = modes[mode]
 		self.persistence = persistence
 		self.blksize = blksizes[blksize]
-		self.assosc = assosciativity[assosc]		 
+		self.assoc = associativity[self.blksize]		 
 	
 	def print_info(self):
 	
@@ -100,13 +100,14 @@ class Cache_rec(Structure):
 		modes = {3:"Write Through", 1:"Write Back", 2:"Read Only",0:"N/A"}
 		policies = {3:"rand", 1:"fifo", 2:"lru", 0:"N/A"}
 
-		print ""
+
 		print "Cache Name       : " + self.name 
 		print "Source Device    : " + self.src_name 
 		print "SSD Device       : " + self.ssd_name
 		print "Policy           : " + policies[self.policy] 
 		print "Mode             : " + modes[self.mode]
-		print "assoc		: " + self.assoc	
+		print "block size	: " + str(self.blksize)	
+		print "assoc		: " + str(self.assoc)	
 
 		pass
 
@@ -224,7 +225,7 @@ def main():
 		cache.ssd_size = ssd_sz.dev_size
 		cache.ssd_sector_size = ssd_sz.dev_sect_size
 
-		
+		cache.print_info()	
 
 		cache.do_eio_ioctl(EIO_IOC_CREATE)
 		pass
