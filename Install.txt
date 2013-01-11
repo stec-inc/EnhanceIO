@@ -18,20 +18,26 @@ Run following commands as root
 
 3) Driver installation
 
-   1. Copy Driver/enhanceio dir under $(KERNEL_SRC)/drivers/block
-      Apply config patch
-      patch -p0 < <pathto Driver directory> config.patch
+   1. Let's say kernel sources are located at the path KERNEL_SRC and the driver has been downloaded
+      at the path DRIVER_REPO
+      Copy Driver/enhanceio dir under KERNEL_SRC/drivers/block
+      Apply config patch.
+      cd KERNEL_SRC; patch -p0 < DRIVER_REPO/Driver/config.patch
 
    2. Regenerate config file
       Run make menuconfig and save the configuration
 
    3. To compile:
-      > cd $(KERNEL_SRC)
+      > cd KERNEL_SRC
       > make modules
 
    4. To install modules
       > make modules_install
 
-4) You can now create enhanceio caches using the utility eio_cli. Please refer
+4) manually load modules by running
+   modprobe enhanceio_fifo
+   modprobe enhanceio_lru
+   modprobe enhanceio
+   You can now create enhanceio caches using the utility eio_cli. Please refer
    to Documents/Persistence.txt for information about making a cache
    configuration persistent across reboot.
