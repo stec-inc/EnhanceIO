@@ -153,7 +153,7 @@ eio_process_ssd_rm_list(void)
 		if (ssd_list_ptr->action == BUS_NOTIFY_DEL_DEVICE)
 			eio_suspend_caching(ssd_list_ptr->dmc, ssd_list_ptr->note);
 		else
-			EIOERR("eio_process_ssd_rm_list: Unknown status (0x%x)\n", ssd_list_ptr->action);
+			pr_err("eio_process_ssd_rm_list: Unknown status (0x%x)\n", ssd_list_ptr->action);
 		list_del(&ssd_list_ptr->list);
 		kfree(ssd_list_ptr);
 	}
@@ -228,7 +228,7 @@ eio_sync_endio(struct bio *bio, int error)
 {
         if(error) {
                 clear_bit(BIO_UPTODATE, &bio->bi_flags);
-		EIOERR("eio_sync_endio: error: %d\n", error);
+		pr_err("eio_sync_endio: error: %d\n", error);
 	}
 
         if(bio->bi_private)
@@ -357,7 +357,7 @@ eio_suspend_caching(struct cache_c *dmc, dev_notifier_t note)
 
 	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 	if (dmc->mode != CACHE_MODE_WB && CACHE_FAILED_IS_SET(dmc)) {
-		EIOERR("suspend caching: Cache \"%s\" is already in FAILED state, exiting.\n",
+		pr_err("suspend caching: Cache \"%s\" is already in FAILED state, exiting.\n",
 				dmc->cache_name);
 		SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 		return;
@@ -370,7 +370,7 @@ eio_suspend_caching(struct cache_c *dmc, dev_notifier_t note)
 			dmc->cache_flags |= CACHE_FLAGS_FAILED;
 			dmc->eio_errors.no_source_dev = 1;
 			ATOMIC_SET(&dmc->eio_stats.cached_blocks, 0);
-			EIOINFO("suspend_caching: Source Device Removed. Cache \"%s\" is in Failed mode.\n",
+			pr_info("suspend_caching: Source Device Removed. Cache \"%s\" is in Failed mode.\n",
 					dmc->cache_name);
 			break;
 
@@ -384,24 +384,24 @@ eio_suspend_caching(struct cache_c *dmc, dev_notifier_t note)
 				 */
 				VERIFY(!CACHE_DEGRADED_IS_SET(dmc));
 				dmc->cache_flags |= CACHE_FLAGS_FAILED;
-				EIOINFO("suspend caching: SSD Device Removed. Cache \"%s\" is in Failed mode.\n",
+				pr_info("suspend caching: SSD Device Removed. Cache \"%s\" is in Failed mode.\n",
 						dmc->cache_name);
 			} else {
 				if (CACHE_DEGRADED_IS_SET(dmc) || CACHE_SSD_ADD_INPROG_IS_SET(dmc)) {
 					SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
-					EIOERR("suspend_caching: Cache \"%s\" is either degraded or device add in progress, exiting.\n",
+					pr_err("suspend_caching: Cache \"%s\" is either degraded or device add in progress, exiting.\n",
 						dmc->cache_name);
 					return;
 				}
 				dmc->cache_flags |= CACHE_FLAGS_DEGRADED;
 				ATOMIC_SET(&dmc->eio_stats.cached_blocks, 0);
-				EIOINFO("suspend caching: Cache \"%s\" is in Degraded mode.\n", dmc->cache_name);
+				pr_info("suspend caching: Cache \"%s\" is in Degraded mode.\n", dmc->cache_name);
 			}
 			dmc->eio_errors.no_cache_dev = 1;
 			break;
 
 		default:
-			EIOERR("suspend_caching: incorrect notify message.\n");
+			pr_err("suspend_caching: incorrect notify message.\n");
 			break;
 	}
 
@@ -426,17 +426,17 @@ eio_resume_caching(struct cache_c *dmc, char *dev)
 	EIO_SIM_PR1();
 
 	if (dmc == NULL || dev == NULL) {
-		EIOERR("resume_caching: Null device or cache instance when resuming caching.\n");
+		pr_err("resume_caching: Null device or cache instance when resuming caching.\n");
 		return;
 	}
 	if (strlen(dev) >= DEV_PATHLEN) {
-		EIOERR("resume_caching: Device name %s too long.\n", dev);
+		pr_err("resume_caching: Device name %s too long.\n", dev);
 		return;
 	}
 
 	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 	if (CACHE_STALE_IS_SET(dmc)) {
-		EIOERR("eio_resume_caching: Hard Failure Detected!! Cache \"%s\" can not be resumed.",
+		pr_err("eio_resume_caching: Hard Failure Detected!! Cache \"%s\" can not be resumed.",
 				dmc->cache_name);
 		SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 		return;
@@ -445,7 +445,7 @@ eio_resume_caching(struct cache_c *dmc, char *dev)
 	/* sanity check for writeback */
 	if (dmc->mode == CACHE_MODE_WB) {
 		if (!CACHE_FAILED_IS_SET(dmc) || CACHE_SRC_IS_ABSENT(dmc) || CACHE_SSD_ADD_INPROG_IS_SET(dmc)) {
-			EIODEBUG("eio_resume_caching: Cache not in Failed state or Source is absent or SSD add already in progress for cache \"%s\".\n",
+			pr_debug("eio_resume_caching: Cache not in Failed state or Source is absent or SSD add already in progress for cache \"%s\".\n",
 					dmc->cache_name);
 			SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 			return;
@@ -453,7 +453,7 @@ eio_resume_caching(struct cache_c *dmc, char *dev)
 	} else {
 		/* sanity check for WT or RO cache. */
 		if (CACHE_FAILED_IS_SET(dmc) || !CACHE_DEGRADED_IS_SET(dmc) || CACHE_SSD_ADD_INPROG_IS_SET(dmc)) {
-			EIOERR("resume_caching: Cache \"%s\" is either in failed mode or cache device add in progress, ignoring.\n",
+			pr_err("resume_caching: Cache \"%s\" is either in failed mode or cache device add in progress, ignoring.\n",
 					dmc->cache_name);
 			SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 			return;
@@ -466,7 +466,7 @@ eio_resume_caching(struct cache_c *dmc, char *dev)
 	r = eio_ctr_ssd_add(dmc, dev);
 	if (r) {
 		/* error */
-		EIODEBUG("resume caching: returned error: %d\n", r);
+		pr_debug("resume caching: returned error: %d\n", r);
 		SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 		dmc->cache_flags &= ~CACHE_FLAGS_SSD_ADD_INPROG;
 		SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
@@ -481,5 +481,5 @@ eio_resume_caching(struct cache_c *dmc, char *dev)
 		dmc->cache_flags &= ~CACHE_FLAGS_FAILED;
 	dmc->cache_flags &= ~CACHE_FLAGS_SSD_ADD_INPROG;
 	SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
-	EIOINFO("resume_caching: cache \"%s\" is restored to ACTIVE mode.\n", dmc->cache_name);
+	pr_info("resume_caching: cache \"%s\" is restored to ACTIVE mode.\n", dmc->cache_name);
 }

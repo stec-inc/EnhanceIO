@@ -151,8 +151,8 @@ eio_io_async_pages(struct cache_c *dmc, struct eio_io_region *where, int rw,
 
 	if (unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
 		if (where->bdev != dmc->disk_dev->bdev) {
-			EIOERR("eio_io_async_pages: Cache is in degraded mode.\n");
-			EIOERR("eio_io_async_pages: Can not issue i/o to ssd device.\n");
+			pr_err("eio_io_async_pages: Cache is in degraded mode.\n");
+			pr_err("eio_io_async_pages: Can not issue i/o to ssd device.\n");
 			return -ENODEV;
 		}
 	}
@@ -181,8 +181,8 @@ eio_io_async_bvec(struct cache_c *dmc, struct eio_io_region *where, int rw,
 
 	if (unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
 		if (where->bdev != dmc->disk_dev->bdev) {
-			EIOERR("eio_io_async_bvec: Cache is in degraded mode.\n");
-			EIOERR("eio_io_async_Bvec: Can not issue i/o to ssd device.\n");
+			pr_err("eio_io_async_bvec: Cache is in degraded mode.\n");
+			pr_err("eio_io_async_Bvec: Can not issue i/o to ssd device.\n");
 			return -ENODEV;
 		}
 	}
@@ -301,7 +301,7 @@ eio_disk_io_callback(int error, void *context)
 	SPIN_UNLOCK_IRQRESTORE(&dmc->cache_sets[eb_cacheset].cs_lock, flags);
 
 	if (unlikely(error))
-		EIOERR("disk_io_callback: io error %d block %lu action %d",
+		pr_err("disk_io_callback: io error %d block %lu action %d",
 			error, job->job_io_regions.disk.sector, job->action);
 
 	eb_endio(ebio, error);
@@ -396,7 +396,7 @@ eio_post_io_callback(struct work_struct *work)
 
 	eb_cacheset = ebio->eb_cacheset;
 	if (error)
-		EIOERR("io_callback: io error %d block %lu action %d",
+		pr_err("io_callback: io error %d block %lu action %d",
 		      error, job->job_io_regions.disk.sector, job->action);
 
 	switch (job->action) {
@@ -499,7 +499,7 @@ eio_post_io_callback(struct work_struct *work)
 		break;
 
 	default:
-		EIOERR("io_callback: invalid action %d", job->action);
+		pr_err("io_callback: invalid action %d", job->action);
 		return;
 	}
 
@@ -885,7 +885,7 @@ eio_do_readfill(struct work_struct *work)
 												eio_io_callback, job, 0);
 						}
 						if (err) {
-							EIOERR("eio_do_readfill: IO submission failed, block %llu", EIO_DBN_GET(dmc, index));
+							pr_err("eio_do_readfill: IO submission failed, block %llu", EIO_DBN_GET(dmc, index));
 							spin_lock_irqsave(&dmc->cache_sets[iebio->eb_cacheset].cs_lock, flags);
 							EIO_CACHE_STATE_SET(dmc, iebio->eb_index, INVALID);
 							spin_unlock_irqrestore(&dmc->cache_sets[iebio->eb_cacheset].cs_lock, flags);
@@ -919,7 +919,7 @@ eio_do_readfill(struct work_struct *work)
 						}
 
 						if (err) {
-							EIOERR("eio_do_readfill: dirty block read IO submission failed, block %llu", 
+							pr_err("eio_do_readfill: dirty block read IO submission failed, block %llu", 
 									EIO_DBN_GET(dmc, index));
 							/* can't invalidate the DIRTY block, just return error */
 							eb_endio(iebio, err);
@@ -1582,7 +1582,7 @@ eio_comply_dirty_thresholds(struct cache_c *dmc, index_t set)
 	 */
 
 	if (unlikely(CACHE_FAILED_IS_SET(dmc))) {
-		EIODEBUG("eio_comply_dirty_thresholds: Cache %s is in failed mode.\n",
+		pr_debug("eio_comply_dirty_thresholds: Cache %s is in failed mode.\n",
 				dmc->cache_name);
 		return;
 	}
@@ -1627,7 +1627,7 @@ eio_cached_read(struct cache_c *dmc, struct eio_bio* ebio, int rw_flags)
 	}
 	if (err) {
 		unsigned long flags;
-		EIOERR("eio_cached_read: IO submission failed, block %llu", EIO_DBN_GET(dmc, index));
+		pr_err("eio_cached_read: IO submission failed, block %llu", EIO_DBN_GET(dmc, index));
 		spin_lock_irqsave(&dmc->cache_sets[ebio->eb_cacheset].cs_lock, flags);
 		/* 
 		 * For already DIRTY block, invalidation is too costly, skip it. 
@@ -1706,19 +1706,19 @@ eio_invalidate_sanity_check(struct cache_c *dmc, u_int64_t iosector,
 	 * Sanity check the arguements
 	 */
 	if(unlikely(*num_sectors == 0)) {
-		EIOINFO("invaldate_sector_range: nothing to do because number of sectors specified is zero");
+		pr_info("invaldate_sector_range: nothing to do because number of sectors specified is zero");
 		return -EINVAL;
 	}
 
 	disk_size = to_sector(eio_get_device_size(dmc->disk_dev));
 	if (iosector >= disk_size) {
-		EIOERR("eio_inval_range: nothing to do because starting sector is past last sector (%lu > %lu)",
+		pr_err("eio_inval_range: nothing to do because starting sector is past last sector (%lu > %lu)",
 			(long unsigned int)iosector, (long unsigned int)disk_size);
 		return -EINVAL;
 	}
 
 	if ((iosector + (*num_sectors)) > disk_size) {
-		EIOINFO("eio_inval_range: trimming range because there are less sectors to invalidate than requested. (%lu < %lu)",
+		pr_info("eio_inval_range: trimming range because there are less sectors to invalidate than requested. (%lu < %lu)",
 			(long unsigned int)(disk_size - iosector), (long unsigned int)*num_sectors);
 		*num_sectors = (disk_size - iosector);
 	}
@@ -1737,7 +1737,7 @@ eio_invalidate_sector_range(char *cache_name, u_int64_t iosector, u_int64_t num_
 	dmc = eio_find_cache(cache_name);
 
 	if (dmc == NULL) {
-		EIOERR("invalidate_sector_range: cache object with name=%s does not exist.",
+		pr_err("invalidate_sector_range: cache object with name=%s does not exist.",
 			cache_name);
 		return -EINVAL;
 	}
@@ -1750,7 +1750,7 @@ eio_invalidate_sector_range(char *cache_name, u_int64_t iosector, u_int64_t num_
 		return ret;
 
 	if (CACHE_VERBOSE_IS_SET(dmc)) {
-		EIOINFO("eio_inval_range: Invalidated sector range from sector=%lu to sector=%lu",
+		pr_info("eio_inval_range: Invalidated sector range from sector=%lu to sector=%lu",
 			(long unsigned int)iosector, (long unsigned int)num_sectors);
 	}
 
@@ -1886,7 +1886,7 @@ eio_uncached_write(struct cache_c *dmc, struct eio_bio *ebio)
 	}
 
 	if (err) {
-		EIOERR("eio_uncached_write: IO submission failed, block %llu",
+		pr_err("eio_uncached_write: IO submission failed, block %llu",
 				EIO_DBN_GET(dmc, index));
 		spin_lock_irqsave(&dmc->cache_sets[ebio->eb_cacheset].cs_lock, flags);
 		if (EIO_CACHE_STATE_GET(dmc, ebio->eb_index) == ALREADY_DIRTY) {
@@ -1965,7 +1965,7 @@ eio_cached_write(struct cache_c *dmc, struct eio_bio *ebio, int rw_flags)
 	}
 
 	if (err) {
-		EIOERR("eio_cached_write: IO submission failed, block %llu", EIO_DBN_GET(dmc, index));
+		pr_err("eio_cached_write: IO submission failed, block %llu", EIO_DBN_GET(dmc, index));
 		spin_lock_irqsave(&dmc->cache_sets[ebio->eb_cacheset].cs_lock, flags);
 		cstate = EIO_CACHE_STATE_GET(dmc, index);
 		if (cstate == DIRTY_INPROG) {
@@ -2349,7 +2349,7 @@ eio_alloc_mdreqs(struct cache_c *dmc, struct bio_container *bc)
 						ret = eio_alloc_wb_bvecs(mdreq->mdblk_bvecs, nr_bvecs,
 								SECTORS_PER_PAGE);
 					if (ret) {
-						EIOERR("eio_alloc_mdreqs: failed to allocated pages\n");
+						pr_err("eio_alloc_mdreqs: failed to allocated pages\n");
 						kfree(mdreq->mdblk_bvecs);
 						mdreq->mdblk_bvecs = NULL;
 					}
@@ -2453,18 +2453,21 @@ eio_map(struct cache_c *dmc, struct request_queue *rq,
 	struct eio_bio *enext = NULL;
 
 	VERIFY(bio->bi_idx == 0);
+
+	pr_debug("this needs to be removed immediately \n");	
+
 	if (bio_rw_flagged(bio, REQ_DISCARD)) {
-		EIODEBUG("eio_map: Discard IO received. Invalidate incore start=%lu totalsectors=%d.\n",
+		pr_debug("eio_map: Discard IO received. Invalidate incore start=%lu totalsectors=%d.\n",
 				(unsigned long)bio->bi_sector, (int)to_sector(bio->bi_size));
 		bio_endio(bio, 0);
-		EIOERR("eio_map: I/O with Discard flag received. Discard flag is not supported.\n");
+		pr_err("eio_map: I/O with Discard flag received. Discard flag is not supported.\n");
 		return 0;
 	}
 
 	if (unlikely(dmc->cache_rdonly)) {
 		if (data_dir != READ) {
 			bio_endio(bio, -EPERM);
-			EIODEBUG("eio_map: cache is read only, write not permitted\n");
+			pr_debug("eio_map: cache is read only, write not permitted\n");
 			return 0;
 		}
 	}
@@ -3001,7 +3004,7 @@ eio_write(struct cache_c *dmc, struct bio_container *bc,
 				unsigned long flags;
 				u_int8_t cstate;
 
-				EIOERR("eio_write: IO submission failed, block %llu",
+				pr_err("eio_write: IO submission failed, block %llu",
 						 EIO_DBN_GET(dmc, ebio->eb_index));
 				spin_lock_irqsave(&dmc->cache_sets[ebio->eb_cacheset].cs_lock,
 										flags);
@@ -3044,7 +3047,7 @@ eio_clean_all(struct cache_c *dmc)
 		 atomic_inc(&dmc->clean_index)) {
 
 		if (unlikely(CACHE_FAILED_IS_SET(dmc))) {
-			EIOERR("clean_all: CACHE \"%s\" is in FAILED state.",
+			pr_err("clean_all: CACHE \"%s\" is in FAILED state.",
 					dmc->cache_name);
 			break;
 		}
@@ -3193,7 +3196,7 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 
 	/* Cache is failed mode, do nothing. */
 	if (unlikely(CACHE_FAILED_IS_SET(dmc))) {
-		EIODEBUG("clean_set: CACHE \"%s\" is in FAILED state.",
+		pr_debug("clean_set: CACHE \"%s\" is in FAILED state.",
 			dmc->cache_name);
 		goto err_out1;
 	}
@@ -3470,7 +3473,7 @@ eio_clean_aged_sets(struct work_struct *work)
 	 * In FAILED state, dont schedule cleaning of sets.
 	 */
 	if (unlikely(CACHE_FAILED_IS_SET(dmc))) {
-		EIODEBUG("clean_aged_sets: Cache \"%s\" is in failed mode.\n",
+		pr_debug("clean_aged_sets: Cache \"%s\" is in failed mode.\n",
 				dmc->cache_name);
 		/*
 		 * This is to make sure that this thread is rescheduled

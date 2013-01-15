@@ -27,6 +27,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include "os.h"
 /* Generic policy functions prototyes */
 int eio_lru_init(struct cache_c *);
@@ -105,7 +107,7 @@ eio_lru_cache_sets_init(struct eio_policy *p_ops)
 		cache_sets[i].lru_tail = EIO_LRU_NULL;
 		cache_sets[i].lru_head = EIO_LRU_NULL;
 	}
-	EIOINFO("Initialized %d sets in LRU", i);
+	pr_info("Initialized %d sets in LRU", i);
 
 	return 0;
 }
@@ -144,7 +146,7 @@ eio_lru_instance_init(void)
 
 	new_instance = (struct eio_policy *)vmalloc(sizeof (struct eio_policy));
 	if (new_instance == NULL) {
-		EIOERR("eio_lru_instance_init: vmalloc failed");
+		pr_err("eio_lru_instance_init: vmalloc failed");
 		return NULL;
 	}
 
@@ -163,7 +165,7 @@ eio_lru_instance_init(void)
 	try_module_get(THIS_MODULE);
 #endif /* EIO_SIM */
 
-	EIOINFO("eio_lru_instance_init: created new instance of LRU");
+	pr_info("eio_lru_instance_init: created new instance of LRU");
 
 	return new_instance;
 }
@@ -329,7 +331,7 @@ lru_register(void)
 
 	ret = eio_register_policy(&eio_lru_ops);
 	if (ret != 0)
-		EIOINFO("eio_lru already registered");
+		pr_info("eio_lru already registered");
 
 	return ret;
 }
@@ -347,7 +349,7 @@ lru_unregister(void)
 
 	ret = eio_unregister_policy(&eio_lru_ops);
 	if (ret != 0)
-		EIOERR("eio_lru unregister failed");
+		pr_err("eio_lru unregister failed");
 }
 
 #ifndef EIO_SIM

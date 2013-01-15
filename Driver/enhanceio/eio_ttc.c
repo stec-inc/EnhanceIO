@@ -188,7 +188,7 @@ eio_ttc_activate(struct cache_c *dmc)
 
 	bdev = dmc->disk_dev->bdev;
 	if (bdev == NULL) {
-		EIOERR("cache_create: Source device not found\n");
+		pr_err("cache_create: Source device not found\n");
 		return (-ENODEV);
 	}
 	rq = bdev->bd_disk->queue;
@@ -202,7 +202,7 @@ eio_ttc_activate(struct cache_c *dmc)
 	dmc->dev_end_sect =
 		bdev->bd_part->start_sect + bdev->bd_part->nr_sects - 1;
 
-	EIODEBUG("eio_ttc_activate: Device/Partition"
+	pr_debug("eio_ttc_activate: Device/Partition"
 		 " sector_start: %llu, end: %llu\n",
 		 (uint64_t)dmc->dev_start_sect, (uint64_t)dmc->dev_end_sect);
 
@@ -258,9 +258,9 @@ eio_ttc_activate(struct cache_c *dmc)
 out:
 	if (error == -EINVAL) {
 		if (wholedisk)
-			EIOERR("cache_create: A partition of this device is already cached.\n");
+			pr_err("cache_create: A partition of this device is already cached.\n");
 		else
-			EIOERR("cache_create: Device is already cached.\n");
+			pr_err("cache_create: Device is already cached.\n");
 	}
 	return error;
 }
@@ -287,12 +287,12 @@ eio_ttc_deactivate(struct cache_c *dmc, int force)
 		if (!CACHE_FAILED_IS_SET(dmc))  {
 			ret = eio_finish_nrdirty(dmc);
 			if (ret) {
-				EIOERR("ttc_deactivate: nrdirty failed to finish for cache \"%s\".",
+				pr_err("ttc_deactivate: nrdirty failed to finish for cache \"%s\".",
 					dmc->cache_name);
 				return ret;
 			}
 		} else {
-			EIODEBUG("ttc_deactivate: Cache \"%s\" failed is already set. Continue with cache delete.",
+			pr_debug("ttc_deactivate: Cache \"%s\" failed is already set. Continue with cache delete.",
 					dmc->cache_name);
 		}
 	}
@@ -428,7 +428,7 @@ re_lookup:
 		     (bio->bi_sector + to_sector(bio->bi_size) - 1 <=
 		      dmc1->dev_end_sect))) {
 			overlap = 1;
-			EIOERR("Overlapping I/O detected on %s cache at sector: %llu, size: %u\n",
+			pr_err("Overlapping I/O detected on %s cache at sector: %llu, size: %u\n",
 				dmc1->cache_name, (uint64_t)bio->bi_sector, bio->bi_size);
 			break;
 		}
@@ -438,7 +438,7 @@ re_lookup:
 		up_read(&eio_ttc_lock[index]);
 
 		if (bio_rw_flagged(bio, REQ_DISCARD)) {
-			EIOERR("eio_mfn: Overlap I/O with Discard flag received."
+			pr_err("eio_mfn: Overlap I/O with Discard flag received."
 				" Discard flag is not supported.\n");
 			bio_endio(bio, -EOPNOTSUPP);
 		} else {
@@ -800,7 +800,7 @@ int eio_async_io(struct cache_c *dmc, struct eio_io_region *where, int rw, struc
 
 	io = mempool_alloc(_io_pool, GFP_NOIO);
 	if (unlikely(io == NULL)) {
-		EIOERR("eio_async_io: failed to allocate eio_context.\n");
+		pr_err("eio_async_io: failed to allocate eio_context.\n");
 		return -ENOMEM;
 	}
 	BZERO((char *)io, sizeof (struct eio_context));
@@ -970,7 +970,7 @@ eio_finish_nrdirty(struct cache_c *dmc)
 
 	/* Wait for the in-flight I/Os to drain out */
 	while (ATOMIC_READ(&dmc->nr_ios) != 0) {
-		EIODEBUG("finish_nrdirty: Draining I/O inflight\n");
+		pr_debug("finish_nrdirty: Draining I/O inflight\n");
 		schedule_timeout(msecs_to_jiffies(1));
 	}
 	VERIFY(!(dmc->sysctl_active.do_clean & EIO_CLEAN_START));
@@ -984,7 +984,7 @@ eio_finish_nrdirty(struct cache_c *dmc)
 	 */
 	do {
 		if (unlikely(CACHE_FAILED_IS_SET(dmc))) {
-			EIOERR("finish_nrdirty: CACHE \"%s\" is in FAILED state.",
+			pr_err("finish_nrdirty: CACHE \"%s\" is in FAILED state.",
 				dmc->cache_name);
 			ret = -ENODEV;
 			break;
@@ -1007,7 +1007,7 @@ eio_finish_nrdirty(struct cache_c *dmc)
 		ret = -EINVAL;
 	}
 	if (ret)
-		EIOERR("finish_nrdirty: Failed to finish %lu dirty blocks for cache \"%s\".",
+		pr_err("finish_nrdirty: Failed to finish %lu dirty blocks for cache \"%s\".",
 			ATOMIC_READ(&dmc->nr_dirty), dmc->cache_name);
 
 	return ret;
@@ -1027,7 +1027,7 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 
 	dmc = eio_cache_lookup(cache_name);
 	if (NULL == dmc) {
-		EIOERR("cache_edit: cache %s do not exist", cache_name);
+		pr_err("cache_edit: cache %s do not exist", cache_name);
 		return -EINVAL;
 	}
 
@@ -1035,7 +1035,7 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 		return 0;
 
 	if (unlikely(CACHE_FAILED_IS_SET(dmc)) || unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
-		EIOERR("cache_edit: Cannot proceed with edit for cache \"%s\"."
+		pr_err("cache_edit: Cannot proceed with edit for cache \"%s\"."
 			" Cache is in failed or degraded state.",
 			dmc->cache_name);
 		return -EINVAL;
@@ -1043,13 +1043,13 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 
 	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 	if (dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG) {
-		EIOERR("cache_edit: system shutdown in progress, cannot edit"
+		pr_err("cache_edit: system shutdown in progress, cannot edit"
 			" cache %s", cache_name);
 		SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 		return -EINVAL;
 	}
 	if (dmc->cache_flags & CACHE_FLAGS_MOD_INPROG) {
-		EIOERR("cache_edit: simultaneous edit/delete operation on cache"
+		pr_err("cache_edit: simultaneous edit/delete operation on cache"
 			" %s is not permitted", cache_name);
 		SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 		return -EINVAL;
@@ -1060,7 +1060,7 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 
 	if (dmc->mode == CACHE_MODE_WB) {
 		if (CACHE_FAILED_IS_SET(dmc)) {
-			EIOERR("cache_edit:  Can not proceed with edit for Failed cache \"%s\".",
+			pr_err("cache_edit:  Can not proceed with edit for Failed cache \"%s\".",
 				dmc->cache_name);
 			error = -EINVAL;
 			goto out;
@@ -1072,7 +1072,7 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 	/* Wait for nr_dirty to drop to zero */
 	if (dmc->mode == CACHE_MODE_WB && mode != CACHE_MODE_WB) {
 		if (CACHE_FAILED_IS_SET(dmc)) {
-			EIOERR("cache_edit:  Can not proceed with edit for Failed cache \"%s\".",
+			pr_err("cache_edit:  Can not proceed with edit for Failed cache \"%s\".",
 				dmc->cache_name);
 			error = -EINVAL;
 			goto out;
@@ -1081,7 +1081,7 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 		error = eio_finish_nrdirty(dmc);
 		/* This error can mostly occur due to Device removal */
 		if (unlikely(error)) {
-			EIOERR("cache_edit: nr_dirty FAILED to finish for cache \"%s\".",
+			pr_err("cache_edit: nr_dirty FAILED to finish for cache \"%s\".",
 				dmc->cache_name);
 			goto out;
 		}
@@ -1095,11 +1095,11 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 
 	/* Wait for the in-flight I/Os to drain out */
 	while (ATOMIC_READ(&dmc->nr_ios) != 0) {
-		EIODEBUG("cache_edit: Draining I/O inflight\n");
+		pr_debug("cache_edit: Draining I/O inflight\n");
 		schedule_timeout(msecs_to_jiffies(1));
 	}
 
-	EIODEBUG("cache_edit: Blocking application I/O\n");
+	pr_debug("cache_edit: Blocking application I/O\n");
 
 	VERIFY(ATOMIC_READ(&dmc->nr_ios) == 0);
 
@@ -1128,7 +1128,7 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 	error = eio_sb_store(dmc);
 	if (error) {
 		/* XXX: In case of error put the cache in degraded mode. */
-		EIOERR("eio_cache_edit: superblock update failed(error %d)",
+		pr_err("eio_cache_edit: superblock update failed(error %d)",
 			error);
 		goto out;
 	}
@@ -1151,12 +1151,12 @@ out:
 
 	/* Restart async-task for "WB" cache. */
 	if ((dmc->mode == CACHE_MODE_WB) && (restart_async_task == 1)) {
-		EIODEBUG("cache_edit: Restarting the clean_thread.\n");
+		pr_debug("cache_edit: Restarting the clean_thread.\n");
 		VERIFY(dmc->clean_thread == NULL);
 		ret = eio_start_clean_thread(dmc);
 		if (ret) {
 			error = ret;
-			EIOERR("cache_edit: Failed to restart async tasks. error=%d.\n", ret);
+			pr_err("cache_edit: Failed to restart async tasks. error=%d.\n", ret);
 		}
 		if (dmc->sysctl_active.time_based_clean_interval &&
 		    ATOMIC_READ(&dmc->nr_dirty)) {
@@ -1168,7 +1168,7 @@ out:
 	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 	dmc->cache_flags &= ~CACHE_FLAGS_MOD_INPROG;
 	SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
-	EIODEBUG("eio_cache_edit: Allowing application I/O\n");
+	pr_debug("eio_cache_edit: Allowing application I/O\n");
 	return error;
 }
 
@@ -1179,7 +1179,7 @@ eio_mode_switch(struct cache_c *dmc, u_int32_t mode)
 	u_int32_t	orig_mode;
 
 	VERIFY(dmc->mode != mode);
-	EIODEBUG("eio_mode_switch: mode switch from %u to %u\n",
+	pr_debug("eio_mode_switch: mode switch from %u to %u\n",
 		 dmc->mode, mode);
 
 	if (mode == CACHE_MODE_WB) {
@@ -1202,7 +1202,7 @@ eio_mode_switch(struct cache_c *dmc, u_int32_t mode)
 
 out:
 	if (error) {
-		EIOERR("mode_switch: Failed to switch mode, error: %d\n", error);
+		pr_err("mode_switch: Failed to switch mode, error: %d\n", error);
 	}
 	return error;
 }
@@ -1230,13 +1230,13 @@ eio_policy_switch(struct cache_c *dmc, u_int32_t policy)
 
 	error = eio_repl_blk_init(dmc->policy_ops);
 	if (error) {
-		EIOERR("eio_policy_swtich: Unable to allocate memory for policy cache block");
+		pr_err("eio_policy_swtich: Unable to allocate memory for policy cache block");
 		goto out;
 	}
 
 	error = eio_repl_sets_init(dmc->policy_ops);
 	if (error) {
-		EIOERR("eio_policy_switch: Failed to allocate memory for cache policy");
+		pr_err("eio_policy_switch: Failed to allocate memory for cache policy");
 		goto out;
 	}
 
@@ -1338,7 +1338,7 @@ eio_alloc_wb_bvecs(struct bio_vec *bvec, int max, int blksize)
 				/* Allocate page only for even bio vector */
 				page = alloc_page(GFP_KERNEL | __GFP_ZERO);
 				if (unlikely(!page)) {
-					EIOERR("eio_alloc_wb_bvecs: System memory too low.\n");
+					pr_err("eio_alloc_wb_bvecs: System memory too low.\n");
 					goto err;
 				}
 				iovec[i].bv_page = page;
@@ -1361,7 +1361,7 @@ eio_alloc_wb_bvecs(struct bio_vec *bvec, int max, int blksize)
 		case BLKSIZE_8K:
 				page = alloc_page(GFP_KERNEL | __GFP_ZERO);
 				if (unlikely(!page)) {
-					EIOERR("eio_alloc_wb_bvecs: System memory too low.\n");
+					pr_err("eio_alloc_wb_bvecs: System memory too low.\n");
 					goto err;
 				}
 				iovec[i].bv_page = page;
@@ -1398,7 +1398,7 @@ eio_alloc_wb_pages(struct page **pages, int max)
 
 		page = alloc_page(GFP_KERNEL | __GFP_ZERO);
 		if (unlikely(!page)) {
-			EIOERR("alloc_wb_pages: System memory too low.\n");
+			pr_err("alloc_wb_pages: System memory too low.\n");
 			break;
 		}
 		pages[i] = page;
@@ -1446,7 +1446,7 @@ eio_alloc_pages(u_int32_t max_pages, int *page_count)
 	
 	pages = kzalloc(nr_pages * sizeof(struct bio_vec), GFP_NOIO);
 	if (unlikely(!pages)) {
-		EIOERR("eio_alloc_pages: System memory too low.\n");
+		pr_err("eio_alloc_pages: System memory too low.\n");
 		return NULL;
 	}
 
@@ -1454,7 +1454,7 @@ eio_alloc_pages(u_int32_t max_pages, int *page_count)
 	for (i = 0; i < nr_pages; i++) {
 		pages[i].bv_page = alloc_page(GFP_KERNEL | __GFP_ZERO);
 		if (unlikely(!pages[i].bv_page)) {
-			EIOERR("eio_alloc_pages: System memory too low.\n");
+			pr_err("eio_alloc_pages: System memory too low.\n");
 			break;
 		} else {
 			pages[i].bv_len = PAGE_SIZE;
@@ -1464,7 +1464,7 @@ eio_alloc_pages(u_int32_t max_pages, int *page_count)
 	}
 
 	if (pcount == 0) {
-		EIOERR("Single page allocation failed. System memory too low.");
+		pr_err("Single page allocation failed. System memory too low.");
 		if (pages)
 			kfree(pages);
 		
@@ -1517,14 +1517,14 @@ eio_reboot_handling(void)
 			tempdmc = NULL;
 			if (unlikely(CACHE_FAILED_IS_SET(dmc)) ||
 			    unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
-				EIOERR("Cache \"%s\" is in failed/degraded mode."
+				pr_err("Cache \"%s\" is in failed/degraded mode."
 					" Cannot mark cache read only.\n",
 					dmc->cache_name);
 				continue;
 			}
 
 			while (ATOMIC_READ(&dmc->nr_ios) != 0) {
-				EIODEBUG("rdonly: Draining I/O inflight\n");
+				pr_debug("rdonly: Draining I/O inflight\n");
 				schedule_timeout(msecs_to_jiffies(10));
 			}
 
@@ -1564,18 +1564,18 @@ eio_reboot_handling(void)
 			dmc->sysctl_active.time_based_clean_interval = old_time_thresh;
 
 			dmc->cache_rdonly = 1;
-			EIOINFO("Cache \"%s\" marked read only\n", dmc->cache_name);
+			pr_info("Cache \"%s\" marked read only\n", dmc->cache_name);
 			up_write(&eio_ttc_lock[i]);
 
 			if (dmc->cold_boot && ATOMIC_READ(&dmc->nr_dirty) && !eio_force_warm_boot) {
-				EIOINFO("Cold boot set for cache %s: Draining dirty blocks: %ld",
+				pr_info("Cold boot set for cache %s: Draining dirty blocks: %ld",
 						dmc->cache_name, ATOMIC_READ(&dmc->nr_dirty));
 				eio_clean_for_reboot(dmc);
 			}
 
 			error = eio_md_store(dmc);
 			if (error) {
-				EIOERR("Cannot mark cache \"%s\" read only\n",
+				pr_err("Cannot mark cache \"%s\" read only\n",
 					dmc->cache_name);
 			}
 

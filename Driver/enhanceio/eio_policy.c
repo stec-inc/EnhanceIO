@@ -40,7 +40,7 @@ eio_register_policy(struct eio_policy_header *new_policy)
 	}
 	list_add_tail(&new_policy->sph_list, &eio_policy_list);
 
-	EIOINFO("register_policy: policy %d added", new_policy->sph_name);
+	pr_info("register_policy: policy %d added", new_policy->sph_name);
 	EIO_SIM_PR1("policy %d added", new_policy->sph_name);
 
 	return 0;
@@ -60,7 +60,7 @@ eio_unregister_policy(struct eio_policy_header *p_ops)
 		curr = list_entry(ptr, struct eio_policy_header, sph_list);
 		if (curr->sph_name == p_ops->sph_name) {
 			list_del(&curr->sph_list);
-			EIOINFO("unregister_policy: policy %d removed", (int)p_ops->sph_name);
+			pr_info("unregister_policy: policy %d removed", (int)p_ops->sph_name);
 			EIO_SIM_PR1("policy %d removed", (int)p_ops->sph_name);
 			return 0;
 		}
@@ -97,7 +97,7 @@ eio_get_policy(int policy)
 	case CACHE_REPL_RANDOM:
 		return NULL;
 	default:
-		EIOERR("get_policy: Undefined policy %d", policy);
+		pr_err("get_policy: Undefined policy %d", policy);
 		return NULL;
 	}
 #endif /* defined(EIO_SIM) */
@@ -105,11 +105,11 @@ eio_get_policy(int policy)
 	list_for_each(ptr, &eio_policy_list) {
 		curr = list_entry(ptr, struct eio_policy_header, sph_list);
 		if (curr->sph_name == policy) {
-			EIOINFO("get_policy: policy %d found", policy);
+			pr_info("get_policy: policy %d found", policy);
 			return curr->sph_instance_init();
 		}
 	}
-	EIOINFO("get_policy: cannot find policy %d", policy);
+	pr_info("get_policy: cannot find policy %d", policy);
 
 	return NULL;
 }
@@ -126,7 +126,7 @@ eio_put_policy(struct eio_policy *p_ops)
 	EIO_SIM_PR1();
 
 	if (p_ops == NULL) {
-		EIOERR("put_policy: Cannot decrement reference count of NULL policy");
+		pr_err("put_policy: Cannot decrement reference count of NULL policy");
 		return;
 	}
 	p_ops->sp_repl_exit();

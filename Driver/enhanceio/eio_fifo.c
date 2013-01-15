@@ -27,6 +27,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include "os.h"
 /* Generic policy functions prototypes */
 int eio_fifo_init(struct cache_c *);
@@ -81,7 +84,7 @@ eio_fifo_cache_sets_init(struct eio_policy *p_ops)
 
 	EIO_SIM_PR1();
 
-	EIOINFO("Initializing fifo cache sets\n");
+	pr_info("Initializing fifo cache sets\n");
 	order = (dmc->size >> dmc->consecutive_shift) * sizeof (struct eio_fifo_cache_set);
 
 	dmc->sp_cache_set = (struct eio_fifo_cache_set *)vmalloc((size_t) order);
@@ -199,7 +202,7 @@ eio_fifo_instance_init(void)
 
 	new_instance = (struct eio_policy *)vmalloc(sizeof (struct eio_policy));
 	if (new_instance == NULL) {
-		EIOERR("ssdscache_fifo_instance_init: vmalloc failed");
+		pr_err("ssdscache_fifo_instance_init: vmalloc failed");
 		return NULL;
 	}
 
@@ -218,7 +221,7 @@ eio_fifo_instance_init(void)
 	try_module_get(THIS_MODULE);
 #endif /* !EIO_SIM */
 
-	EIOINFO("eio_fifo_instance_init: created new instance of FIFO");
+	pr_info("eio_fifo_instance_init: created new instance of FIFO");
 
 	return new_instance;
 }
@@ -250,7 +253,7 @@ fifo_register(void)
 
 	ret = eio_register_policy(&eio_fifo_ops);
 	if (ret != 0)
-		EIOINFO("eio_fifo already registered");
+		pr_info("eio_fifo already registered");
 
 	return ret;
 }
@@ -268,7 +271,7 @@ fifo_unregister(void)
 
 	ret = eio_unregister_policy(&eio_fifo_ops);
 	if (ret != 0)
-		EIOERR("eio_fifo unregister failed");
+		pr_err("eio_fifo unregister failed");
 }
 
 #ifndef EIO_SIM

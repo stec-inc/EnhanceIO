@@ -76,7 +76,7 @@ eio_zerostats_sysctl(ctl_table *table, int write, void __user *buffer, size_t *l
 
 		if ((dmc->sysctl_pending.zerostats != 0) && 
 				(dmc->sysctl_pending.zerostats != 1)) {
-			EIOERR("0 or 1 are the only valid values for zerostats");
+			pr_err("0 or 1 are the only valid values for zerostats");
 			return -EINVAL;
 		}
 
@@ -138,7 +138,7 @@ eio_mem_limit_pct_sysctl(ctl_table *table, int write, void __user *buffer, size_
 		/* do sanity check */
 		if ((dmc->sysctl_pending.mem_limit_pct < 0) ||
 				(dmc->sysctl_pending.mem_limit_pct > 100)) {
-			EIOERR("only valid percents are [0 - 100] for mem_limit_pct");
+			pr_err("only valid percents are [0 - 100] for mem_limit_pct");
 			return -EINVAL;
 		}
 
@@ -205,12 +205,12 @@ eio_clean_sysctl(ctl_table *table, int write, void __user *buffer, size_t *lengt
 
 		if (dmc->mode != CACHE_MODE_WB) {
 			/* do_clean is only valid for writeback cache */
-			EIOERR("do_clean is only valid for writeback cache");
+			pr_err("do_clean is only valid for writeback cache");
 			return -EINVAL;
 		}
 
 		if (dmc->sysctl_pending.do_clean & ~(EIO_CLEAN_START | EIO_CLEAN_KEEP)) {
-			EIOERR("do_clean should be either clean start/clean keep");
+			pr_err("do_clean should be either clean start/clean keep");
 			return -EINVAL;
 		}
 
@@ -225,7 +225,7 @@ eio_clean_sysctl(ctl_table *table, int write, void __user *buffer, size_t *lengt
 
 		if (dmc->cache_flags & CACHE_FLAGS_MOD_INPROG) {
 			SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
-			EIOERR("do_clean called while cache modification in progress");
+			pr_err("do_clean called while cache modification in progress");
 			return -EBUSY;
 		} else {
 			dmc->sysctl_active.do_clean = dmc->sysctl_pending.do_clean;	
@@ -284,17 +284,17 @@ eio_dirty_high_threshold_sysctl(ctl_table *table, int write, void __user *buffer
 		/* do sanity check */
 
 		if (dmc->mode != CACHE_MODE_WB) {
-			EIOERR("dirty_high_threshold is only valid for writeback cache");
+			pr_err("dirty_high_threshold is only valid for writeback cache");
 			return -EINVAL;
 		}
 
 		if (dmc->sysctl_pending.dirty_high_threshold > 100) {
-			EIOERR("dirty_high_threshold percentage should be [0 - 100]");
+			pr_err("dirty_high_threshold percentage should be [0 - 100]");
 			return -EINVAL;
 		}
 
 		if (dmc->sysctl_pending.dirty_high_threshold < dmc->sysctl_active.dirty_low_threshold) {
-			EIOERR("dirty high shouldn't be less than dirty low threshold");
+			pr_err("dirty high shouldn't be less than dirty low threshold");
 			return -EINVAL;
 		}
 
@@ -359,17 +359,17 @@ eio_dirty_low_threshold_sysctl(ctl_table *table, int write, void __user *buffer,
 		/* do sanity check */
 
 		if (dmc->mode != CACHE_MODE_WB) {
-			EIOERR("dirty_low_threshold is valid for only writeback cache");
+			pr_err("dirty_low_threshold is valid for only writeback cache");
 			return -EINVAL;
 		}
 
 		if (dmc->sysctl_pending.dirty_low_threshold > 100) {
-			EIOERR("dirty_low_threshold percentage should be [0 - 100]");
+			pr_err("dirty_low_threshold percentage should be [0 - 100]");
 			return -EINVAL;
 		}
 
 		if (dmc->sysctl_pending.dirty_low_threshold > dmc->sysctl_active.dirty_high_threshold) {
-			EIOERR("dirty low shouldn't be more than dirty high threshold");
+			pr_err("dirty low shouldn't be more than dirty high threshold");
 			return -EINVAL;
 		}
 
@@ -441,17 +441,17 @@ eio_dirty_set_high_threshold_sysctl(ctl_table *table, int write, void __user *bu
 		/* do sanity check */
 
 		if (dmc->mode != CACHE_MODE_WB) {
-			EIOERR("dirty_set_high_threshold is valid only for writeback cache");
+			pr_err("dirty_set_high_threshold is valid only for writeback cache");
 			return -EINVAL;
 		}
 
 		if (dmc->sysctl_pending.dirty_set_high_threshold > 100) {
-			EIOERR("dirty_set_high_threshold percentage should be [0 - 100]");
+			pr_err("dirty_set_high_threshold percentage should be [0 - 100]");
 			return -EINVAL;
 		}
 
 		if (dmc->sysctl_pending.dirty_set_high_threshold < dmc->sysctl_active.dirty_set_low_threshold) {
-			EIOERR("dirty_set_high_threshold shouldn't be less than dirty low threshold");
+			pr_err("dirty_set_high_threshold shouldn't be less than dirty low threshold");
 			return -EINVAL;
 		}
 
@@ -519,17 +519,17 @@ eio_dirty_set_low_threshold_sysctl(ctl_table *table, int write, void __user *buf
 		/* do sanity check */
 
 		if (dmc->mode != CACHE_MODE_WB) {
-			EIOERR("dirty_set_low_threshold is valid only for writeback cache");
+			pr_err("dirty_set_low_threshold is valid only for writeback cache");
 			return -EINVAL;
 		}
 
 		if (dmc->sysctl_pending.dirty_set_low_threshold > 100) {
-			EIOERR("dirty_set_low_threshold percentage should be [0 - 100]");
+			pr_err("dirty_set_low_threshold percentage should be [0 - 100]");
 			return -EINVAL;
 		}
 
 		if (dmc->sysctl_pending.dirty_set_low_threshold > dmc->sysctl_active.dirty_set_high_threshold) {
-			EIOERR("dirty_set_low_threshold shouldn't be more than dirty_set_high_threshold");
+			pr_err("dirty_set_low_threshold shouldn't be more than dirty_set_high_threshold");
 			return -EINVAL;
 		}
 
@@ -603,13 +603,13 @@ eio_autoclean_threshold_sysctl(ctl_table *table, int write, void __user *buffer,
 		/* do sanity check */
 
 		if (dmc->mode != CACHE_MODE_WB) {
-			EIOERR("autoclean_threshold is valid only for writeback cache");
+			pr_err("autoclean_threshold is valid only for writeback cache");
 			return -EINVAL;
 		}
 
 		if ((dmc->sysctl_pending.autoclean_threshold < 0) ||
 				(dmc->sysctl_pending.autoclean_threshold > AUTOCLEAN_THRESH_MAX)) {
-			EIOERR("autoclean_threshold is valid range is 0 to %d", AUTOCLEAN_THRESH_MAX);
+			pr_err("autoclean_threshold is valid range is 0 to %d", AUTOCLEAN_THRESH_MAX);
 			return -EINVAL;
 		}
 
@@ -673,13 +673,13 @@ eio_time_based_clean_interval_sysctl(ctl_table *table, int write, void __user *b
 		/* do sanity check */
 
 		if (dmc->mode != CACHE_MODE_WB) {
-			EIOERR("time_based_clean_interval is valid only for writeback cache");
+			pr_err("time_based_clean_interval is valid only for writeback cache");
 			return -EINVAL;
 		}
 
 		if (dmc->sysctl_pending.time_based_clean_interval > TIME_BASED_CLEAN_INTERVAL_MAX) {
 			/* valid values are 0 to TIME_BASED_CLEAN_INTERVAL_MAX */
-			EIOERR("time_based_clean_interval valid range is 0 to %u", TIME_BASED_CLEAN_INTERVAL_MAX);
+			pr_err("time_based_clean_interval valid range is 0 to %u", TIME_BASED_CLEAN_INTERVAL_MAX);
 			return -EINVAL;
 		}
 
@@ -755,7 +755,7 @@ eio_control_sysctl(ctl_table *table, int write, void __user *buffer, size_t *len
 		if (dmc->sysctl_pending.control > CACHE_CONTROL_FLAG_MAX ||
 		    dmc->sysctl_pending.control < 0) {
 			/* valid values are from 0 till CACHE_CONTROL_FLAG_MAX */
-			EIOERR("control valid values are from 0 till %d", CACHE_CONTROL_FLAG_MAX);
+			pr_err("control valid values are from 0 till %d", CACHE_CONTROL_FLAG_MAX);
 			return -EINVAL;
 		}
 
@@ -776,13 +776,13 @@ eio_control_sysctl(ctl_table *table, int write, void __user *buffer, size_t *len
 			SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 			dmc->cache_flags &= ~CACHE_FLAGS_VERBOSE;
 			SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
-			EIOINFO("Turning off verbose mode");
+			pr_info("Turning off verbose mode");
 			break;
 		case CACHE_VERBOSE_ON:
 			SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 			dmc->cache_flags |= CACHE_FLAGS_VERBOSE;
 			SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
-			EIOINFO("Turning on verbose mode");
+			pr_info("Turning on verbose mode");
 			break;
 		case CACHE_WRITEBACK_ON:
 			if (dmc->sysctl_handle_writeback == NULL)
@@ -799,7 +799,7 @@ eio_control_sysctl(ctl_table *table, int write, void __user *buffer, size_t *len
 				dmc->cache_flags |= CACHE_FLAGS_INVALIDATE;
 				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 			} else
-				EIOINFO("Invalidate API already registered");
+				pr_info("Invalidate API already registered");
 			break;
 		case CACHE_INVALIDATE_OFF:
 			if (dmc->sysctl_handle_invalidate) {
@@ -808,7 +808,7 @@ eio_control_sysctl(ctl_table *table, int write, void __user *buffer, size_t *len
 				dmc->cache_flags &= ~CACHE_FLAGS_INVALIDATE;
 				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 			} else
-				EIOINFO("Invalidate API not registered");
+				pr_info("Invalidate API not registered");
 			break;
 		case CACHE_FAST_REMOVE_ON:
 			if (dmc->mode != CACHE_MODE_WB) {
@@ -816,16 +816,16 @@ eio_control_sysctl(ctl_table *table, int write, void __user *buffer, size_t *len
 				dmc->cache_flags |= CACHE_FLAGS_FAST_REMOVE;
 				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 				if (CACHE_VERBOSE_IS_SET(dmc))
-					EIOINFO("Turning on fast remove");
+					pr_info("Turning on fast remove");
 			} else {
 #ifdef EIO_DEBUG
 				SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 				dmc->cache_flags |= CACHE_FLAGS_FAST_REMOVE;
 				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 				if (CACHE_VERBOSE_IS_SET(dmc))
-					EIOINFO("Turning on fast remove");
+					pr_info("Turning on fast remove");
 #else
-				EIOERR("Invalid control value: 0x%x", dmc->sysctl_active.control);
+				pr_err("Invalid control value: 0x%x", dmc->sysctl_active.control);
 				rv = -1;
 #endif	/* EIO_DEBUG */
 			}
@@ -836,22 +836,22 @@ eio_control_sysctl(ctl_table *table, int write, void __user *buffer, size_t *len
 				dmc->cache_flags &= ~CACHE_FLAGS_FAST_REMOVE;
 				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 				if (CACHE_VERBOSE_IS_SET(dmc))
-					EIOINFO("Turning off fast remove");
+					pr_info("Turning off fast remove");
 			} else {
 #ifdef EIO_DEBUG
 				SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 				dmc->cache_flags &= ~CACHE_FLAGS_FAST_REMOVE;
 				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 				if (CACHE_VERBOSE_IS_SET(dmc))
-					EIOINFO("Turning off fast remove");
+					pr_info("Turning off fast remove");
 #else
-				EIOERR("Invalid control value: 0x%x", dmc->sysctl_active.control);
+				pr_err("Invalid control value: 0x%x", dmc->sysctl_active.control);
 				rv = -1;
 #endif	/* EIO_DEBUG */
 			}
 			break;
 		default:
-			EIOERR("Invalid control value: 0x%x", dmc->sysctl_active.control);
+			pr_err("Invalid control value: 0x%x", dmc->sysctl_active.control);
 			rv = -1;
 		}
 	}
@@ -1191,7 +1191,7 @@ eio_procfs_ctr(struct cache_c *dmc)
 	entry = proc_mkdir(s, NULL);
 	kfree(s);
 	if (entry == NULL) {
-		EIOERR("Failed to create /proc/%s", s);
+		pr_err("Failed to create /proc/%s", s);
 		return;
 	}
 
@@ -1295,7 +1295,7 @@ eio_invalidate_sysctl(ctl_table *table, int write, void __user *buffer,
 
 	dmc = (struct cache_c *)table->extra1;
 	if (dmc == NULL) {
-		EIOERR("Cannot invalidate due to unexpected NULL cache pointer");
+		pr_err("Cannot invalidate due to unexpected NULL cache pointer");
 		SPIN_UNLOCK_IRQRESTORE(&invalidate_spin_lock, flags);
 		return -EBUSY;
 	}
@@ -1338,7 +1338,7 @@ eio_invalidate_sysctl(ctl_table *table, int write, void __user *buffer,
 	}
 
 	if (CACHE_VERBOSE_IS_SET(dmc) && num_sectors) {
-		EIOINFO("eio_inval_range: Invalidated sector range from sector=%lu to sector=%lu",
+		pr_info("eio_inval_range: Invalidated sector range from sector=%lu to sector=%lu",
 			(long unsigned int)sector, (long unsigned int)num_sectors);
 	}
 
@@ -1364,7 +1364,7 @@ eio_find_sysctl_data(struct cache_c *dmc, ctl_table *vars)
 	if (strcmp(vars->procname, "control") == 0)		return (void *)&dmc->sysctl_pending.control;
 	if (strcmp(vars->procname, "invalidate") == 0)		return (void *)&dmc->sysctl_pending.invalidate;
 
-	EIOERR("Cannot find sysctl data for %s", vars->procname);
+	pr_err("Cannot find sysctl data for %s", vars->procname);
 	return NULL;
 }
 
@@ -1382,9 +1382,9 @@ eio_cons_sysctl_devname(struct cache_c *dmc)
 		if (pathname)
 			strcpy(pathname, dmc->cache_name);
 		else
-			EIOERR("Failed to allocate memory");
+			pr_err("Failed to allocate memory");
 	} else {
-		EIOERR("Cache name is NULL");
+		pr_err("Cache name is NULL");
 		pathname = NULL;
 	}
 
@@ -1412,9 +1412,9 @@ eio_cons_procfs_cachename(struct cache_c *dmc, char *path_component)
 				strcat(pathname, path_component);
 			}
 		} else
-			EIOERR("Failed to allocate memory");
+			pr_err("Failed to allocate memory");
 	} else {
-		EIOERR("Cache name is NULL");
+		pr_err("Cache name is NULL");
 		pathname = NULL;
 	}
 
@@ -1430,7 +1430,7 @@ eio_sysctl_register_dir(void)
 
 	dir = kmemdup(&sysctl_template_dir, sizeof sysctl_template_dir, GFP_KERNEL);
 	if (unlikely(dir == NULL)) {
-		EIOERR("Failed to allocate memory for dir sysctl");
+		pr_err("Failed to allocate memory for dir sysctl");
 		return;
 	}
 
@@ -1438,7 +1438,7 @@ eio_sysctl_register_dir(void)
 	dir->root[0].child = dir->dir;
 	dir->sysctl_header = register_sysctl_table(dir->root);
 	if (unlikely(dir->sysctl_header == NULL)) {
-		EIOERR("Failed to register dir sysctl");
+		pr_err("Failed to register dir sysctl");
 		goto out;
 	}
 
@@ -1471,7 +1471,7 @@ eio_sysctl_register_common(struct cache_c *dmc)
 
 	common = kmemdup(&sysctl_template_common, sizeof sysctl_template_common, GFP_KERNEL);
 	if (common == NULL) {
-		EIOERR("Failed to allocate memory for common sysctl");
+		pr_err("Failed to allocate memory for common sysctl");
 		return;
 	}
 	for (i = 0 ; i < ARRAY_SIZE(common->vars) - 1 ; i++) {
@@ -1485,7 +1485,7 @@ eio_sysctl_register_common(struct cache_c *dmc)
 	common->root[0].child = common->dir;
 	common->sysctl_header = register_sysctl_table(common->root);
 	if (common->sysctl_header == NULL) {
-		EIOERR("Failed to register common sysctl");
+		pr_err("Failed to register common sysctl");
 		goto out;
 	}
 
@@ -1526,7 +1526,7 @@ eio_sysctl_register_writeback(struct cache_c *dmc)
 
 	writeback = kmemdup(&sysctl_template_writeback, sizeof sysctl_template_writeback, GFP_KERNEL);
 	if (writeback == NULL) {
-		EIOERR("Failed to allocate memory for writeback sysctl");
+		pr_err("Failed to allocate memory for writeback sysctl");
 		return;
 	}
 	for (i = 0 ; i < ARRAY_SIZE(writeback->vars) - 1 ; i++) {
@@ -1540,7 +1540,7 @@ eio_sysctl_register_writeback(struct cache_c *dmc)
 	writeback->root[0].child = writeback->dir;
 	writeback->sysctl_header = register_sysctl_table(writeback->root);
 	if (writeback->sysctl_header == NULL) {
-		EIOERR("Failed to register writeback sysctl");
+		pr_err("Failed to register writeback sysctl");
 		goto out;
 	}
 
@@ -1581,7 +1581,7 @@ eio_sysctl_register_invalidate(struct cache_c *dmc)
 
 	invalidate = kmemdup(&sysctl_template_invalidate, sizeof sysctl_template_invalidate, GFP_KERNEL);
 	if (invalidate == NULL) {
-		EIOERR("Failed to allocate memory for invalidate sysctl");
+		pr_err("Failed to allocate memory for invalidate sysctl");
 		return;
 	}
 	for (i = 0 ; i < ARRAY_SIZE(invalidate->vars) - 1 ; i++) {
@@ -1595,7 +1595,7 @@ eio_sysctl_register_invalidate(struct cache_c *dmc)
 	invalidate->root[0].child = invalidate->dir;
 	invalidate->sysctl_header = register_sysctl_table(invalidate->root);
 	if (invalidate->sysctl_header == NULL) {
-		EIOERR("Failed to register invalidate sysctl");
+		pr_err("Failed to register invalidate sysctl");
 		goto out;
 	}
 

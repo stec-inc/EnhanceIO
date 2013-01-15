@@ -34,6 +34,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include "os.h"
 #include "eio_ttc.h"
 
@@ -155,17 +157,17 @@ eio_policy_init(struct cache_c *dmc)
 
 	if (dmc->req_policy == CACHE_REPL_RANDOM) {
 		dmc->policy_ops = NULL;
-		EIOINFO("Setting replacement policy to random");
+		pr_info("Setting replacement policy to random");
 	} else {
 		dmc->policy_ops = eio_get_policy(dmc->req_policy);
 		if (dmc->policy_ops == NULL) {
 			dmc->req_policy = CACHE_REPL_RANDOM;
-			EIOERR("policy_init: Cannot find requested policy, defaulting to random");
+			pr_err("policy_init: Cannot find requested policy, defaulting to random");
 			error = -ENOMEM;
 		} else {
 			/* Back pointer to reference dmc from policy_ops */
 			dmc->policy_ops->sp_dmc = dmc;
-			EIOINFO("Setting replacement policy to %s (%d)", (dmc->policy_ops->sp_name == CACHE_REPL_FIFO) ? "fifo" : "lru",
+			pr_info("Setting replacement policy to %s (%d)", (dmc->policy_ops->sp_name == CACHE_REPL_FIFO) ? "fifo" : "lru",
 				dmc->policy_ops->sp_name);
 		}
 	}
@@ -270,7 +272,7 @@ eio_sb_store(struct cache_c *dmc)
 
 	if ((unlikely(CACHE_FAILED_IS_SET(dmc)) || CACHE_DEGRADED_IS_SET(dmc)) &&
 			(!CACHE_SSD_ADD_INPROG_IS_SET(dmc))) {
-		EIOERR("sb_store: Cannot write superblock for cache \"%s\", in degraded/failed mode.\n",
+		pr_err("sb_store: Cannot write superblock for cache \"%s\", in degraded/failed mode.\n",
 				dmc->cache_name);
 		return -ENODEV;
 	}
@@ -281,7 +283,7 @@ eio_sb_store(struct cache_c *dmc)
 
 	sb_pages = eio_alloc_pages(nr_pages, &page_count);
 	if (sb_pages == NULL) {
-		EIOERR("sb_store: System memory too low.\n");
+		pr_err("sb_store: System memory too low.\n");
 		return -ENOMEM;
 	}
 
@@ -334,7 +336,7 @@ eio_sb_store(struct cache_c *dmc)
 	where.count = to_sector(EIO_SUPERBLOCK_SIZE);
 	error = eio_io_sync_vm(dmc, &where, WRITE, sb_pages, nr_pages);
 	if (error) {
-		EIOERR("sb_store: Could not write out superblock to sector %lu (error %d) for cache \"%s\".\n",
+		pr_err("sb_store: Could not write out superblock to sector %lu (error %d) for cache \"%s\".\n",
 			where.sector, error, dmc->cache_name);
 	}
 
@@ -374,14 +376,14 @@ eio_md_store(struct cache_c *dmc)
 
 
 	if (unlikely(CACHE_FAILED_IS_SET(dmc)) || unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
-		EIOERR("md_store: Cannot write metadata in failed/degraded mode for cache \"%s\".",
+		pr_err("md_store: Cannot write metadata in failed/degraded mode for cache \"%s\".",
 			dmc->cache_name);
 		return -ENODEV;
 	}
 
 	if (CACHE_FAST_REMOVE_IS_SET(dmc)) {
 		if (CACHE_VERBOSE_IS_SET(dmc)) {
-			EIOINFO("Skipping writing out metadata to cache");
+			pr_info("Skipping writing out metadata to cache");
 		}
 		if (!dmc->sb_version) {
 
@@ -396,14 +398,14 @@ eio_md_store(struct cache_c *dmc)
 	}
 
 	if (!eio_mem_available(dmc, METADATA_IO_BLOCKSIZE_SECT)) {
-		EIOERR("md_store: System memory too low for allocating metadata IO buffers");
+		pr_err("md_store: System memory too low for allocating metadata IO buffers");
 		return -ENOMEM;
 	}
 
 	page_count = 0;
 	pages = eio_alloc_pages(dmc->bio_nr_pages, &page_count);
 	if (pages == NULL) {
-		EIOERR("eio_md_store: System memory too low.");
+		pr_err("eio_md_store: System memory too low.");
 		return -ENOMEM;
 	}
 
@@ -416,7 +418,7 @@ eio_md_store(struct cache_c *dmc)
 
 	pg_virt_addr = kmalloc(nr_pages * (sizeof (void *)), GFP_KERNEL);
 	if (pg_virt_addr == NULL) {
-		EIOERR("eio_md_store: System memory too low.");
+		pr_err("eio_md_store: System memory too low.");
 		for (k = 0; k < nr_pages; k++)
 			put_page(pages[k].bv_page);
 		kfree(pages);
@@ -429,7 +431,7 @@ eio_md_store(struct cache_c *dmc)
 	next_ptr = (struct flash_cacheblock *)pg_virt_addr[page_index];
 	j = MD_BLOCKS_PER_PAGE;
 
-	EIOINFO("Writing out metadata to cache device. Please wait...");
+	pr_info("Writing out metadata to cache device. Please wait...");
 
 	for (i = 0 ; i < dmc->size ; i++) {
 		if (EIO_CACHE_STATE_GET(dmc, (index_t)i) & VALID)
@@ -462,7 +464,7 @@ eio_md_store(struct cache_c *dmc)
 
 				if (error) {
 					write_errors++;
-					EIOERR("md_store: Could not write out metadata to sector %lu (error %d)",
+					pr_err("md_store: Could not write out metadata to sector %lu (error %d)",
 					      where.sector, error);
 				}
 				where.sector += where.count;	/* Advance offset */
@@ -510,7 +512,7 @@ eio_md_store(struct cache_c *dmc)
 		/* XXX: should we call eio_sb_store() on error ?? */
 		if (error) {
 			write_errors++;
-			EIOERR("md_store: Could not write out metadata to sector %lu (error %d)",
+			pr_err("md_store: Could not write out metadata to sector %lu (error %d)",
 			      where.sector, error);
 		}
 	}
@@ -522,7 +524,7 @@ eio_md_store(struct cache_c *dmc)
 	VERIFY(sectors_expected == sectors_written);
 	/* XXX: should we call eio_sb_store() on error ?? */
 	if (sectors_expected != sectors_written) {
-		EIOERR("md_store: Sector mismatch! sectors_expected=%ld, sectors_written=%ld\n",
+		pr_err("md_store: Sector mismatch! sectors_expected=%ld, sectors_written=%ld\n",
 		       sectors_expected, sectors_written);
 	}
 
@@ -551,21 +553,21 @@ sb_store:
 	if (error) {
 		/* Harish: TBD. should we return error */
 		write_errors++;
-		EIOERR("md_store: superblock store failed(error %d)", error);
+		pr_err("md_store: superblock store failed(error %d)", error);
 	}
 	if (!dmc->sb_version && CACHE_FAST_REMOVE_IS_SET(dmc)) {
 		return 0;
 	}
 
 	if (write_errors == 0) {
-		EIOINFO("Metadata saved on the cache device");
+		pr_info("Metadata saved on the cache device");
 	} else {
-		EIOINFO("CRITICAL: There were %d errors in saving metadata on cache device", write_errors);
+		pr_info("CRITICAL: There were %d errors in saving metadata on cache device", write_errors);
 		if (num_dirty)
-			EIOINFO("CRITICAL: %d dirty blocks could not be written out", num_dirty);
+			pr_info("CRITICAL: %d dirty blocks could not be written out", num_dirty);
 	}
 
-	EIOINFO("Valid blocks: %d, Dirty blocks: %d, Metadata sectors: %lu",
+	pr_info("Valid blocks: %d, Dirty blocks: %d, Metadata sectors: %lu",
 	       num_valid, num_dirty, (long unsigned int)dmc->md_sectors);
 
 	return 0;
@@ -595,7 +597,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 	page_count = 0;
 	header_page = eio_alloc_pages(1, &page_count);
 	if (header_page == NULL) {
-		EIOERR("eio_md_create: System memory too low.");
+		pr_err("eio_md_create: System memory too low.");
 		return -ENOMEM;
 	}
 
@@ -611,7 +613,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 	 */
 	if ((unlikely(CACHE_FAILED_IS_SET(dmc)) || unlikely(CACHE_DEGRADED_IS_SET(dmc)))
 			&& (!CACHE_SSD_ADD_INPROG_IS_SET(dmc))) {
-		EIOERR("md_create: Cannot write metadata in failed/degraded mode for cache \"%s\".\n",
+		pr_err("md_create: Cannot write metadata in failed/degraded mode for cache \"%s\".\n",
 				dmc->cache_name);
 		ret = -ENODEV;
 		goto free_header;
@@ -622,7 +624,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 	where.count = to_sector(EIO_SUPERBLOCK_SIZE);
 	error = eio_io_sync_vm(dmc, &where, READ, header_page, 1);
 	if (error) {
-		EIOERR("md_create: Could not read superblock sector %lu error %d for cache \"%s\".\n",
+		pr_err("md_create: Could not read superblock sector %lu error %d for cache \"%s\".\n",
 		      where.sector, error, dmc->cache_name);
 		ret = -EINVAL;
 		goto free_header;
@@ -632,7 +634,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 	    ((header->sbf.cache_sb_state == CACHE_MD_STATE_DIRTY) ||
 	     (header->sbf.cache_sb_state == CACHE_MD_STATE_CLEAN) ||
 	     (header->sbf.cache_sb_state == CACHE_MD_STATE_FASTCLEAN))) {
-		EIOERR("md_create: Existing cache detected, use force to re-create.\n");
+		pr_err("md_create: Existing cache detected, use force to re-create.\n");
 		ret = -EINVAL;
 		goto free_header;
 	}
@@ -660,7 +662,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 	}
 	if ((unlikely(CACHE_FAILED_IS_SET(dmc)) || unlikely(CACHE_DEGRADED_IS_SET(dmc)))
 			&& (!CACHE_SSD_ADD_INPROG_IS_SET(dmc))) {
-		EIOERR("md_create: Cannot write metadata in failed/degraded mode for cache \"%s\".\n",
+		pr_err("md_create: Cannot write metadata in failed/degraded mode for cache \"%s\".\n",
 				dmc->cache_name);
 		ret = -ENODEV;
 		goto free_header;
@@ -668,7 +670,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 	dev_size = to_sector(eio_get_device_size(dmc->cache_dev));
 	cache_size = dmc->md_sectors + (dmc->size * dmc->block_size);
 	if (cache_size > dev_size) {
-		EIOERR("md_create: Requested cache size exceeds the cache device's capacity (%lu > %lu)",
+		pr_err("md_create: Requested cache size exceeds the cache device's capacity (%lu > %lu)",
   		      cache_size, dev_size);
 		ret = -EINVAL;
 		goto free_header;
@@ -676,13 +678,13 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 
 	order = dmc->size * (EIO_MD8(dmc) ? sizeof (struct cacheblock_md8) : sizeof (struct cacheblock));
 	i = EIO_MD8(dmc) ? sizeof (struct cacheblock_md8) : sizeof (struct cacheblock);
-	EIOINFO("Allocate %luKB (%luB per) mem for %lu-entry cache " \
+	pr_info("Allocate %luKB (%luB per) mem for %lu-entry cache " \
 	       "(capacity:%luMB, associativity:%u, block size:%u bytes)",
 	       order >> 10, i, (long unsigned int)dmc->size,
 	       (cache_size >> (20-SECTOR_SHIFT)), dmc->assoc, dmc->block_size << SECTOR_SHIFT);
 
 	if (!eio_mem_available(dmc, order) && !CACHE_SSD_ADD_INPROG_IS_SET(dmc)) {
-		EIOERR("md_create: System memory too low for allocating cache metadata.\n");
+		pr_err("md_create: System memory too low for allocating cache metadata.\n");
 		ret = -ENOMEM;
 		goto free_header;
 	}
@@ -697,14 +699,14 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 		else
 			dmc->cache = (struct cacheblock *)vmalloc((size_t)order);
 		if ((EIO_MD8(dmc) && !dmc->cache_md8) || (!EIO_MD8(dmc) && !dmc->cache)) {
-			EIOERR("md_create: Unable to allocate cache md for cache \"%s\".\n",
+			pr_err("md_create: Unable to allocate cache md for cache \"%s\".\n",
 					dmc->cache_name);
 			ret = -ENOMEM;
 			goto free_header;
 		}
 	}
 	if (eio_repl_blk_init(dmc->policy_ops) != 0) {
-		EIOERR("md_create: Unable to allocate memory for policy cache block for cache \"%s\".\n",
+		pr_err("md_create: Unable to allocate memory for policy cache block for cache \"%s\".\n",
 				dmc->cache_name);
 		ret = -ENOMEM;
 		goto free_header;
@@ -728,7 +730,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 		} while ((retry++ < 10) && (i < dmc->size));
 
 		if (i < dmc->size) {
-			EIOERR("md_create: Cache \"%s\" is not in quiesce state. Can't proceed to resume.\n",
+			pr_err("md_create: Cache \"%s\" is not in quiesce state. Can't proceed to resume.\n",
 					dmc->cache_name);
 			ret = -EBUSY;
 			goto free_header;
@@ -738,9 +740,9 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 		page_count = 0;
 		pages = eio_alloc_pages(dmc->bio_nr_pages, &page_count);
 		if (!pages) {
-			EIOERR("md_create: Unable to allocate pages for cache \"%s\".\n",
+			pr_err("md_create: Unable to allocate pages for cache \"%s\".\n",
 				dmc->cache_name);
-			EIOERR("md_create: Could not write out cache metadata.\n");
+			pr_err("md_create: Could not write out cache metadata.\n");
 			ret = -ENOMEM;
 			goto free_header;
 		}
@@ -755,7 +757,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 
 		pg_virt_addr = kmalloc(nr_pages * (sizeof (void *)), GFP_KERNEL);
 		if (pg_virt_addr == NULL) {
-			EIOERR("md_create: System memory too low.\n");
+			pr_err("md_create: System memory too low.\n");
 			for (k = 0; k < nr_pages; k++)
 				put_page(pages[k].bv_page);
 			kfree(pages);
@@ -792,7 +794,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 					if (error) {
 						if (!CACHE_SSD_ADD_INPROG_IS_SET(dmc))
 							vfree(EIO_CACHE(dmc));
-						EIOERR("md_create: Could not write cache metadata sector %lu error %d.\n for cache \"%s\".\n",
+						pr_err("md_create: Could not write cache metadata sector %lu error %d.\n for cache \"%s\".\n",
 						      where.sector, error, dmc->cache_name);
 						ret = -EIO;
 						goto free_md;
@@ -837,7 +839,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 			if (error) {
 				if (!CACHE_SSD_ADD_INPROG_IS_SET(dmc))
 					vfree((void *)EIO_CACHE(dmc));
-				EIOERR("md_create: Could not write cache metadata sector %lu error %d for cache \"%s\".\n",
+				pr_err("md_create: Could not write cache metadata sector %lu error %d for cache \"%s\".\n",
 				      where.sector, error, dmc->cache_name);
 				ret = -EIO;
 				goto free_md;
@@ -849,7 +851,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 		if (dmc->size % MD_BLOCKS_PER_SECTOR)
 			sectors_expected++;
 		if (sectors_expected != sectors_written) {
-			EIOERR("md_create: Sector mismatch! sectors_expected=%ld, sectors_written=%ld for cache \"%s\".\n",
+			pr_err("md_create: Sector mismatch! sectors_expected=%ld, sectors_written=%ld for cache \"%s\".\n",
 			       sectors_expected, sectors_written, dmc->cache_name);
 			ret = -EIO;
 			goto free_md;
@@ -860,7 +862,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 
 	if ((unlikely(CACHE_FAILED_IS_SET(dmc)) || unlikely(CACHE_DEGRADED_IS_SET(dmc)))
 				&& (!CACHE_SSD_ADD_INPROG_IS_SET(dmc))) {
-		EIOERR("md_create: Cannot write metadata in failed/degraded mode for cache \"%s\".\n",
+		pr_err("md_create: Cannot write metadata in failed/degraded mode for cache \"%s\".\n",
 				dmc->cache_name);
 		vfree((void *)EIO_CACHE(dmc));
 		ret = -ENODEV;
@@ -873,7 +875,7 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 	if (error) {
 		if (!CACHE_SSD_ADD_INPROG_IS_SET(dmc))
 			vfree((void *)EIO_CACHE(dmc));
-		EIOERR("md_create: Could not write cache superblock sector(error %d) for cache \"%s\"\n",
+		pr_err("md_create: Could not write cache superblock sector(error %d) for cache \"%s\"\n",
 				error, dmc->cache_name);
 		ret = -EIO;
 		goto free_md;
@@ -930,7 +932,7 @@ eio_md_load(struct cache_c *dmc)
 	page_count = 0;
 	header_page = eio_alloc_pages(1, &page_count);
 	if (header_page == NULL) {
-		EIOERR ("md_load: Unable to allocate memory");
+		pr_err ("md_load: Unable to allocate memory");
 		return -ENOMEM;
 	}
 
@@ -938,7 +940,7 @@ eio_md_load(struct cache_c *dmc)
 	header = (eio_superblock_t *)kmap(header_page[0].bv_page);
 
 	if (CACHE_FAILED_IS_SET(dmc) || CACHE_DEGRADED_IS_SET(dmc)) {
-		EIOERR("md_load: Cannot load metadata in failed / degraded mode");
+		pr_err("md_load: Cannot load metadata in failed / degraded mode");
 		ret = -ENODEV;
 		goto free_header;
 	}
@@ -949,7 +951,7 @@ eio_md_load(struct cache_c *dmc)
 	EIO_SIM_PR1("reading superblock");
 	error = eio_io_sync_vm(dmc, &where, READ, header_page, 1);
 	if (error) {
-		EIOERR("md_load: Could not read cache superblock sector %lu error %d",
+		pr_err("md_load: Could not read cache superblock sector %lu error %d",
 		      where.sector, error);
 		ret = -EINVAL;
 		goto free_header;
@@ -957,12 +959,12 @@ eio_md_load(struct cache_c *dmc)
 
 	/* check ondisk superblock version */
 	if (header->sbf.cache_version != EIO_SB_VERSION) {
-		EIOINFO("md_load: Cache superblock mismatch detected."\
+		pr_info("md_load: Cache superblock mismatch detected."\
 		       " (current: %u, ondisk: %u)", EIO_SB_VERSION,
 		       header->sbf.cache_version);
 
 		if (header->sbf.cache_version == 0) {
-			EIOERR("md_load: Can't enable cache %s. Either "\
+			pr_err("md_load: Can't enable cache %s. Either "\
 				"superblock version is invalid or cache has"\
 				" been deleted", header->sbf.cache_name);
 			ret = 1;
@@ -970,14 +972,14 @@ eio_md_load(struct cache_c *dmc)
 		}
 
 		if (header->sbf.cache_version > EIO_SB_VERSION) {
-			EIOERR("md_load: Can't enable cache %s with newer "\
+			pr_err("md_load: Can't enable cache %s with newer "\
 			      " superblock version.", header->sbf.cache_name);
 			ret = 1;
 			goto free_header;
 		}
 
 		if (header->sbf.mode == CACHE_MODE_WB) {
-			EIOERR("md_load: Can't enable write-back cache %s" \
+			pr_err("md_load: Can't enable write-back cache %s" \
 			      " with newer superblock version.",
 			      header->sbf.cache_name);
 			ret = 1;
@@ -985,7 +987,7 @@ eio_md_load(struct cache_c *dmc)
 		} else if ((header->sbf.mode == CACHE_MODE_RO) ||
 			   (header->sbf.mode == CACHE_MODE_WT)) {
 			dmc->persistence = CACHE_FORCECREATE;
-			EIOINFO("md_load: Can't enable cache, recreating"\
+			pr_info("md_load: Can't enable cache, recreating"\
 			       " cache %s with newer superblock version.",
 			       header->sbf.cache_name);
 			ret = 0;
@@ -997,7 +999,7 @@ eio_md_load(struct cache_c *dmc)
 
 	if (header->sbf.cache_version >= EIO_SB_MAGIC_VERSION &&
 	    header->sbf.magic != EIO_MAGIC) {
-		EIOERR("md_load: Magic number mismatch in superblock detected."\
+		pr_err("md_load: Magic number mismatch in superblock detected."\
 			" (current: %u, ondisk: %u)", EIO_MAGIC,
 			header->sbf.magic);
 		ret = 1;
@@ -1016,7 +1018,7 @@ eio_md_load(struct cache_c *dmc)
 	if (!((header->sbf.cache_sb_state == CACHE_MD_STATE_DIRTY) ||
 	      (header->sbf.cache_sb_state == CACHE_MD_STATE_CLEAN) ||
 	      (header->sbf.cache_sb_state == CACHE_MD_STATE_FASTCLEAN))) {
-		EIOERR("md_load: Corrupt cache superblock");
+		pr_err("md_load: Corrupt cache superblock");
 		ret = -EINVAL;
 		goto free_header;
 	}
@@ -1041,22 +1043,22 @@ eio_md_load(struct cache_c *dmc)
  		clean_shutdown = 0;
 	} else {
 		if (header->sbf.cache_sb_state == CACHE_MD_STATE_DIRTY) {
-			EIOINFO("Unclean shutdown detected");
-			EIOINFO("Only dirty blocks exist in cache");
+			pr_info("Unclean shutdown detected");
+			pr_info("Only dirty blocks exist in cache");
 			clean_shutdown = 0;
 		} else if (header->sbf.cache_sb_state == CACHE_MD_STATE_CLEAN) {
-			EIOINFO("Slow (clean) shutdown detected");
-			EIOINFO("Only clean blocks exist in cache");
+			pr_info("Slow (clean) shutdown detected");
+			pr_info("Only clean blocks exist in cache");
 			clean_shutdown = 1;
 		} else if (header->sbf.cache_sb_state == CACHE_MD_STATE_FASTCLEAN) {
-			EIOINFO("Fast (clean) shutdown detected");
-			EIOINFO("Both clean and dirty blocks exist in cache");
+			pr_info("Fast (clean) shutdown detected");
+			pr_info("Both clean and dirty blocks exist in cache");
 			clean_shutdown = 1;
 		} else {
 			/* Harish: Won't reach here, but TBD may change the previous if condition */
-			EIOINFO("cache state is %d. Treating as unclean shutdown",
+			pr_info("cache state is %d. Treating as unclean shutdown",
 					header->sbf.cache_sb_state);
-			EIOINFO("Only dirty blocks exist in cache");
+			pr_info("Only dirty blocks exist in cache");
 			clean_shutdown = 0;
 		}
 	}
@@ -1088,7 +1090,7 @@ eio_md_load(struct cache_c *dmc)
 	dmc->sysctl_active.autoclean_threshold = header->sbf.autoclean_threshold;
 
 	if ((i = eio_mem_init(dmc)) == -1) {
-		EIOERR("eio_md_load: Failed to initialize memory.");
+		pr_err("eio_md_load: Failed to initialize memory.");
 		ret = -EINVAL;
 		goto free_header;
 	}
@@ -1096,7 +1098,7 @@ eio_md_load(struct cache_c *dmc)
 	order = dmc->size * ((i == 1) ? sizeof (struct cacheblock_md8) : sizeof (struct cacheblock));
 	data_size = dmc->size * dmc->block_size;
 	size = EIO_MD8(dmc) ? sizeof (struct cacheblock_md8) : sizeof (struct cacheblock);
-	EIOINFO("Allocate %luKB (%ldB per) mem for %lu-entry cache " \
+	pr_info("Allocate %luKB (%ldB per) mem for %lu-entry cache " \
 	       "(capacity:%luMB, associativity:%u, block size:%u bytes)",
 	       order >> 10, size, (long unsigned int)dmc->size,
 	       (long unsigned int)(dmc->md_sectors + data_size) >> (20-SECTOR_SHIFT),
@@ -1108,14 +1110,14 @@ eio_md_load(struct cache_c *dmc)
 		dmc->cache = (struct cacheblock *)vmalloc((size_t)order);
 
 	if ((EIO_MD8(dmc) && !dmc->cache_md8) || (!EIO_MD8(dmc) && !dmc->cache)) {
-		EIOERR("md_load: Unable to allocate memory");
+		pr_err("md_load: Unable to allocate memory");
 		vfree((void *)header);
 		return 1;
 	}
 
 	if (eio_repl_blk_init(dmc->policy_ops) != 0) {
 		vfree((void *)EIO_CACHE(dmc));
-		EIOERR("md_load: Unable to allocate memory for policy cache block");
+		pr_err("md_load: Unable to allocate memory for policy cache block");
 		ret = -EINVAL;
 		goto free_header;
 	}
@@ -1124,8 +1126,8 @@ eio_md_load(struct cache_c *dmc)
 	page_count = 0;
 	pages = eio_alloc_pages(dmc->bio_nr_pages, &page_count);
 	if (!pages) {
-		EIOERR("md_create: unable to allocate pages");
-		EIOERR("md_create: Could not write out cache metadata");
+		pr_err("md_create: unable to allocate pages");
+		pr_err("md_create: Could not write out cache metadata");
 		vfree((void *)EIO_CACHE(dmc));
 		ret = -ENOMEM;
 		goto free_header;
@@ -1136,7 +1138,7 @@ eio_md_load(struct cache_c *dmc)
 
 	pg_virt_addr = kmalloc(nr_pages * (sizeof (void *)), GFP_KERNEL);
 	if (pg_virt_addr == NULL) {
-		EIOERR("eio_md_store: System memory too low.");
+		pr_err("eio_md_store: System memory too low.");
 		for (i = 0; i < nr_pages; i++)
 			put_page(pages[i].bv_page);
 		kfree(pages);
@@ -1177,7 +1179,7 @@ eio_md_load(struct cache_c *dmc)
 		error = eio_io_sync_vm(dmc, &where, READ, pages, page_count);
 		if (error) {
 			vfree((void *)EIO_CACHE(dmc));
-			EIOERR("md_load: Could not read cache metadata sector %lu error %d",
+			pr_err("md_load: Could not read cache metadata sector %lu error %d",
 			      where.sector, error);
 			ret = -EIO;
 			goto free_md;
@@ -1219,7 +1221,7 @@ eio_md_load(struct cache_c *dmc)
 	 */
 	if (dirty_loaded && dmc->mode != CACHE_MODE_WB) {
 		vfree((void *)EIO_CACHE(dmc));
-		EIOERR("md_load: Cannot use %s mode because dirty data exists in the cache", \
+		pr_err("md_load: Cannot use %s mode because dirty data exists in the cache", \
 				(dmc->mode == CACHE_MODE_RO) ? "read only" : "write through");
 		ret = -EINVAL;
 		goto free_md;
@@ -1230,7 +1232,7 @@ eio_md_load(struct cache_c *dmc)
 	if (dmc->size % MD_BLOCKS_PER_SECTOR)
 		sectors_expected++;
 	if (sectors_expected != sectors_read) {
-		EIOERR("md_load: Sector mismatch! sectors_expected=%ld, sectors_read=%ld\n",
+		pr_err("md_load: Sector mismatch! sectors_expected=%ld, sectors_read=%ld\n",
 		       sectors_expected, sectors_read);
 		vfree((void *)EIO_CACHE(dmc));
 		ret = -EIO;
@@ -1242,7 +1244,7 @@ eio_md_load(struct cache_c *dmc)
 	error = eio_sb_store(dmc);
 	if (error) {
 		vfree((void *)EIO_CACHE(dmc));
-		EIOERR("md_load: Could not write cache superblock sector(error %d)", error);
+		pr_err("md_load: Could not write cache superblock sector(error %d)", error);
 		ret = 1;
 		goto free_md;
 	}
@@ -1268,7 +1270,7 @@ free_header:
 		header_page = NULL;
 	}
 
-	EIOINFO("Cache metadata loaded from disk with %d valid %d dirty blocks",
+	pr_info("Cache metadata loaded from disk with %d valid %d dirty blocks",
 	       num_valid, dirty_loaded);
 	return ret;
 }
@@ -1308,7 +1310,7 @@ eio_handle_ssd_message(char *cache_name, char *ssd_name, dev_notifier_t note)
 
 	dmc = eio_cache_lookup(cache_name);
 	if (NULL == dmc) {
-		EIOERR("eio_handle_ssd_message: cache %s does not exist", cache_name);
+		pr_err("eio_handle_ssd_message: cache %s does not exist", cache_name);
 		return -EINVAL;
 	}
 
@@ -1319,7 +1321,7 @@ eio_handle_ssd_message(char *cache_name, char *ssd_name, dev_notifier_t note)
 		if (CACHE_FAILED_IS_SET(dmc) || CACHE_DEGRADED_IS_SET(dmc))
 			eio_resume_caching(dmc, ssd_name);
 		else
-			EIOERR("eio_handle_ssd_message: SSD_ADD event called for ACTIVE cache \"%s\", ignoring!!!",
+			pr_err("eio_handle_ssd_message: SSD_ADD event called for ACTIVE cache \"%s\", ignoring!!!",
 					dmc->cache_name);
 		break;
 
@@ -1328,7 +1330,7 @@ eio_handle_ssd_message(char *cache_name, char *ssd_name, dev_notifier_t note)
 		break;
 
 	default:
-		EIOERR("Wrong notifier passed for eio_handle_ssd_message\n");
+		pr_err("Wrong notifier passed for eio_handle_ssd_message\n");
 	}
 
 	return 0;
@@ -1550,7 +1552,7 @@ eio_cache_create(cache_rec_short_t *cache)
 		persistence = cache->cr_persistence;
 		if (persistence < CACHE_RELOAD ||
 		    persistence > CACHE_FORCECREATE) {
-			EIOERR("ctr: persistence = %d", persistence);
+			pr_err("ctr: persistence = %d", persistence);
 			strerr = "Invalid cache persistence";
 			error = -EINVAL;
 			goto bad5;
@@ -1582,9 +1584,9 @@ eio_cache_create(cache_rec_short_t *cache)
 	 */
 	if (dmc->mode == 0) {
 		dmc->mode = CACHE_MODE_DEFAULT;
-		EIOINFO("Setting mode to default");
+		pr_info("Setting mode to default");
 	} else {
-		EIOINFO("Setting mode to %s ",
+		pr_info("Setting mode to %s ",
 			(dmc->mode == CACHE_MODE_WB) ? "write back" :
 			((dmc->mode == CACHE_MODE_RO) ? "read only" :
 			 "write through"));
@@ -1601,9 +1603,9 @@ eio_cache_create(cache_rec_short_t *cache)
 			dmc->cache_flags &= ~CACHE_FLAGS_INVALIDATE;
 		else if (flags == 1) {
 			dmc->cache_flags |= CACHE_FLAGS_INVALIDATE;
-			EIOINFO("Enabling invalidate API");
+			pr_info("Enabling invalidate API");
 		} else
-			EIOINFO("Ignoring unknown flags value: %u", flags);
+			pr_info("Ignoring unknown flags value: %u", flags);
 	}
 
 	if (persistence == CACHE_RELOAD)
@@ -1865,7 +1867,7 @@ bad1:
 bad:
 	EIO_SIM_PR1("returning r=%d", r);
 	if (strerr)
-		EIOERR("Cache creation failed: %s.\n", strerr);
+		pr_err("Cache creation failed: %s.\n", strerr);
 	return error;
 }
 
@@ -1887,19 +1889,19 @@ eio_cache_delete(char *cache_name, int do_delete)
 
 	dmc = eio_cache_lookup(cache_name);
 	if (NULL == dmc) {
-		EIOERR("cache delete: cache \"%s\" doesn't exist.", cache_name);
+		pr_err("cache delete: cache \"%s\" doesn't exist.", cache_name);
 		return -EINVAL;
 	}
 
 	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 	if (dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG) {
-		EIOERR("cache_delete: system shutdown in progress, cannot "
+		pr_err("cache_delete: system shutdown in progress, cannot "
 			"delete cache %s", cache_name);
 		SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 		return -EINVAL;
 	}
 	if (dmc->cache_flags & CACHE_FLAGS_MOD_INPROG) {
-		EIOERR("cache_delete: simultaneous edit/delete operation on cache"
+		pr_err("cache_delete: simultaneous edit/delete operation on cache"
 			" %s is not permitted", cache_name);
 		SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 		return -EINVAL;
@@ -1913,7 +1915,7 @@ eio_cache_delete(char *cache_name, int do_delete)
 	 */
 	if (unlikely(CACHE_STALE_IS_SET(dmc))) {
 		if (likely(CACHE_FAILED_IS_SET(dmc))) {
-			EIOERR("cache_delete: Cache \"%s\" is in STALE state. Force deleting!!!",
+			pr_err("cache_delete: Cache \"%s\" is in STALE state. Force deleting!!!",
 			        dmc->cache_name);
 			goto force_delete;
 		} else {
@@ -1921,9 +1923,9 @@ eio_cache_delete(char *cache_name, int do_delete)
 				SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 				dmc->cache_flags &= ~CACHE_FLAGS_MOD_INPROG;
 				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
-				EIOERR("cache_delete: Stale Cache detected with dirty blocks=%ld.\n",
+				pr_err("cache_delete: Stale Cache detected with dirty blocks=%ld.\n",
 						ATOMIC_READ(&dmc->nr_dirty));
-				EIOERR("cache_delete: Cache \"%s\" wont be deleted. Deleting will result in data corruption.\n",
+				pr_err("cache_delete: Cache \"%s\" wont be deleted. Deleting will result in data corruption.\n",
 						dmc->cache_name);
 				return -EINVAL;
 			}
@@ -1942,10 +1944,10 @@ eio_cache_delete(char *cache_name, int do_delete)
 	if (eio_ttc_deactivate(dmc, 0)) {
 
 		/* If deactivate fails; only option is to delete cache. */
-		EIOERR("cache_delete: Failed to deactivate the cache \"%s\".",
+		pr_err("cache_delete: Failed to deactivate the cache \"%s\".",
 				dmc->cache_name);
 		if (CACHE_FAILED_IS_SET(dmc))
-			EIOERR("cache_delete: Use -f option to delete the cache \"%s\".",
+			pr_err("cache_delete: Use -f option to delete the cache \"%s\".",
 				dmc->cache_name);
 		ret = -EPERM;
 		dmc->cache_flags |= CACHE_FLAGS_STALE;
@@ -1964,7 +1966,7 @@ eio_cache_delete(char *cache_name, int do_delete)
 	 */
 	if (unlikely(CACHE_FAILED_IS_SET(dmc)) ||
 		unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
-			EIOERR("cache_delete: Cannot update metadata of cache \"%s\" in failed/degraded mode.",
+			pr_err("cache_delete: Cannot update metadata of cache \"%s\" in failed/degraded mode.",
 				dmc->cache_name);
 	} else {
 		eio_md_store(dmc);
@@ -1974,7 +1976,7 @@ force_delete:
 	eio_procfs_dtr(dmc);
 
 	if (CACHE_STALE_IS_SET(dmc)) {
-		EIOINFO("Force deleting cache \"%s\"!!!.", dmc->cache_name);
+		pr_info("Force deleting cache \"%s\"!!!.", dmc->cache_name);
 		eio_ttc_deactivate(dmc, 1);
 	}
 
@@ -2002,7 +2004,7 @@ out:
 		VERIFY(dmc->clean_thread == NULL);
 		error = eio_start_clean_thread(dmc);
 		if (error)
-			EIOERR("cache_delete: Failed to restart async tasks. error=%d\n", error);
+			pr_err("cache_delete: Failed to restart async tasks. error=%d\n", error);
 	}
 	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 	dmc->cache_flags &= ~CACHE_FLAGS_MOD_INPROG;
@@ -2049,7 +2051,7 @@ eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 	r = eio_ttc_get_device(dev, mode, &dmc->cache_dev);
 	if (r) {
 		dmc->cache_dev = prev_cache_dev;
-		EIOERR("ctr_ssd_add: Failed to lookup cache device %s", dev);
+		pr_err("ctr_ssd_add: Failed to lookup cache device %s", dev);
 		return -EINVAL;
 	}
 	/*
@@ -2060,7 +2062,7 @@ eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 
 	/* sanity check */
 	if (dmc->cache_size != to_sector(eio_get_device_size(dmc->cache_dev))) {
-		EIOERR("ctr_ssd_add: Cache device size has changed, expected (%lu) found (%lu) \
+		pr_err("ctr_ssd_add: Cache device size has changed, expected (%lu) found (%lu) \
 				continuing in degraded mode", dmc->cache_size,  \
 				to_sector(eio_get_device_size(dmc->cache_dev)));
 		r = -EINVAL;
@@ -2069,7 +2071,7 @@ eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 
 	/* sanity check for cache device start sector */
 	if (dmc->cache_dev_start_sect != eio_get_device_start_sect(dmc->cache_dev)) {
-		EIOERR("ctr_ssd_add: Cache device starting sector changed, \
+		pr_err("ctr_ssd_add: Cache device starting sector changed, \
 				expected (%lu) found (%lu) continuing in \
 				degraded mode", dmc->cache_dev_start_sect, \
 				eio_get_device_start_sect(dmc->cache_dev));
@@ -2091,13 +2093,13 @@ eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 
 	r = eio_md_create(dmc, /* force */1,/* cold */ (dmc->mode != CACHE_MODE_WB));
 	if (r) {
-		EIOERR("ctr_ssd_add: Failed to create md, continuing in degraded mode");
+		pr_err("ctr_ssd_add: Failed to create md, continuing in degraded mode");
 		goto out;
 	}
 
 	r = eio_repl_sets_init(dmc->policy_ops);
 	if (r < 0) {
-		EIOERR("ctr_ssd_add: Failed to allocate memory for cache policy");
+		pr_err("ctr_ssd_add: Failed to allocate memory for cache policy");
 		goto out;
 	}
 	eio_policy_lru_pushblks(dmc->policy_ops);
@@ -2188,7 +2190,7 @@ eio_allocate_wb_resources(struct cache_c *dmc)
 	nr_bvecs = IO_BVEC_COUNT(iosize, dmc->block_size);
 	dmc->clean_dbvecs = (struct bio_vec *)kmalloc(sizeof(struct bio_vec) * nr_bvecs, GFP_KERNEL);
 	if (dmc->clean_dbvecs == NULL) {
-		EIOERR("cache_create: Failed to allocated memory.\n");
+		pr_err("cache_create: Failed to allocated memory.\n");
 		ret = -ENOMEM;
 		goto errout;
 	}
@@ -2205,7 +2207,7 @@ eio_allocate_wb_resources(struct cache_c *dmc)
 	nr_pages = IO_PAGE_COUNT(iosize);
 	dmc->clean_mdpages = (struct page **)kmalloc(sizeof(struct page *) * nr_pages, GFP_KERNEL);
 	if (dmc->clean_mdpages == NULL) {
-		EIOERR("cache_create: Failed to allocated memory.\n");
+		pr_err("cache_create: Failed to allocated memory.\n");
 		ret = -ENOMEM;
 		eio_free_wb_bvecs(dmc->clean_dbvecs, dmc->dbvec_count, dmc->block_size);
 		goto errout;
@@ -2247,7 +2249,7 @@ eio_allocate_wb_resources(struct cache_c *dmc)
 	}
 
 	if (ret < 0) {
-		EIOERR("cache_create: Failed to initialize dirty lru set or"
+		pr_err("cache_create: Failed to initialize dirty lru set or"
 			"clean/mdupdate thread for wb cache.\n");
 		if (dmc->dirty_set_lru) {
 			lru_uninit(dmc->dirty_set_lru);
@@ -2332,11 +2334,11 @@ eio_notify_reboot(struct notifier_block *this,
 		eio_wait_schedule, TASK_UNINTERRUPTIBLE);
 	for (dmc = cache_list_head; dmc != NULL; dmc = dmc->next_cache) {
 		if (unlikely(CACHE_FAILED_IS_SET(dmc)) || unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
-			EIOERR("notify_reboot: Cannot sync in failed / degraded mode");
+			pr_err("notify_reboot: Cannot sync in failed / degraded mode");
 			continue;
 		}
 		if (dmc->cold_boot && ATOMIC_READ(&dmc->nr_dirty) && !eio_force_warm_boot) {
-			EIOINFO("Cold boot set for cache %s: Draining dirty blocks: %ld",
+			pr_info("Cold boot set for cache %s: Draining dirty blocks: %ld",
 					dmc->cache_name, ATOMIC_READ(&dmc->nr_dirty));
 			eio_clean_for_reboot(dmc);
 		}
@@ -2399,7 +2401,7 @@ eio_notify_ssd_rm(struct notifier_block *nb, unsigned long action, void *data)
 		return 0;
 
 	if (unlikely(dev == NULL)) {
-		EIOINFO("notify_cache_dev: device is NULL!");
+		pr_info("notify_cache_dev: device is NULL!");
 		return 0;
 	}
 
@@ -2421,12 +2423,12 @@ eio_notify_ssd_rm(struct notifier_block *nb, unsigned long action, void *data)
 
 		/*Check if source dev name or ssd dev name is available or not. */
 		if (check_ssd && 0 == strncmp(device_name, dmc->cache_gendisk_name, len)) {
-			EIOINFO("SSD Removed for cache name %s", dmc->cache_name);
+			pr_info("SSD Removed for cache name %s", dmc->cache_name);
 			notify = NOTIFY_SSD_REMOVED;
 		}
 
 		if (check_src && 0 == strncmp(device_name, dmc->cache_srcdisk_name, len)) {
-			EIOINFO("SRC Removed for cache name %s", dmc->cache_name);
+			pr_info("SRC Removed for cache name %s", dmc->cache_name);
 			notify = NOTIFY_SRC_REMOVED;
 		}
 
@@ -2435,7 +2437,7 @@ eio_notify_ssd_rm(struct notifier_block *nb, unsigned long action, void *data)
 
 		ssd_list_ptr = kmalloc(sizeof (struct ssd_rm_list), GFP_ATOMIC);
 		if (unlikely(ssd_list_ptr == NULL)) {
-			EIOERR("Cannot allocate memory for ssd_rm_list");
+			pr_err("Cannot allocate memory for ssd_rm_list");
 			return -ENOMEM;
 		}
 		ssd_list_ptr->dmc = dmc;
@@ -2471,7 +2473,7 @@ eio_init(void)
 	EIO_SIM_PR1();
 
         if (sizeof (sector_t) != 8 || sizeof (index_t) != 8) {
-                EIOERR("init: EnhanceIO runs only in 64-bit architectures");
+                pr_err("init: EnhanceIO runs only in 64-bit architectures");
                 return -EPERM;
         }
 
@@ -2492,7 +2494,7 @@ eio_init(void)
 	eio_module_procfs_init();
 	eio_control = KMALLOC(sizeof *eio_control, GFP_KERNEL);
 	if (eio_control == NULL) {
-		EIOERR("init: Cannot allocate memory for eio_control");
+		pr_err("init: Cannot allocate memory for eio_control");
 		(void)eio_delete_misc_device();
 		return -ENOMEM;
 	}
@@ -2501,7 +2503,7 @@ eio_init(void)
 	register_reboot_notifier(&eio_reboot_notifier);
 	r = bus_register_notifier(&scsi_bus_type, &eio_ssd_rm_notifier);
 	if (r) {
-		EIOERR("init: bus register notifier failed %d", r);
+		pr_err("init: bus register notifier failed %d", r);
 		(void)eio_delete_misc_device();
 	}
 	return r;
@@ -2522,7 +2524,7 @@ eio_exit(void)
 	unregister_reboot_notifier(&eio_reboot_notifier);
 	r = bus_unregister_notifier(&scsi_bus_type, &eio_ssd_rm_notifier);
 	if (r)
-		EIOERR("exit: Bus unregister notifier failed %d", r);
+		pr_err("exit: Bus unregister notifier failed %d", r);
 
 	eio_jobs_exit();
 	eio_module_procfs_exit();

@@ -33,10 +33,10 @@
 #define EIO_DEVPATH	"/dev/eiodev"
 #define MISC_DEVICE     "eiodev"
 
-#define CACHE_NAME_LEN		32
+#define CACHE_NAME_LEN		31
 #define CACHE_NAME_SZ		CACHE_NAME_LEN + 1 
 
-#define NAME_LEN		128
+#define NAME_LEN		127
 #define NAME_SZ			NAME_LEN + 1
 
 

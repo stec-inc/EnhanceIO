@@ -95,24 +95,6 @@ struct eio_event {
 #define VERIFY(x) do { } while(0);
 #endif /* ENABLE_VERIFY */
 
-#define EIOINFO(fmt, arg...)	\
-	printk(KERN_INFO EIO_MSG_PREFIX ": " fmt "\n", ## arg)
-
-#define EIOERR(fmt, arg...)	\
-	printk(KERN_ERR EIO_MSG_PREFIX ": " fmt "\n", ## arg)
-
-#define EIOWARN(fmt, arg...)	\
-	printk(KERN_WARNING EIO_MSG_PREFIX ": " fmt "\n", ## arg)
-
-#ifdef EIO_DEBUG
-#define EIODEBUG(fmt, arg...)	\
-	printk(KERN_ERR EIO_MSG_PREFIX ": " fmt "\n", ## arg)
-
-#else /* EIO_DEBUG */
-#define EIODEBUG(fmt, arg...) do {} while (0)
-
-#endif /* EIO_DEBUG */
-
 extern sector_t eio_get_device_size(struct eio_bdev *);
 extern sector_t eio_get_device_start_sect(struct eio_bdev *);
 #endif /* __KERNEL__ */

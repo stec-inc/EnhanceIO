@@ -59,7 +59,7 @@ eio_mem_init(struct cache_c *dmc)
 	 */
 	num_sets_64 = dmc->size / dmc->assoc;
 	if (num_sets_64 > UINT_MAX) {
-		EIOERR("Number of cache sets (%lu) greater than maximum allowed (%u)",
+		pr_err("Number of cache sets (%lu) greater than maximum allowed (%u)",
 			(long unsigned int)num_sets_64, UINT_MAX);
 		return -1;
 	}
@@ -78,7 +78,7 @@ eio_mem_init(struct cache_c *dmc)
 	 */
 	if (dmc->num_sets_bits < 16) {
 		dmc->cache_flags |= CACHE_FLAGS_MD8;
-		EIOINFO("Not enough sets to use small metadata");
+		pr_info("Not enough sets to use small metadata");
 		return 1;
 	}
 
@@ -91,7 +91,7 @@ eio_mem_init(struct cache_c *dmc)
 	max_dbn = ((u_int64_t)1) << (msb_bits_24 + dmc->num_sets_bits + lsb_bits);
 	if (to_sector(eio_get_device_size(dmc->disk_dev)) > max_dbn) {
 		dmc->cache_flags |= CACHE_FLAGS_MD8;
-		EIOINFO("Source volume too big to use small metadata");
+		pr_info("Source volume too big to use small metadata");
 		return 1;
 	}
 

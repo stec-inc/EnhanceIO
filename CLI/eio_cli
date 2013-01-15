@@ -59,10 +59,10 @@ def get_caches_list():
 # Class that represents cache. Also used to pass ioctl to driver 
 class Cache_rec(Structure):
 	_fields_ = [
-	("name", c_char * 33),
-	("src_name", c_char * 129),
-	("ssd_name", c_char * 129),
-	("ssd_uuid", c_char * 129),
+	("name", c_char * 32),
+	("src_name", c_char * 128),
+	("ssd_name", c_char * 128),
+	("ssd_uuid", c_char * 128),
         ("src_size", c_ulong),	
 	("ssd_size", c_ulong),
         ("src_sector_size", c_int),
@@ -108,8 +108,8 @@ class Cache_rec(Structure):
 		print "SSD Device       : " + self.ssd_name
 		print "Policy           : " + policies[self.policy] 
 		print "Mode             : " + modes[self.mode]
-		print "block size       : " + str(self.blksize)	
-		print "assocativity     : " + str(self.assoc)	
+		print "Block Size       : " + str(self.blksize)	
+		print "Associativity     : " + str(self.assoc)	
 
 		pass
 
