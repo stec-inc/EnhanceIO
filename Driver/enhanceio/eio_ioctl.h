@@ -66,15 +66,15 @@ typedef struct cache_rec_short {
 	char		cr_ssd_uuid[NAME_SZ];
 	uint64_t	cr_src_dev_size;
 	uint64_t	cr_ssd_dev_size;
-	int		cr_src_sector_size;
-	int		cr_ssd_sector_size;
-	int		cr_flags;	/* CACHE_FLAGS_INV* etc. */
+	uint32_t	cr_src_sector_size;
+	uint32_t	cr_ssd_sector_size;
+	uint32_t	cr_flags;	/* CACHE_FLAGS_INV* etc. */
 	char 		cr_policy;
 	char		cr_mode;
 	char 		cr_persistence;
 	char		cr_cold_boot;
-	unsigned long	cr_blksize;
-	unsigned long	cr_assoc;
+	uint64_t	cr_blksize;
+	uint64_t	cr_assoc;
 } cache_rec_short_t;
 
 typedef struct cache_list {

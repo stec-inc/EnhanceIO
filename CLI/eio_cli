@@ -63,17 +63,17 @@ class Cache_rec(Structure):
 	("src_name", c_char * 128),
 	("ssd_name", c_char * 128),
 	("ssd_uuid", c_char * 128),
-        ("src_size", c_ulong),	
-	("ssd_size", c_ulong),
-        ("src_sector_size", c_int),
-        ("ssd_sector_size", c_int),
-	("flags", c_int),
+        ("src_size", c_ulonglong),	
+	("ssd_size", c_ulonglong),
+        ("src_sector_size", c_uint),
+        ("ssd_sector_size", c_uint),
+	("flags", c_uint),
         ("policy", c_byte),
         ("mode", c_byte),
         ("persistence", c_byte),
         ("cold_boot", c_byte),
-        ("blksize", c_ulong),
-        ("assoc", c_ulong)
+        ("blksize", c_ulonglong),
+        ("assoc", c_ulonglong)
 	]
 	def __init__(self, name, src_name="", ssd_name="", src_size=0, ssd_size=0, src_sector_size=0, ssd_sector_size=0, flags=0, policy="", mode="", persistence=0, cold_boot="", blksize="", assoc=""): 
 	

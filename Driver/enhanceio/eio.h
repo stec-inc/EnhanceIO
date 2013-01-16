@@ -625,6 +625,10 @@ struct set_seq {
 };
 
 /* EIO system control variables(tunables) */
+/*
+ * vloatile are used here since the cost a strong synchonisation
+ * is not worth the benefits. 
+*/
 struct eio_sysctl {
  	volatile uint32_t	error_inject;
         volatile int32_t	fast_remove;

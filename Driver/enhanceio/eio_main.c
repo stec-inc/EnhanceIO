@@ -700,9 +700,13 @@ eio_clean_thread_proc(void *context)
 			spin_lock_irqsave(&dmc->dirty_set_lru_lock, flags);
 			dmc->is_clean_aged_sets_sched = 0;
 			if (dmc->sysctl_active.time_based_clean_interval && atomic64_read(&dmc->nr_dirty)) {
-			schedule_delayed_work(&dmc->clean_aged_sets_work,
-				dmc->sysctl_active.time_based_clean_interval * 60 * HZ);
-				dmc->is_clean_aged_sets_sched = 1;
+				/* there is a potential race here, If a sysctl changes
+				   the time_based_clean_interval to 0. However a strong 
+				   synchronisation is not necessary here 	
+				  */
+				schedule_delayed_work(&dmc->clean_aged_sets_work,
+				                      dmc->sysctl_active.time_based_clean_interval * 60 * HZ);
+               			                      dmc->is_clean_aged_sets_sched = 1;
 			}
 			spin_unlock_irqrestore(&dmc->dirty_set_lru_lock, flags);
 		}
