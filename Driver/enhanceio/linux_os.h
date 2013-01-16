@@ -55,15 +55,6 @@
 #include <linux/vmalloc.h>	/* for sysinfo (mem) variables */
 #include <linux/mm.h>
 
-/* 64bit atomic operations */
-#define ATOMIC_INC              atomic64_inc
-#define ATOMIC_DEC              atomic64_dec
-#define ATOMIC_ADD(x, y)        atomic64_add(y, x)
-#define ATOMIC_READ             atomic64_read
-#define ATOMIC_SET              atomic64_set
-#define ATOMIC_CMPXCHG          atomic64_cmpxchg
-#define ATOMIC_DEC_IF_POS       atomic64_dec_if_positive
-
 struct eio_event {
 	struct task_struct *process;	/* handle of the sleeping process */
 };
@@ -99,10 +90,6 @@ extern sector_t eio_get_device_size(struct eio_bdev *);
 extern sector_t eio_get_device_start_sect(struct eio_bdev *);
 #endif /* __KERNEL__ */
 
-#define BZERO(bufp, len)	memset(bufp, 0, len)
-#define STRICMP(a, b)		strcasecmp(a, b)
-#define sprintf_s		snprintf
-
 #define EIO_INIT_EVENT(ev)						\
 			do {				  		\
 				(ev)->process = NULL;	  		\
@@ -112,7 +99,6 @@ extern sector_t eio_get_device_start_sect(struct eio_bdev *);
 #define EIO_SET_EVENT_AND_UNLOCK(ev, sl, flags)					\
 			do {	  						\
 				struct task_struct	*p = NULL;		\
-				VERIFY(spin_is_locked((sl)));			\
 				if ((ev)->process) { 				\
 					(p) = (ev)->process;			\
 					(ev)->process = NULL;			\
@@ -126,7 +112,6 @@ extern sector_t eio_get_device_start_sect(struct eio_bdev *);
 //Assumes that the spin lock sl is taken while calling this macro
 #define EIO_WAIT_EVENT(ev, sl, flags)						\
 			do {							\
-				VERIFY(spin_is_locked((sl)));			\
 				(ev)->process = current;			\
 				set_current_state(TASK_INTERRUPTIBLE);		\
 				spin_unlock_irqrestore((sl), flags); 		\

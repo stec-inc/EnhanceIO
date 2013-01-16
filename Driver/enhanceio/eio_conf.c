@@ -92,7 +92,6 @@ static struct notifier_block eio_ssd_rm_notifier = {
 int
 eio_wait_schedule(void *unused)
 {
-	EIO_SIM_PR1();
 
 	schedule();
 	return 0;
@@ -107,7 +106,6 @@ eio_mem_available(struct cache_c *dmc, size_t size)
 {
 	struct sysinfo si;
 
-	EIO_SIM_PR1();
 
 	if (unlikely(dmc->sysctl_active.mem_limit_pct <= 0 || dmc->sysctl_active.mem_limit_pct >= 100))
 		return 1;
@@ -150,7 +148,6 @@ eio_policy_init(struct cache_c *dmc)
 {
 	int	error = 0;
 
-	EIO_SIM_PR1();
 
 	if (dmc->req_policy == 0)
 		dmc->req_policy = CACHE_REPL_DEFAULT;
@@ -177,7 +174,6 @@ eio_policy_init(struct cache_c *dmc)
 static int
 eio_jobs_init(void)
 {
-	EIO_SIM_PR1();
 
 	_job_cache = _io_cache = NULL;
 	_job_pool = _io_pool = NULL;
@@ -226,7 +222,6 @@ out:
 static void
 eio_jobs_exit(void)
 {
-	EIO_SIM_PR1();
 
 	mempool_destroy(_io_pool);
 	mempool_destroy(_job_pool);
@@ -241,7 +236,6 @@ eio_jobs_exit(void)
 static int
 eio_kcached_init(struct cache_c *dmc)
 {
-	EIO_SIM_PR1();
 
 	/* init_waitqueue_head(&dmc->destroyq); */
 	atomic_set(&dmc->nr_jobs, 0);
@@ -252,7 +246,6 @@ eio_kcached_init(struct cache_c *dmc)
 static void
 eio_kcached_client_destroy(struct cache_c *dmc)
 {
-	EIO_SIM_PR1();
 
 	/* Wait for all IOs */
 	//wait_event(dmc->destroyq, !atomic_read(&dmc->nr_jobs));
@@ -299,13 +292,13 @@ eio_sb_store(struct cache_c *dmc)
 	sb->sbf.assoc = dmc->assoc;
 	sb->sbf.cache_md_start_sect = dmc->md_start_sect;
 	sb->sbf.cache_data_start_sect = dmc->md_sectors;
-	STRNCPY(sb->sbf.disk_devname, dmc->disk_devname, DEV_PATHLEN);
-	STRNCPY(sb->sbf.cache_devname, dmc->cache_devname, DEV_PATHLEN);
-	STRNCPY(sb->sbf.ssd_uuid, dmc->ssd_uuid, DEV_PATHLEN - 1);
+	strncpy(sb->sbf.disk_devname, dmc->disk_devname, DEV_PATHLEN);
+	strncpy(sb->sbf.cache_devname, dmc->cache_devname, DEV_PATHLEN);
+	strncpy(sb->sbf.ssd_uuid, dmc->ssd_uuid, DEV_PATHLEN - 1);
 	sb->sbf.cache_devsize = to_sector(eio_get_device_size(dmc->cache_dev));
 	sb->sbf.disk_devsize = to_sector(eio_get_device_size(dmc->disk_dev));
 	sb->sbf.cache_version = dmc->sb_version;
-	STRNCPY(sb->sbf.cache_name, dmc->cache_name, DEV_PATHLEN);
+	strncpy(sb->sbf.cache_name, dmc->cache_name, DEV_PATHLEN);
 	sb->sbf.cache_name[DEV_PATHLEN-1] = '\0';
 	sb->sbf.mode = dmc->mode;
 	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
@@ -711,7 +704,6 @@ eio_md_create(struct cache_c *dmc, int force, int cold)
 		ret = -ENOMEM;
 		goto free_header;
 	}
-	EIO_SIM_ALLOC_CACHE(dmc, order);
 
 	if (cold) {
 		int retry = 0;
@@ -948,7 +940,6 @@ eio_md_load(struct cache_c *dmc)
 	where.bdev = dmc->cache_dev->bdev;
 	where.sector = EIO_SUPERBLOCK_START;
 	where.count = to_sector(EIO_SUPERBLOCK_SIZE);
-	EIO_SIM_PR1("reading superblock");
 	error = eio_io_sync_vm(dmc, &where, READ, header_page, 1);
 	if (error) {
 		pr_err("md_load: Could not read cache superblock sector %lu error %d",
@@ -1278,7 +1269,6 @@ free_header:
 void
 eio_policy_free(struct cache_c *dmc)
 {
-	EIO_SIM_PR1();
 
 	if (dmc->policy_ops != NULL) {
 		eio_put_policy(dmc->policy_ops);
@@ -1360,7 +1350,7 @@ eio_init_ssddev_props(struct cache_c *dmc)
 	if (dmc->cache_dev && dmc->cache_dev->bdev &&
 	    dmc->cache_dev->bdev->bd_disk &&
 	    dmc->cache_dev->bdev->bd_disk->driverfs_dev) {
-		STRNCPY(dmc->cache_gendisk_name,
+		strncpy(dmc->cache_gendisk_name,
 			dev_name(dmc->cache_dev->bdev->bd_disk->driverfs_dev),
 			DEV_PATHLEN);
 	} else {
@@ -1375,7 +1365,7 @@ eio_init_srcdev_props(struct cache_c *dmc)
 	if (dmc->disk_dev && dmc->disk_dev->bdev &&
 	    dmc->disk_dev->bdev->bd_disk &&
 	    dmc->disk_dev->bdev->bd_disk->driverfs_dev) {
-		STRNCPY(dmc->cache_srcdisk_name,
+		strncpy(dmc->cache_srcdisk_name,
 			dev_name(dmc->disk_dev->bdev->bd_disk->driverfs_dev),
 			DEV_PATHLEN);
 	} else {
@@ -1399,7 +1389,7 @@ eio_cache_create(cache_rec_short_t *cache)
 	fmode_t			mode = (FMODE_READ | FMODE_WRITE);
 	char			*strerr = NULL;
 
-	dmc = (struct cache_c *)KZALLOC(sizeof(*dmc), GFP_KERNEL);
+	dmc = (struct cache_c *)kzalloc(sizeof(*dmc), GFP_KERNEL);
 	if (dmc == NULL) {
 		strerr = "Failed to allocate memory for cache context";
 		error = -ENOMEM;
@@ -1425,7 +1415,7 @@ eio_cache_create(cache_rec_short_t *cache)
 		error = -EFBIG;
 		goto bad2;
 	}
-	STRNCPY(dmc->disk_devname, cache->cr_src_devname, DEV_PATHLEN);
+	strncpy(dmc->disk_devname, cache->cr_src_devname, DEV_PATHLEN);
 
 	/*
 	 * Cache device.
@@ -1446,10 +1436,10 @@ eio_cache_create(cache_rec_short_t *cache)
 		strerr = "Same devices specified";
 		goto bad3;
 	}
-	STRNCPY(dmc->cache_devname, cache->cr_ssd_devname, DEV_PATHLEN);
+	strncpy(dmc->cache_devname, cache->cr_ssd_devname, DEV_PATHLEN);
 
 	if (cache->cr_name[0] != '\0') {
-		STRNCPY(dmc->cache_name, cache->cr_name,
+		strncpy(dmc->cache_name, cache->cr_name,
 			sizeof (dmc->cache_name));
 		/* make sure it is zero terminated */
 		dmc->cache_name[sizeof (dmc->cache_name) - 1] = '\x00';
@@ -1460,7 +1450,7 @@ eio_cache_create(cache_rec_short_t *cache)
 	}
 
 
-	STRNCPY(dmc->ssd_uuid, cache->cr_ssd_uuid, DEV_PATHLEN - 1);
+	strncpy(dmc->ssd_uuid, cache->cr_ssd_uuid, DEV_PATHLEN - 1);
 
 	dmc->cache_dev_start_sect = eio_get_device_start_sect(dmc->cache_dev);
 	error = eio_do_preliminary_checks(dmc);
@@ -1559,7 +1549,6 @@ eio_cache_create(cache_rec_short_t *cache)
 		}
 		dmc->persistence = persistence;
 	}
-	EIO_SIM_PR1("persistence=%d", persistence);
 	if (persistence == CACHE_RELOAD) {
 		if (eio_md_load(dmc)) {
 			strerr = "Failed to reload cache";
@@ -1729,9 +1718,6 @@ init:
 		goto bad5;
 	}
 
-	EIO_SIM_PR1("initializing cache sets 0...%lu",
-		    (long unsigned int)(dmc->size >> dmc->consecutive_shift)
-		    - 1);
 	for (i = 0 ; i < (dmc->size >> dmc->consecutive_shift) ; i++) {
 		dmc->cache_sets[i].nr_dirty = 0;
 		spin_lock_init(&dmc->cache_sets[i].cs_lock);
@@ -1748,7 +1734,6 @@ init:
 	}
 	eio_policy_lru_pushblks(dmc->policy_ops);
 
-	EIO_SIM_PRINT(1);
 
 	SPIN_LOCK_INIT(&dmc->cache_spin_lock);
 
@@ -1768,7 +1753,7 @@ init:
 
 	atomic_set(&dmc->clean_index, 0);
 
-	ATOMIC_SET(&dmc->nr_ios, 0);
+	atomic64_set(&dmc->nr_ios, 0);
 
 	/*
 	 * sysctl_mem_limit_pct [0 - 100]. Before doing a vmalloc()
@@ -1791,10 +1776,10 @@ init:
 	prev_set = -1; 
 	for (i = 0 ; i < dmc->size ; i++) {
 		if (EIO_CACHE_STATE_GET(dmc, i) & VALID)
-			ATOMIC_INC(&dmc->eio_stats.cached_blocks);
+			atomic64_inc(&dmc->eio_stats.cached_blocks);
 		if (EIO_CACHE_STATE_GET(dmc, i) & DIRTY) {
 			dmc->cache_sets[i / dmc->assoc].nr_dirty++;
-			ATOMIC_INC(&dmc->nr_dirty);
+			atomic64_inc(&dmc->nr_dirty);
 			cur_set = i / dmc->assoc;
 			if (prev_set != cur_set) {
 				/* Move the given set at the head of the set LRU list */
@@ -1860,12 +1845,9 @@ bad3:
 bad2:
 	eio_ttc_put_device(&dmc->disk_dev);
 bad1:
-#ifndef EIO_SIM
 	eio_policy_free(dmc);
 	kfree(dmc);
-#endif /* !EIO_SIM */
 bad:
-	EIO_SIM_PR1("returning r=%d", r);
 	if (strerr)
 		pr_err("Cache creation failed: %s.\n", strerr);
 	return error;
@@ -1885,7 +1867,6 @@ eio_cache_delete(char *cache_name, int do_delete)
 
 	ret = 0;
 	restart_async_task = 0;
-	EIO_SIM_PR1();
 
 	dmc = eio_cache_lookup(cache_name);
 	if (NULL == dmc) {
@@ -1919,12 +1900,12 @@ eio_cache_delete(char *cache_name, int do_delete)
 			        dmc->cache_name);
 			goto force_delete;
 		} else {
-			if (ATOMIC_READ(&dmc->nr_dirty) != 0) {
+			if (atomic64_read(&dmc->nr_dirty) != 0) {
 				SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 				dmc->cache_flags &= ~CACHE_FLAGS_MOD_INPROG;
 				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
 				pr_err("cache_delete: Stale Cache detected with dirty blocks=%ld.\n",
-						ATOMIC_READ(&dmc->nr_dirty));
+						atomic64_read(&dmc->nr_dirty));
 				pr_err("cache_delete: Cache \"%s\" wont be deleted. Deleting will result in data corruption.\n",
 						dmc->cache_name);
 				return -EINVAL;
@@ -1958,7 +1939,7 @@ eio_cache_delete(char *cache_name, int do_delete)
 	}
 
 	if (!CACHE_FAILED_IS_SET(dmc))
-		VERIFY(dmc->sysctl_active.fast_remove || (ATOMIC_READ(&dmc->nr_dirty) == 0));
+		VERIFY(dmc->sysctl_active.fast_remove || (atomic64_read(&dmc->nr_dirty) == 0));
 
 	/*
 	 * If ttc_deactivate succeeded... proceed with cache delete.
@@ -2079,7 +2060,7 @@ eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 		goto out;
 	}
 
-	STRNCPY(dmc->cache_devname, dev, DEV_PATHLEN);
+	strncpy(dmc->cache_devname, dev, DEV_PATHLEN);
 	eio_init_ssddev_props(dmc);
 	dmc->size = dmc->cache_size; 	/* dmc->size will be recalculated in eio_md_create() */
 
@@ -2119,7 +2100,6 @@ out:
 void
 eio_status_info(struct cache_c *dmc, status_type_t type, char *result, unsigned int maxlen)
 {
-	EIO_SIM_PR1();
 
 	return; /* We already have stats under /proc/.../eio_stats */
 }
@@ -2313,7 +2293,6 @@ eio_notify_reboot(struct notifier_block *this,
 {
 	struct cache_c *dmc;
 
-	EIO_SIM_PR1();
 
 	if (eio_reboot_notified  == EIO_REBOOT_HANDLING_DONE) {
 		return NOTIFY_DONE;
@@ -2337,9 +2316,9 @@ eio_notify_reboot(struct notifier_block *this,
 			pr_err("notify_reboot: Cannot sync in failed / degraded mode");
 			continue;
 		}
-		if (dmc->cold_boot && ATOMIC_READ(&dmc->nr_dirty) && !eio_force_warm_boot) {
+		if (dmc->cold_boot && atomic64_read(&dmc->nr_dirty) && !eio_force_warm_boot) {
 			pr_info("Cold boot set for cache %s: Draining dirty blocks: %ld",
-					dmc->cache_name, ATOMIC_READ(&dmc->nr_dirty));
+					dmc->cache_name, atomic64_read(&dmc->nr_dirty));
 			eio_clean_for_reboot(dmc);
 		}
 		eio_md_store(dmc);
@@ -2395,7 +2374,6 @@ eio_notify_ssd_rm(struct notifier_block *nb, unsigned long action, void *data)
 	unsigned check_src = 0, check_ssd = 0;
 	dev_notifier_t notify = NOTIFY_INITIALIZER;
 
-	EIO_SIM_PR1();
 
 	if (likely(action != BUS_NOTIFY_DEL_DEVICE))
 		return 0;
@@ -2470,7 +2448,6 @@ eio_init(void)
 	int r;
 	extern struct bus_type scsi_bus_type;
 
-	EIO_SIM_PR1();
 
         if (sizeof (sector_t) != 8 || sizeof (index_t) != 8) {
                 pr_err("init: EnhanceIO runs only in 64-bit architectures");
@@ -2492,7 +2469,7 @@ eio_init(void)
 	INIT_WORK(&_kcached_wq, eio_do_work);
 
 	eio_module_procfs_init();
-	eio_control = KMALLOC(sizeof *eio_control, GFP_KERNEL);
+	eio_control = kmalloc(sizeof *eio_control, GFP_KERNEL);
 	if (eio_control == NULL) {
 		pr_err("init: Cannot allocate memory for eio_control");
 		(void)eio_delete_misc_device();
@@ -2519,7 +2496,6 @@ eio_exit(void)
 	int r;
 	extern struct bus_type scsi_bus_type;
 
-	EIO_SIM_PR1();
 
 	unregister_reboot_notifier(&eio_reboot_notifier);
 	r = bus_unregister_notifier(&scsi_bus_type, &eio_ssd_rm_notifier);
@@ -2543,7 +2519,6 @@ eio_exit(void)
 sector_t
 eio_get_device_size(struct eio_bdev *dev)
 {
-	EIO_SIM_PR1();
 
 	return dev->bdev->bd_inode->i_size;
 }
@@ -2554,7 +2529,6 @@ eio_get_device_size(struct eio_bdev *dev)
 sector_t
 eio_get_device_start_sect(struct eio_bdev *dev)
 {
-        EIO_SIM_PR1();
 
         if (dev == NULL || dev->bdev == NULL || dev->bdev->bd_part == NULL)
                 return 0;

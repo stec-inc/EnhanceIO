@@ -65,7 +65,6 @@ struct eio_policy_header eio_fifo_ops = {
 int
 eio_fifo_init(struct cache_c *dmc)
 {
-	EIO_SIM_PR1();
 
 	return 0;
 }
@@ -82,7 +81,6 @@ eio_fifo_cache_sets_init(struct eio_policy *p_ops)
 	struct cache_c *dmc = p_ops->sp_dmc;
 	struct eio_fifo_cache_set *cache_sets;
 
-	EIO_SIM_PR1();
 
 	pr_info("Initializing fifo cache sets\n");
 	order = (dmc->size >> dmc->consecutive_shift) * sizeof (struct eio_fifo_cache_set);
@@ -115,7 +113,6 @@ eio_fifo_find_reclaim_dbn(struct eio_policy *p_ops, index_t start_index, index_t
 	struct eio_fifo_cache_set *cache_sets;
 	struct cache_c *dmc = p_ops->sp_dmc;
 
-	EIO_SIM_PR1();
 
 	set = start_index / dmc->assoc;
 	end_index = start_index + dmc->assoc;
@@ -154,7 +151,6 @@ eio_fifo_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
 	struct eio_fifo_cache_set *cache_sets;
 	struct cache_c *dmc;
 
-	EIO_SIM_PR1();
 
 	dmc = p_ops->sp_dmc;
 	cache_sets = (struct eio_fifo_cache_set *)dmc->sp_cache_set;
@@ -184,7 +180,6 @@ eio_fifo_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
 int
 eio_fifo_cache_blk_init(struct eio_policy *p_ops)
 {
-	EIO_SIM_PR1();
 
 	return 0;
 }
@@ -198,7 +193,6 @@ eio_fifo_instance_init(void)
 {
 	struct eio_policy *new_instance;
 
-	EIO_SIM_PR1();
 
 	new_instance = (struct eio_policy *)vmalloc(sizeof (struct eio_policy));
 	if (new_instance == NULL) {
@@ -217,9 +211,7 @@ eio_fifo_instance_init(void)
 	new_instance->sp_clean_set = eio_fifo_clean_set;
 	new_instance->sp_dmc = NULL;
 
-#ifndef EIO_SIM
 	try_module_get(THIS_MODULE);
-#endif /* !EIO_SIM */
 
 	pr_info("eio_fifo_instance_init: created new instance of FIFO");
 
@@ -233,23 +225,17 @@ eio_fifo_instance_init(void)
 void
 eio_fifo_exit(void)
 {
-	EIO_SIM_PR1();
 
-#ifndef EIO_SIM
 	module_put(THIS_MODULE);
-#endif /* !EIO_SIM */
 }
 
 
-#if !defined(EIO_SIM)
 static
-#endif /*!EIO_SIM */
 int __init
 fifo_register(void)
 {
 	int ret;
 
-	EIO_SIM_PR1("registering FIFO policy");
 
 	ret = eio_register_policy(&eio_fifo_ops);
 	if (ret != 0)
@@ -259,22 +245,18 @@ fifo_register(void)
 }
 
 
-#if !defined(EIO_SIM)
 static
-#endif /* !EIO_SIM */
 void __exit
 fifo_unregister(void)
 {
 	int ret;
 
-	EIO_SIM_PR1("unregistering LRU policy");
 
 	ret = eio_unregister_policy(&eio_fifo_ops);
 	if (ret != 0)
 		pr_err("eio_fifo unregister failed");
 }
 
-#ifndef EIO_SIM
 module_init(fifo_register);
 module_exit(fifo_unregister);
 
@@ -282,4 +264,3 @@ MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("FIFO policy for EnhanceIO");
 MODULE_AUTHOR("STEC, Inc. based on code by Facebook");
 MODULE_VERSION(EIO_RELEASE);
-#endif /* !EIO_SIM */

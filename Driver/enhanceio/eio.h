@@ -570,7 +570,7 @@ struct eio_errors {
  * code relies on it.
  */
 #define SECTOR_STATS(statval, io_size)	\
-	ATOMIC_ADD(&statval, to_sector(io_size));
+	atomic64_add(to_sector(io_size), &statval);
 
 struct eio_stats {
 	atomic64_t reads;		/* Number of reads */
@@ -778,11 +778,11 @@ struct cache_c {
 #define CACHE_SRC_IS_ABSENT(dmc)		(((dmc)->eio_errors.no_source_dev == 1) ? 1 : 0)
 
 #define AUTOCLEAN_THRESHOLD_CROSSED(dmc)	\
-	((ATOMIC_READ(&(dmc)->nr_ios) > (int64_t)(dmc)->sysctl_active.autoclean_threshold) || \
+	((atomic64_read(&(dmc)->nr_ios) > (int64_t)(dmc)->sysctl_active.autoclean_threshold) || \
 	 ((dmc)->sysctl_active.autoclean_threshold == 0))
 
 #define DIRTY_CACHE_THRESHOLD_CROSSED(dmc)	\
-	(((ATOMIC_READ(&(dmc)->nr_dirty) - ATOMIC_READ(&(dmc)->clean_pendings)) >= \
+	(((atomic64_read(&(dmc)->nr_dirty) - atomic64_read(&(dmc)->clean_pendings)) >= \
 	 (int64_t)((dmc)->sysctl_active.dirty_high_threshold * (dmc)->size) / 100) && \
 	 ((dmc)->sysctl_active.dirty_high_threshold > (dmc)->sysctl_active.dirty_low_threshold))
 

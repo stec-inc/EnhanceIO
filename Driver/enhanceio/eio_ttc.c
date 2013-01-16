@@ -131,7 +131,7 @@ eio_ttc_get_device(const char *path, fmode_t mode, struct eio_bdev **result)
 	 * bd_claim_by_disk(bdev, charptr, gendisk)
 	 */
 
-	eio_bdev = (struct eio_bdev *)KZALLOC(sizeof(*eio_bdev), GFP_KERNEL);
+	eio_bdev = (struct eio_bdev *)kzalloc(sizeof(*eio_bdev), GFP_KERNEL);
 	if (eio_bdev == NULL) {
 		blkdev_put(bdev, mode);
 		return -ENOMEM;
@@ -338,7 +338,7 @@ deactivate:
 	up_write(&eio_ttc_lock[index]);
 
 	/* wait for nr_ios to drain-out */
-	while (ATOMIC_READ(&dmc->nr_ios) != 0)
+	while (atomic64_read(&dmc->nr_ios) != 0)
 		schedule_timeout(msecs_to_jiffies(100));
 
 	return ret;
@@ -566,11 +566,11 @@ out:
 static void
 eio_cache_rec_fill(struct cache_c *dmc, cache_rec_short_t *rec)
 {
-	STRNCPY(rec->cr_name, dmc->cache_name,
+	strncpy(rec->cr_name, dmc->cache_name,
 		sizeof (rec->cr_name));
-	STRNCPY(rec->cr_src_devname, dmc->disk_devname,
+	strncpy(rec->cr_src_devname, dmc->disk_devname,
 		sizeof (rec->cr_src_devname));
-	STRNCPY(rec->cr_ssd_devname, dmc->cache_devname,
+	strncpy(rec->cr_ssd_devname, dmc->cache_devname,
 		sizeof (rec->cr_ssd_devname));
 	rec->cr_src_dev_size = eio_get_device_size(dmc->disk_dev);
 	rec->cr_ssd_dev_size = eio_get_device_size(dmc->cache_dev);
@@ -803,7 +803,7 @@ int eio_async_io(struct cache_c *dmc, struct eio_io_region *where, int rw, struc
 		pr_err("eio_async_io: failed to allocate eio_context.\n");
 		return -ENOMEM;
 	}
-	BZERO((char *)io, sizeof (struct eio_context));
+	memset((char *)io, 0, sizeof (struct eio_context));
 
 	atomic_set(&io->count, 1);
 	io->callback = req->notify;
@@ -847,7 +847,7 @@ int eio_sync_io(struct cache_c *dmc, struct eio_io_region *where,
 	struct eio_context io;
 	DECLARE_COMPLETION_ONSTACK(wait);
 
-	BZERO((char *)&io, sizeof io);
+	memset((char *)&io, 0, sizeof io);
 
 	atomic_set(&io.count, 1);
 	io.event = &wait;
@@ -969,7 +969,7 @@ eio_finish_nrdirty(struct cache_c *dmc)
 	down_write(&eio_ttc_lock[index]);
 
 	/* Wait for the in-flight I/Os to drain out */
-	while (ATOMIC_READ(&dmc->nr_ios) != 0) {
+	while (atomic64_read(&dmc->nr_ios) != 0) {
 		pr_debug("finish_nrdirty: Draining I/O inflight\n");
 		schedule_timeout(msecs_to_jiffies(1));
 	}
@@ -993,7 +993,7 @@ eio_finish_nrdirty(struct cache_c *dmc)
 		if (!dmc->sysctl_active.fast_remove) {
 			eio_clean_all(dmc);
 		}
-	} while (!dmc->sysctl_active.fast_remove && (ATOMIC_READ(&dmc->nr_dirty) > 0)
+	} while (!dmc->sysctl_active.fast_remove && (atomic64_read(&dmc->nr_dirty) > 0)
 		 && (!(dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG)));
 	dmc->sysctl_active.do_clean &= ~EIO_CLEAN_START;
 
@@ -1003,12 +1003,12 @@ eio_finish_nrdirty(struct cache_c *dmc)
 	 */
 	if (((dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG) ||
 		(retry_count == 0)) &&
-		(ATOMIC_READ(&dmc->nr_dirty) > 0)) {
+		(atomic64_read(&dmc->nr_dirty) > 0)) {
 		ret = -EINVAL;
 	}
 	if (ret)
 		pr_err("finish_nrdirty: Failed to finish %lu dirty blocks for cache \"%s\".",
-			ATOMIC_READ(&dmc->nr_dirty), dmc->cache_name);
+			atomic64_read(&dmc->nr_dirty), dmc->cache_name);
 
 	return ret;
 }
@@ -1087,21 +1087,21 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 		}
 		VERIFY((dmc->sysctl_active.do_clean & EIO_CLEAN_KEEP) &&
 			!(dmc->sysctl_active.do_clean & EIO_CLEAN_START));
-		VERIFY(dmc->sysctl_active.fast_remove || (ATOMIC_READ(&dmc->nr_dirty) == 0));
+		VERIFY(dmc->sysctl_active.fast_remove || (atomic64_read(&dmc->nr_dirty) == 0));
 	}
 
 	index = EIO_HASH_BDEV(dmc->disk_dev->bdev->bd_contains->bd_dev);
 	down_write(&eio_ttc_lock[index]);
 
 	/* Wait for the in-flight I/Os to drain out */
-	while (ATOMIC_READ(&dmc->nr_ios) != 0) {
+	while (atomic64_read(&dmc->nr_ios) != 0) {
 		pr_debug("cache_edit: Draining I/O inflight\n");
 		schedule_timeout(msecs_to_jiffies(1));
 	}
 
 	pr_debug("cache_edit: Blocking application I/O\n");
 
-	VERIFY(ATOMIC_READ(&dmc->nr_ios) == 0);
+	VERIFY(atomic64_read(&dmc->nr_ios) == 0);
 
 	/* policy change */
 	if ((policy != 0) && (policy != dmc->req_policy)) {
@@ -1159,7 +1159,7 @@ out:
 			pr_err("cache_edit: Failed to restart async tasks. error=%d.\n", ret);
 		}
 		if (dmc->sysctl_active.time_based_clean_interval &&
-		    ATOMIC_READ(&dmc->nr_dirty)) {
+		    atomic64_read(&dmc->nr_dirty)) {
 			schedule_delayed_work(&dmc->clean_aged_sets_work,
 					      dmc->sysctl_active.time_based_clean_interval * 60 * HZ);
 			dmc->is_clean_aged_sets_sched = 1;
@@ -1523,12 +1523,12 @@ eio_reboot_handling(void)
 				continue;
 			}
 
-			while (ATOMIC_READ(&dmc->nr_ios) != 0) {
+			while (atomic64_read(&dmc->nr_ios) != 0) {
 				pr_debug("rdonly: Draining I/O inflight\n");
 				schedule_timeout(msecs_to_jiffies(10));
 			}
 
-			VERIFY(ATOMIC_READ(&dmc->nr_ios) == 0);
+			VERIFY(atomic64_read(&dmc->nr_ios) == 0);
 			VERIFY(dmc->cache_rdonly == 0);
 
 			/*
@@ -1567,9 +1567,9 @@ eio_reboot_handling(void)
 			pr_info("Cache \"%s\" marked read only\n", dmc->cache_name);
 			up_write(&eio_ttc_lock[i]);
 
-			if (dmc->cold_boot && ATOMIC_READ(&dmc->nr_dirty) && !eio_force_warm_boot) {
+			if (dmc->cold_boot && atomic64_read(&dmc->nr_dirty) && !eio_force_warm_boot) {
 				pr_info("Cold boot set for cache %s: Draining dirty blocks: %ld",
-						dmc->cache_name, ATOMIC_READ(&dmc->nr_dirty));
+						dmc->cache_name, atomic64_read(&dmc->nr_dirty));
 				eio_clean_for_reboot(dmc);
 			}
 

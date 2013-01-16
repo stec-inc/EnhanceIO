@@ -52,7 +52,6 @@ eio_mem_init(struct cache_c *dmc)
 	u_int64_t max_dbn;
 	u_int64_t num_sets_64;
 
-	EIO_SIM_PR1();
 
 	/*
 	 * Sanity check the number of sets.
@@ -108,7 +107,6 @@ eio_hash_block(struct cache_c *dmc, sector_t dbn)
 	int wrapped;
 	u_int64_t set_number;
 
-	EIO_SIM_PR1("dbn=%lu", dbn);
 
 	EIO_DBN_TO_SET(dmc, dbn, set_number, wrapped);
 	VERIFY(set_number < dmc->num_sets);
@@ -132,7 +130,6 @@ eio_shrink_dbn(struct cache_c *dmc, sector_t dbn)
 	sector_t msb;
 	sector_t set_number;
 
-	EIO_SIM_PR2("dbn=0x%lx", dbn);
 
 	VERIFY(!EIO_MD8(dmc));
 	if (unlikely(dbn == 0)) {
@@ -163,7 +160,6 @@ eio_expand_dbn(struct cache_c *dmc, u_int64_t index)
 	sector_t msb;
 	sector_t dbn_40;
 
-	EIO_SIM_PR2("index=%lu\n", (long unsigned int)index);
 
 	VERIFY(!EIO_MD8(dmc));
 	/*
@@ -203,7 +199,6 @@ EXPORT_SYMBOL(eio_expand_dbn);
 void
 eio_invalidate_md(struct cache_c *dmc, u_int64_t index)
 {
-	EIO_SIM_PR1();
 
 	if (EIO_MD8(dmc))
 		dmc->cache_md8[index].md8_md = EIO_MD8_INVALID;
@@ -218,7 +213,6 @@ eio_invalidate_md(struct cache_c *dmc, u_int64_t index)
 void
 eio_md4_dbn_set(struct cache_c *dmc, u_int64_t index, u_int32_t dbn_24)
 {
-	EIO_SIM_PR1();
 
 	VERIFY((dbn_24 & ~EIO_MD4_DBN_MASK) == 0);
 
@@ -241,7 +235,6 @@ eio_md4_dbn_set(struct cache_c *dmc, u_int64_t index, u_int32_t dbn_24)
 void
 eio_md8_dbn_set(struct cache_c *dmc, u_int64_t index, sector_t dbn)
 {
-	EIO_SIM_PR1();
 
 	VERIFY((dbn & ~EIO_MD8_DBN_MASK) == 0);
 

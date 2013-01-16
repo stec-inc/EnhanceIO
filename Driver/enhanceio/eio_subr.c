@@ -43,7 +43,6 @@ LIST_HEAD(_disk_read_jobs);
 int
 eio_io_empty(void)
 {
-	EIO_SIM_PR1();
 
 	return list_empty(&_io_jobs);
 }
@@ -53,7 +52,6 @@ eio_alloc_cache_job(void)
 {
 	struct kcached_job *job;
 
-	EIO_SIM_PR1("incrementing nr_cache_jobs");
 
 	job = mempool_alloc(_job_pool, GFP_NOIO);
 	if (likely(job))
@@ -65,7 +63,6 @@ eio_alloc_cache_job(void)
 void
 eio_free_cache_job(struct kcached_job *job)
 {
-	EIO_SIM_PR1("decrementing nr_cache_jobs");
 
 	mempool_free(job, _job_pool);
 	atomic_dec(&nr_cache_jobs);
@@ -80,7 +77,6 @@ eio_pop(struct list_head *jobs)
 	struct kcached_job *job = NULL;
 	unsigned long flags = 0;
 
-	EIO_SIM_PR1("(%s)", jobs_string(jobs));
 
 	SPIN_LOCK_IRQSAVE(&_job_lock, flags);
 	if (!list_empty(jobs)) {
@@ -97,7 +93,6 @@ eio_push(struct list_head *jobs, struct kcached_job *job)
 {
 	unsigned long flags = 0;
 
-	EIO_SIM_PR1("(%s)", jobs_string(jobs));
 
 	SPIN_LOCK_IRQSAVE(&_job_lock, flags);
 	list_add_tail(&job->list, jobs);
@@ -107,7 +102,6 @@ eio_push(struct list_head *jobs, struct kcached_job *job)
 void
 eio_push_ssdread_failures(struct kcached_job *job)
 {
-	EIO_SIM_PR1();
 
 	eio_push(&_disk_read_jobs, job);
 }
@@ -115,7 +109,6 @@ eio_push_ssdread_failures(struct kcached_job *job)
 void
 eio_push_io(struct kcached_job *job)
 {
-	EIO_SIM_PR1();
 
 	eio_push(&_io_jobs, job);
 }
@@ -125,7 +118,6 @@ eio_process_jobs(struct list_head *jobs, void (*fn) (struct kcached_job *))
 {
 	struct kcached_job *job;
 
-	EIO_SIM_PR1("%s", jobs_string(jobs));
 
 	while ((job = eio_pop(jobs)) != NULL)
 		(void)fn(job);
@@ -140,7 +132,6 @@ eio_process_ssd_rm_list(void)
 	extern spinlock_t ssd_rm_list_lock;
 	extern struct list_head ssd_rm_list;
 
-	EIO_SIM_PR1();
 
 	SPIN_LOCK_IRQSAVE(&ssd_rm_list_lock, flags);
 	if (likely(list_empty(&ssd_rm_list))) {
@@ -169,7 +160,6 @@ eio_do_work(struct work_struct *unused)
 {
 	extern int ssd_rm_list_not_empty;
 
-	EIO_SIM_PR1("(unused=%p)", unused);
 
 	if (unlikely(ssd_rm_list_not_empty))
 		eio_process_ssd_rm_list();
@@ -181,7 +171,6 @@ eio_new_job(struct cache_c *dmc, struct eio_bio* bio, index_t index)
 {
 	struct kcached_job *job;
 
-	EIO_SIM_PR1("index=%lu", (long unsigned int)index);
 
 	VERIFY((bio != NULL) || (index != -1));
 
@@ -268,7 +257,7 @@ eio_io_sync_vm(struct cache_c *dmc, struct eio_io_region *where, int rw,
 	struct eio_io_request req;
 	int error;
 
-	BZERO((char *)&req, sizeof req);
+	memset((char *)&req, 0, sizeof req);
 
 	/* Fill up the appropriate fields
 		in eio_io_request */
@@ -353,7 +342,6 @@ eio_plug_disk_device(struct cache_c *dmc)
 void
 eio_suspend_caching(struct cache_c *dmc, dev_notifier_t note)
 {
-	EIO_SIM_PR1();
 
 	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
 	if (dmc->mode != CACHE_MODE_WB && CACHE_FAILED_IS_SET(dmc)) {
@@ -369,7 +357,7 @@ eio_suspend_caching(struct cache_c *dmc, dev_notifier_t note)
 				dmc->cache_flags &= ~CACHE_FLAGS_DEGRADED;
 			dmc->cache_flags |= CACHE_FLAGS_FAILED;
 			dmc->eio_errors.no_source_dev = 1;
-			ATOMIC_SET(&dmc->eio_stats.cached_blocks, 0);
+			atomic64_set(&dmc->eio_stats.cached_blocks, 0);
 			pr_info("suspend_caching: Source Device Removed. Cache \"%s\" is in Failed mode.\n",
 					dmc->cache_name);
 			break;
@@ -394,7 +382,7 @@ eio_suspend_caching(struct cache_c *dmc, dev_notifier_t note)
 					return;
 				}
 				dmc->cache_flags |= CACHE_FLAGS_DEGRADED;
-				ATOMIC_SET(&dmc->eio_stats.cached_blocks, 0);
+				atomic64_set(&dmc->eio_stats.cached_blocks, 0);
 				pr_info("suspend caching: Cache \"%s\" is in Degraded mode.\n", dmc->cache_name);
 			}
 			dmc->eio_errors.no_cache_dev = 1;
@@ -412,7 +400,6 @@ eio_suspend_caching(struct cache_c *dmc, dev_notifier_t note)
 void
 eio_put_cache_device(struct cache_c *dmc)
 {
-	EIO_SIM_PR1();
 
 	eio_ttc_put_device(&dmc->cache_dev);
 }
@@ -423,7 +410,6 @@ eio_resume_caching(struct cache_c *dmc, char *dev)
 {
 	int r;
 
-	EIO_SIM_PR1();
 
 	if (dmc == NULL || dev == NULL) {
 		pr_err("resume_caching: Null device or cache instance when resuming caching.\n");

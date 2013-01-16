@@ -38,26 +38,10 @@
  *       eio_inval_block_set()	uses spin_unlock_irq
  */
 #define SPIN_LOCK_INIT			spin_lock_init
-#define SPIN_IS_LOCKED			spin_is_locked
 #define SPIN_LOCK_IRQSAVE(l, f)		spin_lock_irqsave(l, f)
 #define SPIN_UNLOCK_IRQRESTORE(l, f)	spin_unlock_irqrestore(l, f)
 #define SPIN_LOCK_IRQSAVE_FLAGS(l)	do { long unsigned int f; spin_lock_irqsave(l, f); *(l##_flags) = f; } while (0)
 #define SPIN_UNLOCK_IRQRESTORE_FLAGS(l)	do { long unsigned int f = *(l##_flags); spin_unlock_irqrestore(l, f); } while (0)
-
-#define	KMALLOC				kmalloc
-#define	KZALLOC				kzalloc
-#define	STRNCPY				strncpy
-#define	WAIT_EVENT			wait_event
-#define	PAGE_ADDRESS			page_address
-#define SCHEDULE_WORK			schedule_work
-
-#define	EIO_SIM_PR0(...)
-#define	EIO_SIM_PR1(...)
-#define	EIO_SIM_PR2(...)
-#define	EIO_SIM_PRINT(x)
-#define	EIO_SIM_IN_INTERRUPT(x)
-#define	EIO_SIM_ALLOC_CACHE(dmc, order)
-#define	EIO_SIM_PRINT_CACHE_STATE(dmc, index, cache_state)
 
 #define EIO_DBN_SET(dmc, index, dbn)		ssdcache_dbn_set(dmc, index, dbn)
 #define EIO_DBN_GET(dmc, index)			ssdcache_dbn_get(dmc, index)

@@ -39,7 +39,7 @@ eio_version_query(size_t buf_sz, char *bufp)
 {
 	if (unlikely(buf_sz == 0) || unlikely(bufp == NULL))
 		return -EINVAL;
-	sprintf_s(bufp, buf_sz, "EnhanceIO Version: %s %s (checksum disabled)",
+	snprintf(bufp, buf_sz, "EnhanceIO Version: %s %s (checksum disabled)",
 			EIO_RELEASE, ENHANCEIO_GIT_COMMIT_HASH);
 
 	bufp[buf_sz - 1] = '\0';
@@ -103,9 +103,9 @@ eio_zerostats_sysctl(ctl_table *table, int write, void __user *buffer, size_t *l
 			 * are inadequate to fully protect this 
 			 */
 
-			cached_blocks = ATOMIC_READ(&dmc->eio_stats.cached_blocks);
+			cached_blocks = atomic64_read(&dmc->eio_stats.cached_blocks);
 			memset(&dmc->eio_stats, 0, sizeof (struct eio_stats));
-			ATOMIC_SET(&dmc->eio_stats.cached_blocks, cached_blocks);
+			atomic64_set(&dmc->eio_stats.cached_blocks, cached_blocks);
 		}
 	}
 
@@ -711,7 +711,7 @@ eio_time_based_clean_interval_sysctl(ctl_table *table, int write, void __user *b
 		cancel_delayed_work_sync(&dmc->clean_aged_sets_work);	
 		spin_lock_irqsave(&dmc->dirty_set_lru_lock, flags);
 		dmc->is_clean_aged_sets_sched = 0;
-		if (dmc->sysctl_active.time_based_clean_interval && ATOMIC_READ(&dmc->nr_dirty)) {
+		if (dmc->sysctl_active.time_based_clean_interval && atomic64_read(&dmc->nr_dirty)) {
 			schedule_delayed_work(&dmc->clean_aged_sets_work,
 					dmc->sysctl_active.time_based_clean_interval * 60 * HZ);
 			dmc->is_clean_aged_sets_sched = 1;
@@ -1289,7 +1289,6 @@ eio_invalidate_sysctl(ctl_table *table, int write, void __user *buffer,
 	unsigned long int flags;
 	struct cache_c *dmc;
 
-	EIO_SIM_PR1();
 
 	SPIN_LOCK_IRQSAVE(&invalidate_spin_lock, flags);
 
@@ -1635,74 +1634,74 @@ eio_stats_show(struct seq_file *seq, void *v)
 	struct eio_stats *stats = &dmc->eio_stats;
 	int read_hit_pct, write_hit_pct, dirty_write_hit_pct;
 
-	if (ATOMIC_READ(&stats->reads) > 0)
-		read_hit_pct = ATOMIC_READ(&stats->read_hits) * 100LL / ATOMIC_READ(&stats->reads);
+	if (atomic64_read(&stats->reads) > 0)
+		read_hit_pct = atomic64_read(&stats->read_hits) * 100LL / atomic64_read(&stats->reads);
 	else
 		read_hit_pct = 0;
 
-	if (ATOMIC_READ(&stats->writes) > 0) {
-		write_hit_pct = ATOMIC_READ(&stats->write_hits) * 100LL / ATOMIC_READ(&stats->writes);
-		dirty_write_hit_pct = ATOMIC_READ(&stats->dirty_write_hits) * 100 / ATOMIC_READ(&stats->writes);
+	if (atomic64_read(&stats->writes) > 0) {
+		write_hit_pct = atomic64_read(&stats->write_hits) * 100LL / atomic64_read(&stats->writes);
+		dirty_write_hit_pct = atomic64_read(&stats->dirty_write_hits) * 100 / atomic64_read(&stats->writes);
 	} else {
 		write_hit_pct = 0;
 		dirty_write_hit_pct = 0;
 	}
 
-	seq_printf(seq, "%-26s %12lld\n", "reads", (int64_t) ATOMIC_READ(&stats->reads));
-	seq_printf(seq, "%-26s %12lld\n", "writes", (int64_t) ATOMIC_READ(&stats->writes));
+	seq_printf(seq, "%-26s %12lld\n", "reads", (int64_t) atomic64_read(&stats->reads));
+	seq_printf(seq, "%-26s %12lld\n", "writes", (int64_t) atomic64_read(&stats->writes));
 	
-	seq_printf(seq, "%-26s %12lld\n", "read_hits", (int64_t) ATOMIC_READ(&stats->read_hits));
+	seq_printf(seq, "%-26s %12lld\n", "read_hits", (int64_t) atomic64_read(&stats->read_hits));
 	seq_printf(seq, "%-26s %12d\n", "read_hit_pct", read_hit_pct);
 
-	seq_printf(seq, "%-26s %12lld\n", "write_hits", (int64_t) ATOMIC_READ(&stats->write_hits));
+	seq_printf(seq, "%-26s %12lld\n", "write_hits", (int64_t) atomic64_read(&stats->write_hits));
 	seq_printf(seq, "%-26s %12u\n", "write_hit_pct", write_hit_pct);
 	
-	seq_printf(seq, "%-26s %12lld\n", "dirty_write_hits", (int64_t) ATOMIC_READ(&stats->dirty_write_hits));
+	seq_printf(seq, "%-26s %12lld\n", "dirty_write_hits", (int64_t) atomic64_read(&stats->dirty_write_hits));
 	seq_printf(seq, "%-26s %12d\n", "dirty_write_hit_pct", dirty_write_hit_pct);
 
-	if ((int64_t)(ATOMIC_READ(&stats->cached_blocks)) < 0)
-		ATOMIC_SET(&stats->cached_blocks, 0);
-	seq_printf(seq, "%-26s %12lld\n", "cached_blocks", (int64_t) ATOMIC_READ(&stats->cached_blocks));
+	if ((int64_t)(atomic64_read(&stats->cached_blocks)) < 0)
+		atomic64_set(&stats->cached_blocks, 0);
+	seq_printf(seq, "%-26s %12lld\n", "cached_blocks", (int64_t) atomic64_read(&stats->cached_blocks));
 
-	seq_printf(seq, "%-26s %12lld\n", "rd_replace", (int64_t) ATOMIC_READ(&stats->rd_replace));
-	seq_printf(seq, "%-26s %12lld\n", "wr_replace", (int64_t) ATOMIC_READ(&stats->wr_replace));
+	seq_printf(seq, "%-26s %12lld\n", "rd_replace", (int64_t) atomic64_read(&stats->rd_replace));
+	seq_printf(seq, "%-26s %12lld\n", "wr_replace", (int64_t) atomic64_read(&stats->wr_replace));
 
-	seq_printf(seq, "%-26s %12lld\n", "noroom", (int64_t) ATOMIC_READ(&stats->noroom));
+	seq_printf(seq, "%-26s %12lld\n", "noroom", (int64_t) atomic64_read(&stats->noroom));
 
-	seq_printf(seq, "%-26s %12lld\n", "cleanings", (int64_t) ATOMIC_READ(&stats->cleanings));
-	seq_printf(seq, "%-26s %12lld\n", "md_write_dirty", (int64_t) ATOMIC_READ(&stats->md_write_dirty));
-	seq_printf(seq, "%-26s %12lld\n", "md_write_clean", (int64_t) ATOMIC_READ(&stats->md_write_clean));
-	seq_printf(seq, "%-26s %12lld\n", "md_ssd_writes", (int64_t) ATOMIC_READ(&stats->md_ssd_writes));
+	seq_printf(seq, "%-26s %12lld\n", "cleanings", (int64_t) atomic64_read(&stats->cleanings));
+	seq_printf(seq, "%-26s %12lld\n", "md_write_dirty", (int64_t) atomic64_read(&stats->md_write_dirty));
+	seq_printf(seq, "%-26s %12lld\n", "md_write_clean", (int64_t) atomic64_read(&stats->md_write_clean));
+	seq_printf(seq, "%-26s %12lld\n", "md_ssd_writes", (int64_t) atomic64_read(&stats->md_ssd_writes));
 	seq_printf(seq, "%-26s %12d\n", "do_clean", dmc->sysctl_active.do_clean);
 	seq_printf(seq, "%-26s %12lld\n", "nr_blocks", dmc->size);
-	seq_printf(seq, "%-26s %12lld\n", "nr_dirty", (int64_t) ATOMIC_READ(&dmc->nr_dirty));
+	seq_printf(seq, "%-26s %12lld\n", "nr_dirty", (int64_t) atomic64_read(&dmc->nr_dirty));
 	seq_printf(seq, "%-26s %12u\n", "nr_sets", (uint32_t) dmc->num_sets);
 	seq_printf(seq, "%-26s %12d\n", "clean_index", (uint32_t) atomic_read(&dmc->clean_index));
 	
-	seq_printf(seq, "%-26s %12lld\n", "uncached_reads", (int64_t) ATOMIC_READ(&stats->uncached_reads));
-	seq_printf(seq, "%-26s %12lld\n", "uncached_writes", (int64_t) ATOMIC_READ(&stats->uncached_writes));
-	seq_printf(seq, "%-26s %12lld\n", "uncached_map_size", (int64_t) ATOMIC_READ(&stats->uncached_map_size));
-	seq_printf(seq, "%-26s %12lld\n", "uncached_map_uncacheable", (int64_t) ATOMIC_READ(&stats->uncached_map_uncacheable));
+	seq_printf(seq, "%-26s %12lld\n", "uncached_reads", (int64_t) atomic64_read(&stats->uncached_reads));
+	seq_printf(seq, "%-26s %12lld\n", "uncached_writes", (int64_t) atomic64_read(&stats->uncached_writes));
+	seq_printf(seq, "%-26s %12lld\n", "uncached_map_size", (int64_t) atomic64_read(&stats->uncached_map_size));
+	seq_printf(seq, "%-26s %12lld\n", "uncached_map_uncacheable", (int64_t) atomic64_read(&stats->uncached_map_uncacheable));
 
-	seq_printf(seq, "%-26s %12lld\n", "disk_reads", (int64_t) ATOMIC_READ(&stats->disk_reads));
-	seq_printf(seq, "%-26s %12lld\n", "disk_writes", (int64_t) ATOMIC_READ(&stats->disk_writes));
-	seq_printf(seq, "%-26s %12lld\n", "ssd_reads", (int64_t) ATOMIC_READ(&stats->ssd_reads));
-	seq_printf(seq, "%-26s %12lld\n", "ssd_writes", (int64_t) ATOMIC_READ(&stats->ssd_writes));
-	seq_printf(seq, "%-26s %12lld\n", "ssd_readfills", (int64_t) ATOMIC_READ(&stats->ssd_readfills));
-	seq_printf(seq, "%-26s %12lld\n", "ssd_readfill_unplugs", (int64_t) ATOMIC_READ(&stats->ssd_readfill_unplugs));
+	seq_printf(seq, "%-26s %12lld\n", "disk_reads", (int64_t) atomic64_read(&stats->disk_reads));
+	seq_printf(seq, "%-26s %12lld\n", "disk_writes", (int64_t) atomic64_read(&stats->disk_writes));
+	seq_printf(seq, "%-26s %12lld\n", "ssd_reads", (int64_t) atomic64_read(&stats->ssd_reads));
+	seq_printf(seq, "%-26s %12lld\n", "ssd_writes", (int64_t) atomic64_read(&stats->ssd_writes));
+	seq_printf(seq, "%-26s %12lld\n", "ssd_readfills", (int64_t) atomic64_read(&stats->ssd_readfills));
+	seq_printf(seq, "%-26s %12lld\n", "ssd_readfill_unplugs", (int64_t) atomic64_read(&stats->ssd_readfill_unplugs));
 
-	seq_printf(seq, "%-26s %12lld\n", "readdisk", (int64_t) ATOMIC_READ(&stats->readdisk));
-	seq_printf(seq, "%-26s %12lld\n", "writedisk", (int64_t) ATOMIC_READ(&stats->readdisk));
-	seq_printf(seq, "%-26s %12lld\n", "readcache", (int64_t) ATOMIC_READ(&stats->readcache));
-	seq_printf(seq, "%-26s %12lld\n", "readfill", (int64_t) ATOMIC_READ(&stats->readfill));
-	seq_printf(seq, "%-26s %12lld\n", "writecache", (int64_t) ATOMIC_READ(&stats->writecache));
+	seq_printf(seq, "%-26s %12lld\n", "readdisk", (int64_t) atomic64_read(&stats->readdisk));
+	seq_printf(seq, "%-26s %12lld\n", "writedisk", (int64_t) atomic64_read(&stats->readdisk));
+	seq_printf(seq, "%-26s %12lld\n", "readcache", (int64_t) atomic64_read(&stats->readcache));
+	seq_printf(seq, "%-26s %12lld\n", "readfill", (int64_t) atomic64_read(&stats->readfill));
+	seq_printf(seq, "%-26s %12lld\n", "writecache", (int64_t) atomic64_read(&stats->writecache));
 
-	seq_printf(seq, "%-26s %12lld\n", "readcount", (int64_t) ATOMIC_READ(&stats->readcount));
-	seq_printf(seq, "%-26s %12lld\n", "writecount", (int64_t) ATOMIC_READ(&stats->writecount));
-	seq_printf(seq, "%-26s %12lld\n", "kb_reads", (int64_t) ATOMIC_READ(&stats->reads) / 2);
-	seq_printf(seq, "%-26s %12lld\n", "kb_writes", (int64_t) ATOMIC_READ(&stats->writes) / 2);
-	seq_printf(seq, "%-26s %12lld\n", "rdtime_ms", (int64_t) ATOMIC_READ(&stats->rdtime_ms));
-	seq_printf(seq, "%-26s %12lld\n", "wrtime_ms", (int64_t) ATOMIC_READ(&stats->wrtime_ms));
+	seq_printf(seq, "%-26s %12lld\n", "readcount", (int64_t) atomic64_read(&stats->readcount));
+	seq_printf(seq, "%-26s %12lld\n", "writecount", (int64_t) atomic64_read(&stats->writecount));
+	seq_printf(seq, "%-26s %12lld\n", "kb_reads", (int64_t) atomic64_read(&stats->reads) / 2);
+	seq_printf(seq, "%-26s %12lld\n", "kb_writes", (int64_t) atomic64_read(&stats->writes) / 2);
+	seq_printf(seq, "%-26s %12lld\n", "rdtime_ms", (int64_t) atomic64_read(&stats->rdtime_ms));
+	seq_printf(seq, "%-26s %12lld\n", "wrtime_ms", (int64_t) atomic64_read(&stats->wrtime_ms));
 	return 0;
 }
 
@@ -1758,15 +1757,15 @@ eio_iosize_hist_show(struct seq_file *seq, void *v)
 
 
 	for (i = 1 ; i <= SIZE_HIST - 1; i++) {
-		if (ATOMIC_READ(&dmc->size_hist[i]) == 0)
+		if (atomic64_read(&dmc->size_hist[i]) == 0)
 			continue;
 
 		if (i == 1)
-			seq_printf(seq, "%u   %12lld\n", i * 512, (int64_t) ATOMIC_READ(&dmc->size_hist[i]));
+			seq_printf(seq, "%u   %12lld\n", i * 512, (int64_t) atomic64_read(&dmc->size_hist[i]));
 		else if (i < 20)
-			seq_printf(seq, "%u  %12lld\n", i * 512, (int64_t) ATOMIC_READ(&dmc->size_hist[i]));
+			seq_printf(seq, "%u  %12lld\n", i * 512, (int64_t) atomic64_read(&dmc->size_hist[i]));
 		else
-			seq_printf(seq, "%u %12lld\n", i * 512, (int64_t) ATOMIC_READ(&dmc->size_hist[i]));
+			seq_printf(seq, "%u %12lld\n", i * 512, (int64_t) atomic64_read(&dmc->size_hist[i]));
 	}
 
 	return 0;
@@ -1818,7 +1817,6 @@ eio_config_show(struct seq_file *seq, void *v)
 {
 	struct cache_c *dmc = seq->private;
 
-	EIO_SIM_PR1();
 
 	seq_printf(seq, "src_name   %s\n", dmc->disk_devname);
 	seq_printf(seq, "ssd_name   %s\n", dmc->cache_devname);

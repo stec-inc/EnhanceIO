@@ -31,7 +31,6 @@ eio_register_policy(struct eio_policy_header *new_policy)
 	struct list_head *ptr;
 	struct eio_policy_header *curr;
 
-	EIO_SIM_PR1();
 
 	list_for_each(ptr, &eio_policy_list) {
 		curr = list_entry(ptr, struct eio_policy_header, sph_list);
@@ -41,7 +40,6 @@ eio_register_policy(struct eio_policy_header *new_policy)
 	list_add_tail(&new_policy->sph_list, &eio_policy_list);
 
 	pr_info("register_policy: policy %d added", new_policy->sph_name);
-	EIO_SIM_PR1("policy %d added", new_policy->sph_name);
 
 	return 0;
 }
@@ -54,14 +52,12 @@ eio_unregister_policy(struct eio_policy_header *p_ops)
 	struct list_head *ptr;
 	struct eio_policy_header *curr;
 
-	EIO_SIM_PR1();
 
 	list_for_each(ptr, &eio_policy_list) {
 		curr = list_entry(ptr, struct eio_policy_header, sph_list);
 		if (curr->sph_name == p_ops->sph_name) {
 			list_del(&curr->sph_list);
 			pr_info("unregister_policy: policy %d removed", (int)p_ops->sph_name);
-			EIO_SIM_PR1("policy %d removed", (int)p_ops->sph_name);
 			return 0;
 		}
 	}
@@ -76,31 +72,6 @@ eio_get_policy(int policy)
 {
 	struct list_head *ptr;
 	struct eio_policy_header *curr;
-#if defined(EIO_SIM)
-	/*
-	 * If we are using either the eio-sim or Windows driver,
-	 * simulate the insmod operation based on policy requested by
-	 * explicitly calling the policy_register() function.
-	 */
-	extern int lru_register(void);
-	extern int fifo_register(void);
-
-	EIO_SIM_PR1();
-
-	switch (policy) {
-	case CACHE_REPL_FIFO:
-		fifo_register();
-		break;
-	case CACHE_REPL_LRU:
-		lru_register();
-		break;
-	case CACHE_REPL_RANDOM:
-		return NULL;
-	default:
-		pr_err("get_policy: Undefined policy %d", policy);
-		return NULL;
-	}
-#endif /* defined(EIO_SIM) */
 
 	list_for_each(ptr, &eio_policy_list) {
 		curr = list_entry(ptr, struct eio_policy_header, sph_list);
@@ -123,7 +94,6 @@ eio_get_policy(int policy)
 void
 eio_put_policy(struct eio_policy *p_ops)
 {
-	EIO_SIM_PR1();
 
 	if (p_ops == NULL) {
 		pr_err("put_policy: Cannot decrement reference count of NULL policy");
@@ -140,7 +110,6 @@ eio_put_policy(struct eio_policy *p_ops)
 int
 eio_repl_sets_init(struct eio_policy *p_ops)
 {
-	EIO_SIM_PR1();
 
 	return (p_ops && p_ops->sp_repl_sets_init) ? p_ops->sp_repl_sets_init(p_ops) : 0;
 }
@@ -149,7 +118,6 @@ eio_repl_sets_init(struct eio_policy *p_ops)
 int
 eio_repl_blk_init(struct eio_policy *p_ops)
 {
-	EIO_SIM_PR1();
 
 	return (p_ops && p_ops->sp_repl_blk_init) ? p_ops->sp_repl_blk_init(p_ops) : 0;
 }
@@ -159,7 +127,6 @@ void
 eio_find_reclaim_dbn(struct eio_policy *p_ops,
 			index_t start_index, index_t *index)
 {
-	EIO_SIM_PR1();
 
 	p_ops->sp_find_reclaim_dbn(p_ops, start_index, index);
 }
@@ -168,7 +135,6 @@ eio_find_reclaim_dbn(struct eio_policy *p_ops,
 int
 eio_policy_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
 {
-	EIO_SIM_PR1();
 
 	return p_ops->sp_clean_set(p_ops, set, to_clean);
 }
@@ -180,7 +146,6 @@ eio_policy_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
 void
 eio_policy_lru_pushblks(struct eio_policy *p_ops)
 {
-	EIO_SIM_PR1();
 
 	if (p_ops && p_ops->sp_name == CACHE_REPL_LRU)
 		p_ops->sp_policy.lru->sl_lru_pushblks(p_ops);
@@ -190,7 +155,6 @@ eio_policy_lru_pushblks(struct eio_policy *p_ops)
 void
 eio_policy_reclaim_lru_movetail(struct cache_c *dmc, index_t i, struct eio_policy *p_ops)
 {
-	EIO_SIM_PR1();
 
 	if (p_ops && p_ops->sp_name == CACHE_REPL_LRU)
 		p_ops->sp_policy.lru->sl_reclaim_lru_movetail(dmc, i, p_ops);
