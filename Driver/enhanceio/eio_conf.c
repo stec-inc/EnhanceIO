@@ -1683,7 +1683,7 @@ eio_cache_create(cache_rec_short_t *cache)
 	dmc->sysctl_active.dirty_set_low_threshold = DIRTY_SET_LOW_THRESH_DEF;
 	dmc->sysctl_active.autoclean_threshold = AUTOCLEAN_THRESH_DEF;
 	dmc->sysctl_active.time_based_clean_interval = TIME_BASED_CLEAN_INTERVAL_DEF(dmc);
-
+	SPIN_LOCK_INIT(&dmc->cache_spin_lock);
 	if (persistence == CACHE_CREATE) {
 		error = eio_md_create(dmc,/* force */ 0, /* cold */ 1);
 		if (error) {
@@ -1735,7 +1735,7 @@ init:
 	eio_policy_lru_pushblks(dmc->policy_ops);
 
 
-	SPIN_LOCK_INIT(&dmc->cache_spin_lock);
+	
 
 	if (dmc->mode == CACHE_MODE_WB) {
 		error = eio_allocate_wb_resources(dmc);
