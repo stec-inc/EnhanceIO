@@ -816,7 +816,7 @@ struct job_io_regions {
 #define GET_BIO_FLAGS(ebio)		((ebio)->eb_bc->bc_bio->bi_rw)
 #define VERIFY_BIO_FLAGS(ebio)		VERIFY((ebio) && (ebio)->eb_bc && (ebio)->eb_bc->bc_bio)
 
-#define SET_BARRIER_FLAGS(rw_flags) (rw_flags |= REQ_FLUSH)                 
+#define SET_BARRIER_FLAGS(rw_flags) (rw_flags |= (REQ_WRITE | REQ_FLUSH))                 
 
 struct eio_bio {
 	int eb_iotype; 
