@@ -30,7 +30,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-#include "os.h"
+#include "eio.h"
 /* Generic policy functions prototypes */
 int eio_fifo_init(struct cache_c *);
 void eio_fifo_exit(void);
@@ -263,4 +263,3 @@ module_exit(fifo_unregister);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("FIFO policy for EnhanceIO");
 MODULE_AUTHOR("STEC, Inc. based on code by Facebook");
-MODULE_VERSION(EIO_RELEASE);

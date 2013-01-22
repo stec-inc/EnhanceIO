@@ -29,7 +29,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-#include "os.h"
+#include "eio.h"
 /* Generic policy functions prototyes */
 int eio_lru_init(struct cache_c *);
 void eio_lru_exit(void);

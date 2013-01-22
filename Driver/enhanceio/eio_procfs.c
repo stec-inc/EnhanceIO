@@ -27,7 +27,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "os.h"
+#include "eio.h"
 #define EIO_RELEASE "ENHANCEIO"
 
 #ifndef ENHANCEIO_GIT_COMMIT_HASH
@@ -62,9 +62,9 @@ eio_zerostats_sysctl(ctl_table *table, int write, void __user *buffer, size_t *l
 	/* fetch the new tunable value or post the existing value */
 
 	if (!write) {
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_pending.zerostats = dmc->sysctl_active.zerostats;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	}
 
 	proc_dointvec(table, write, buffer, length, ppos);
@@ -86,9 +86,9 @@ eio_zerostats_sysctl(ctl_table *table, int write, void __user *buffer, size_t *l
 		}
 
 		/* Copy to active */
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_active.zerostats = dmc->sysctl_pending.zerostats;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 		/* apply the new tunable value */
 
@@ -125,9 +125,9 @@ eio_mem_limit_pct_sysctl(ctl_table *table, int write, void __user *buffer, size_
 	/* fetch the new tunable value or post the existing value */
 
 	if (!write) {
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_pending.mem_limit_pct = dmc->sysctl_active.mem_limit_pct;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	}
 
 	proc_dointvec(table, write, buffer, length, ppos);
@@ -148,9 +148,9 @@ eio_mem_limit_pct_sysctl(ctl_table *table, int write, void __user *buffer, size_
 		}
 
 		/* Copy to active */
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_active.mem_limit_pct = dmc->sysctl_pending.mem_limit_pct;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	}
 	
 	return 0;	
@@ -169,9 +169,9 @@ eio_error_inject_sysctl(ctl_table *table, int write, void __user *buffer, size_t
 	/* fetch the new tunable value or post the existing value */
 
 	if (!write) {
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_pending.error_inject = dmc->sysctl_active.error_inject;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	}
 
 	proc_dointvec(table, write, buffer, length, ppos);
@@ -191,9 +191,9 @@ eio_clean_sysctl(ctl_table *table, int write, void __user *buffer, size_t *lengt
 	/* fetch the new tunable value or post the existing value */
 
 	if (!write) {
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_pending.do_clean = dmc->sysctl_active.do_clean;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	}
 
 	proc_dointvec(table, write, buffer, length, ppos);
@@ -221,10 +221,10 @@ eio_clean_sysctl(ctl_table *table, int write, void __user *buffer, size_t *lengt
 
 		/* Copy to active and apply the new tunable value */
 
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 
 		if (dmc->cache_flags & CACHE_FLAGS_MOD_INPROG) {
-			SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+			spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 			pr_err("do_clean called while cache modification in progress");
 			return -EBUSY;
 		} else {
@@ -233,7 +233,7 @@ eio_clean_sysctl(ctl_table *table, int write, void __user *buffer, size_t *lengt
 			if (dmc->sysctl_active.do_clean) {
 				atomic_set(&dmc->clean_index, 0);
 				dmc->sysctl_active.do_clean |= EIO_CLEAN_START;
-				SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+				spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 				/* 
 				 * Wake up the clean thread.
@@ -244,11 +244,11 @@ eio_clean_sysctl(ctl_table *table, int write, void __user *buffer, size_t *lengt
 				 * the blocks dirty.
 				 */
 
-				SPIN_LOCK_IRQSAVE(&dmc->clean_sl, flags);
+				spin_lock_irqsave(&dmc->clean_sl, flags);
 				EIO_SET_EVENT_AND_UNLOCK(&dmc->clean_event,
 						&dmc->clean_sl, flags);
 			} else {
-				SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+				spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 			}
 		}
 	}
@@ -268,9 +268,9 @@ eio_dirty_high_threshold_sysctl(ctl_table *table, int write, void __user *buffer
 	/* fetch the new tunable value or post the existing value */
 
 	if (!write) {
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_pending.dirty_high_threshold = dmc->sysctl_active.dirty_high_threshold;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	}
 
 	proc_dointvec(table, write, buffer, length, ppos);
@@ -304,10 +304,10 @@ eio_dirty_high_threshold_sysctl(ctl_table *table, int write, void __user *buffer
 		}
 
 		/* update the active value with the new tunable value */
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		old_value = dmc->sysctl_active.dirty_high_threshold;
 		dmc->sysctl_active.dirty_high_threshold = dmc->sysctl_pending.dirty_high_threshold;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 		/* apply the new tunable value */
 	
@@ -315,9 +315,9 @@ eio_dirty_high_threshold_sysctl(ctl_table *table, int write, void __user *buffer
 		error = eio_sb_store(dmc);
 		if (error) {
 			/* restore back the old value and return error */
-			SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+			spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 			dmc->sysctl_active.dirty_high_threshold = old_value;	
-			SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+			spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 			return error;
 		}
@@ -343,9 +343,9 @@ eio_dirty_low_threshold_sysctl(ctl_table *table, int write, void __user *buffer,
 	/* fetch the new tunable value or post the existing value */
 
 	if (!write) {
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_pending.dirty_low_threshold = dmc->sysctl_active.dirty_low_threshold;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	}
 
 	proc_dointvec(table, write, buffer, length, ppos);
@@ -379,10 +379,10 @@ eio_dirty_low_threshold_sysctl(ctl_table *table, int write, void __user *buffer,
 		}
 
 		/* update the active value with the new tunable value */
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		old_value = dmc->sysctl_active.dirty_low_threshold;
 		dmc->sysctl_active.dirty_low_threshold = dmc->sysctl_pending.dirty_low_threshold;
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 		/* apply the new tunable value */
 	
@@ -390,9 +390,9 @@ eio_dirty_low_threshold_sysctl(ctl_table *table, int write, void __user *buffer,
 		error = eio_sb_store(dmc);
 		if (error) {
 			/* restore back the old value and return error */
-			SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+			spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 			dmc->sysctl_active.dirty_low_threshold = old_value;	
-			SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+			spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 			return error;
 		}
@@ -424,9 +424,9 @@ eio_dirty_set_high_threshold_sysctl(ctl_table *table, int write, void __user *bu
 	/* fetch the new tunable value or post the existing value */
 
 	if (!write) {
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_pending.dirty_set_high_threshold = dmc->sysctl_active.dirty_set_high_threshold;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	}
 
 	proc_dointvec(table, write, buffer, length, ppos);
@@ -461,10 +461,10 @@ eio_dirty_set_high_threshold_sysctl(ctl_table *table, int write, void __user *bu
 		}
 
 		/* update the active value with the new tunable value */
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		old_value = dmc->sysctl_active.dirty_set_high_threshold;
 		dmc->sysctl_active.dirty_set_high_threshold = dmc->sysctl_pending.dirty_set_high_threshold;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 		/* apply the new tunable value */
 	
@@ -472,9 +472,9 @@ eio_dirty_set_high_threshold_sysctl(ctl_table *table, int write, void __user *bu
 		error = eio_sb_store(dmc);
 		if (error) {
 			/* restore back the old value and return error */
-			SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+			spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 			dmc->sysctl_active.dirty_set_high_threshold = old_value;	
-			SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+			spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 			return error;
 		}
@@ -502,9 +502,9 @@ eio_dirty_set_low_threshold_sysctl(ctl_table *table, int write, void __user *buf
 	/* fetch the new tunable value or post the existing value */
 
 	if (!write) {
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_pending.dirty_set_low_threshold = dmc->sysctl_active.dirty_set_low_threshold;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	}
 
 	proc_dointvec(table, write, buffer, length, ppos);
@@ -539,10 +539,10 @@ eio_dirty_set_low_threshold_sysctl(ctl_table *table, int write, void __user *buf
 		}
 
 		/* update the active value with the new tunable value */
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		old_value = dmc->sysctl_active.dirty_set_low_threshold;
 		dmc->sysctl_active.dirty_set_low_threshold = dmc->sysctl_pending.dirty_set_low_threshold;
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 		/* apply the new tunable value */
 	
@@ -550,9 +550,9 @@ eio_dirty_set_low_threshold_sysctl(ctl_table *table, int write, void __user *buf
 		error = eio_sb_store(dmc);
 		if (error) {
 			/* restore back the old value and return error */
-			SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+			spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 			dmc->sysctl_active.dirty_set_low_threshold = old_value;	
-			SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+			spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 			return error;
 		}
@@ -587,9 +587,9 @@ eio_autoclean_threshold_sysctl(ctl_table *table, int write, void __user *buffer,
 	/* fetch the new tunable value or post existing value */
 
 	if (!write) {
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_pending.autoclean_threshold = dmc->sysctl_active.autoclean_threshold;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	}
 
 	proc_dointvec(table, write, buffer, length, ppos);
@@ -619,10 +619,10 @@ eio_autoclean_threshold_sysctl(ctl_table *table, int write, void __user *buffer,
 		}
 
 		/* update the active value with the new tunable value */
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		old_value = dmc->sysctl_active.autoclean_threshold;
 		dmc->sysctl_active.autoclean_threshold = dmc->sysctl_pending.autoclean_threshold;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 		/* apply the new tunable value */
 
@@ -630,9 +630,9 @@ eio_autoclean_threshold_sysctl(ctl_table *table, int write, void __user *buffer,
 		error = eio_sb_store(dmc);
 		if (error) {
 			/* restore back the old value and return error */
-			SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+			spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 			dmc->sysctl_active.autoclean_threshold = old_value;	
-			SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+			spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 			return error;
 		}
@@ -657,9 +657,9 @@ eio_time_based_clean_interval_sysctl(ctl_table *table, int write, void __user *b
 	/* fetch the new tunable value or post existing value */
 
 	if (!write) {
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_pending.time_based_clean_interval = dmc->sysctl_active.time_based_clean_interval;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	}
 
 	proc_dointvec(table, write, buffer, length, ppos);
@@ -689,10 +689,10 @@ eio_time_based_clean_interval_sysctl(ctl_table *table, int write, void __user *b
 		}
 
 		/* update the active value with the new tunable value */
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		old_value = dmc->sysctl_active.time_based_clean_interval;
 		dmc->sysctl_active.time_based_clean_interval = dmc->sysctl_pending.time_based_clean_interval;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 		/* apply the new tunable value */
 
@@ -700,9 +700,9 @@ eio_time_based_clean_interval_sysctl(ctl_table *table, int write, void __user *b
 		error = eio_sb_store(dmc);
 		if (error) {
 			/* restore back the old value and return error */
-			SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+			spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 			dmc->sysctl_active.time_based_clean_interval = old_value;	
-			SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+			spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 			return error;
 		}
@@ -740,9 +740,9 @@ eio_control_sysctl(ctl_table *table, int write, void __user *buffer, size_t *len
 	/* fetch the new tunable value */
 
 	if (!write) {
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_pending.control = dmc->sysctl_active.control;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	}
 
 	proc_dointvec(table, write, buffer, length, ppos);
@@ -765,23 +765,23 @@ eio_control_sysctl(ctl_table *table, int write, void __user *buffer, size_t *len
 		}
 
 		/* update the active value with the new tunable value */
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_active.control = dmc->sysctl_pending.control;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 		/* apply the new tunable value */
 
 		switch (dmc->sysctl_active.control) {
 		case CACHE_VERBOSE_OFF:
-			SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+			spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 			dmc->cache_flags &= ~CACHE_FLAGS_VERBOSE;
-			SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+			spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 			pr_info("Turning off verbose mode");
 			break;
 		case CACHE_VERBOSE_ON:
-			SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+			spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 			dmc->cache_flags |= CACHE_FLAGS_VERBOSE;
-			SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+			spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 			pr_info("Turning on verbose mode");
 			break;
 		case CACHE_WRITEBACK_ON:
@@ -795,33 +795,33 @@ eio_control_sysctl(ctl_table *table, int write, void __user *buffer, size_t *len
 		case CACHE_INVALIDATE_ON:
 			if (dmc->sysctl_handle_invalidate == NULL) {
 				eio_sysctl_register_invalidate(dmc);
-				SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+				spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 				dmc->cache_flags |= CACHE_FLAGS_INVALIDATE;
-				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+				spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 			} else
 				pr_info("Invalidate API already registered");
 			break;
 		case CACHE_INVALIDATE_OFF:
 			if (dmc->sysctl_handle_invalidate) {
 				eio_sysctl_unregister_invalidate(dmc);
-				SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+				spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 				dmc->cache_flags &= ~CACHE_FLAGS_INVALIDATE;
-				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+				spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 			} else
 				pr_info("Invalidate API not registered");
 			break;
 		case CACHE_FAST_REMOVE_ON:
 			if (dmc->mode != CACHE_MODE_WB) {
-				SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+				spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 				dmc->cache_flags |= CACHE_FLAGS_FAST_REMOVE;
-				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+				spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 				if (CACHE_VERBOSE_IS_SET(dmc))
 					pr_info("Turning on fast remove");
 			} else {
 #ifdef EIO_DEBUG
-				SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+				spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 				dmc->cache_flags |= CACHE_FLAGS_FAST_REMOVE;
-				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+				spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 				if (CACHE_VERBOSE_IS_SET(dmc))
 					pr_info("Turning on fast remove");
 #else
@@ -832,16 +832,16 @@ eio_control_sysctl(ctl_table *table, int write, void __user *buffer, size_t *len
 			break;
 		case CACHE_FAST_REMOVE_OFF:
 			if (dmc->mode != CACHE_MODE_WB) {
-				SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+				spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 				dmc->cache_flags &= ~CACHE_FLAGS_FAST_REMOVE;
-				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+				spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 				if (CACHE_VERBOSE_IS_SET(dmc))
 					pr_info("Turning off fast remove");
 			} else {
 #ifdef EIO_DEBUG
-				SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+				spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 				dmc->cache_flags &= ~CACHE_FLAGS_FAST_REMOVE;
-				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+				spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 				if (CACHE_VERBOSE_IS_SET(dmc))
 					pr_info("Turning off fast remove");
 #else
@@ -1290,12 +1290,12 @@ eio_invalidate_sysctl(ctl_table *table, int write, void __user *buffer,
 	struct cache_c *dmc;
 
 
-	SPIN_LOCK_IRQSAVE(&invalidate_spin_lock, flags);
+	spin_lock_irqsave(&invalidate_spin_lock, flags);
 
 	dmc = (struct cache_c *)table->extra1;
 	if (dmc == NULL) {
 		pr_err("Cannot invalidate due to unexpected NULL cache pointer");
-		SPIN_UNLOCK_IRQRESTORE(&invalidate_spin_lock, flags);
+		spin_unlock_irqrestore(&invalidate_spin_lock, flags);
 		return -EBUSY;
 	}
 
@@ -1303,7 +1303,7 @@ eio_invalidate_sysctl(ctl_table *table, int write, void __user *buffer,
 	proc_doulongvec_minmax(table, write, buffer, length, ppos);
 	table->extra1 = dmc;
 
-	SPIN_UNLOCK_IRQRESTORE(&invalidate_spin_lock, flags);
+	spin_unlock_irqrestore(&invalidate_spin_lock, flags);
 
 	rv = 0;
 
@@ -1311,9 +1311,9 @@ eio_invalidate_sysctl(ctl_table *table, int write, void __user *buffer,
 		/* Harish: TBD. Need to put appropriate sanity checks */
 
 		/* update the active value with the new tunable value */
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 		dmc->sysctl_active.invalidate = dmc->sysctl_pending.invalidate;	
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 
 		/* apply the new tunable value */
 
@@ -1599,7 +1599,7 @@ eio_sysctl_register_invalidate(struct cache_c *dmc)
 	}
 
 	dmc->sysctl_handle_invalidate = invalidate;
-	SPIN_LOCK_INIT(&invalidate_spin_lock);
+	spin_lock_init(&invalidate_spin_lock);
 	return;
 out:
 	kfree(invalidate->dev[0].procname);

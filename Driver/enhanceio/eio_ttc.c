@@ -29,7 +29,7 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
-#include "os.h"
+#include "eio.h"
 #include "eio_ttc.h"
 struct rw_semaphore	eio_ttc_lock[EIO_HASHTBL_SIZE];
 static struct list_head	eio_ttc_list[EIO_HASHTBL_SIZE];
@@ -1041,21 +1041,21 @@ eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 		return -EINVAL;
 	}
 
-	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+	spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 	if (dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG) {
 		pr_err("cache_edit: system shutdown in progress, cannot edit"
 			" cache %s", cache_name);
-		SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 		return -EINVAL;
 	}
 	if (dmc->cache_flags & CACHE_FLAGS_MOD_INPROG) {
 		pr_err("cache_edit: simultaneous edit/delete operation on cache"
 			" %s is not permitted", cache_name);
-		SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 		return -EINVAL;
 	}
 	dmc->cache_flags |= CACHE_FLAGS_MOD_INPROG;
-	SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+	spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 	old_time_thresh = dmc->sysctl_active.time_based_clean_interval;
 
 	if (dmc->mode == CACHE_MODE_WB) {
@@ -1165,9 +1165,9 @@ out:
 			dmc->is_clean_aged_sets_sched = 1;
 		}
 	}
-	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+	spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 	dmc->cache_flags &= ~CACHE_FLAGS_MOD_INPROG;
-	SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+	spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 	pr_debug("eio_cache_edit: Allowing application I/O\n");
 	return error;
 }
@@ -1536,10 +1536,10 @@ eio_reboot_handling(void)
 			 * Stop all ongoing activities.
 			 */
 
-			SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+			spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 			VERIFY(!(dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG));
 			dmc->cache_flags |= CACHE_FLAGS_SHUTDOWN_INPROG;
-			SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+			spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 
 			/*
 			 * Wait for ongoing edit/delete to complete.
@@ -1579,9 +1579,9 @@ eio_reboot_handling(void)
 					dmc->cache_name);
 			}
 
-			SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+			spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 			dmc->cache_flags &= ~CACHE_FLAGS_SHUTDOWN_INPROG;
-			SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+			spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 
 			down_write(&eio_ttc_lock[i]);
 		}

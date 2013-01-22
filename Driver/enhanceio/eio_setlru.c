@@ -19,7 +19,7 @@
  * You should have received a copy of the GNU General Public License
  */
 
-#include "os.h"
+#include "eio.h"
 
 /* Initialize the lru list */
 int

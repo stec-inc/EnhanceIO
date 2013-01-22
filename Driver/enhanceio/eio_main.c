@@ -34,7 +34,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "os.h"
+#include "eio.h"
 #include "eio_ttc.h"
 
 #define CTRACE(X) { }
@@ -292,11 +292,11 @@ eio_disk_io_callback(int error, void *context)
 	if (unlikely(error))
 		dmc->eio_errors.disk_read_errors++;
 
-	SPIN_LOCK_IRQSAVE(&dmc->cache_sets[eb_cacheset].cs_lock, flags);
+	spin_lock_irqsave(&dmc->cache_sets[eb_cacheset].cs_lock, flags);
 	/* Invalidate the cache block */
 	EIO_CACHE_STATE_SET(dmc, ebio->eb_index, INVALID);
 	atomic64_dec_if_positive(&dmc->eio_stats.cached_blocks);
-	SPIN_UNLOCK_IRQRESTORE(&dmc->cache_sets[eb_cacheset].cs_lock, flags);
+	spin_unlock_irqrestore(&dmc->cache_sets[eb_cacheset].cs_lock, flags);
 
 	if (unlikely(error))
 		pr_err("disk_io_callback: io error %d block %lu action %d",
@@ -440,12 +440,12 @@ eio_post_io_callback(struct work_struct *work)
 			dmc->eio_errors.ssd_read_errors++;
 			 /* Retry read from HDD for non-DIRTY blocks. */
 			if (cstate != ALREADY_DIRTY) {
-				SPIN_LOCK_IRQSAVE(&dmc->cache_sets[eb_cacheset].cs_lock, flags);
+				spin_lock_irqsave(&dmc->cache_sets[eb_cacheset].cs_lock, flags);
 				EIO_CACHE_STATE_OFF(dmc, ebio->eb_index,
 							CACHEREADINPROG);
 				EIO_CACHE_STATE_ON(dmc, ebio->eb_index,
 						DISKREADINPROG);
-				SPIN_UNLOCK_IRQRESTORE(&dmc->cache_sets[eb_cacheset].cs_lock, flags);
+				spin_unlock_irqrestore(&dmc->cache_sets[eb_cacheset].cs_lock, flags);
 
 				eio_push_ssdread_failures(job);
 				schedule_work(&_kcached_wq);
@@ -593,9 +593,9 @@ eio_ssderror_diskread(struct kcached_job *job)
 
 	VERIFY(index != -1);
 
-	SPIN_LOCK_IRQSAVE(&dmc->cache_sets[index / dmc->assoc].cs_lock, flags);
+	spin_lock_irqsave(&dmc->cache_sets[index / dmc->assoc].cs_lock, flags);
 	VERIFY(EIO_CACHE_STATE_GET(dmc, index) & DISKREADINPROG);
-	SPIN_UNLOCK_IRQRESTORE(&dmc->cache_sets[index / dmc->assoc].cs_lock, flags);
+	spin_unlock_irqrestore(&dmc->cache_sets[index / dmc->assoc].cs_lock, flags);
 	
 	VERIFY(ebio->eb_dir == READ);
 
@@ -621,9 +621,9 @@ out:
 	 * block should be marked as INVALID by turning off already set
 	 * flags.
 	 */
-	SPIN_LOCK_IRQSAVE(&dmc->cache_sets[index / dmc->assoc].cs_lock, flags);
+	spin_lock_irqsave(&dmc->cache_sets[index / dmc->assoc].cs_lock, flags);
 	EIO_CACHE_STATE_SET(dmc, ebio->eb_index, INVALID);
-	SPIN_UNLOCK_IRQRESTORE(&dmc->cache_sets[index / dmc->assoc].cs_lock, flags);
+	spin_unlock_irqrestore(&dmc->cache_sets[index / dmc->assoc].cs_lock, flags);
 
 	atomic64_dec_if_positive(&dmc->eio_stats.cached_blocks);
 
@@ -732,7 +732,7 @@ eio_clean_thread_proc(void *context)
 
 		spin_unlock_irqrestore(&dmc->clean_sl, flags);
 
-		GET_SYSTIME(&systime);
+		systime=jiffies;
 		while (!list_empty(&setlist)) {
 			set = list_entry((&setlist)->next, struct cache_set, list);
 			list_del(&set->list);
@@ -787,7 +787,7 @@ eio_enqueue_readfill(struct cache_c *dmc, struct kcached_job *job)
 	int do_schedule = 0;
 
 
-	SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+	spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 	/* Insert job in sorted order of cache sector */
 	j1 = &dmc->readfill_queue;
 	while (*j1 != NULL && (*j1)->job_io_regions.cache.sector <
@@ -797,7 +797,7 @@ eio_enqueue_readfill(struct cache_c *dmc, struct kcached_job *job)
 	*j1 = job;
 	job->next = next;
 	do_schedule = (dmc->readfill_in_prog == 0);
-	SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+	spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	if (do_schedule)
 		schedule_work(&dmc->readfill_wq);
 }
@@ -813,14 +813,14 @@ eio_do_readfill(struct work_struct *work)
 
 
 
-	SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+	spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 	if (dmc->readfill_in_prog)
 		goto out;
 	dmc->readfill_in_prog = 1;
 	while (dmc->readfill_queue != NULL) {
 		joblist = dmc->readfill_queue;
 		dmc->readfill_queue = NULL;
-		SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 		for (job = joblist ; job != NULL ; job = nextjob) {
 			struct eio_bio *iebio;
 			struct eio_bio *next;
@@ -942,11 +942,11 @@ eio_do_readfill(struct work_struct *work)
 			ebio = NULL;
 			eio_free_cache_job(job);
 		}
-		SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 	}
 	dmc->readfill_in_prog = 0;
 out:
-	SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+	spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 	atomic64_inc(&dmc->eio_stats.ssd_readfill_unplugs);
 	eio_unplug_cache_device(dmc);
 }
@@ -1771,11 +1771,11 @@ eio_invalidate_cache(struct cache_c *dmc)
 
         /* invalidate the whole cache */
         for (i = 0 ; i < (dmc->size >> dmc->consecutive_shift) ; i++) {
-                SPIN_LOCK_IRQSAVE (&dmc->cache_sets[i].cs_lock, flags);
+                spin_lock_irqsave (&dmc->cache_sets[i].cs_lock, flags);
 		/* Harish: TBD. Apply proper fix for the cast to disk_dev_size */
                 (void) eio_inval_block_set_range(dmc, (int) i, 0,
 						 (unsigned)disk_dev_size, 0);
-                SPIN_UNLOCK_IRQRESTORE(&dmc->cache_sets[i].cs_lock, flags);
+                spin_unlock_irqrestore(&dmc->cache_sets[i].cs_lock, flags);
         } /* end - for all cachesets (i) */
 
         return (0); /* i suspect we may need to return different statuses in the future */
@@ -2468,13 +2468,6 @@ eio_map(struct cache_c *dmc, struct request_queue *rq,
 	if (unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
 		VERIFY(dmc->mode != CACHE_MODE_WB);
 		force_uncached = 1;
-	} else if (EIO_IS_BIO_DO_NOT_CACHE(bio) ||
-			(data_dir == WRITE && dmc->mode == CACHE_MODE_RO)) {
-		if (to_sector(bio->bi_size) != dmc->block_size)
-			atomic64_inc(&dmc->eio_stats.uncached_map_size);
-		else
-			atomic64_inc(&dmc->eio_stats.uncached_map_uncacheable);
-		force_uncached = 1;
 	}
 
 	/*
@@ -3021,9 +3014,9 @@ eio_clean_all(struct cache_c *dmc)
 		eio_clean_set(dmc, (index_t)(atomic_read(&dmc->clean_index)), /* whole */ 1, /* force */1);
 	}
 
-	SPIN_LOCK_IRQSAVE(&dmc->cache_spin_lock, flags);
+	spin_lock_irqsave(&dmc->cache_spin_lock, flags);
 	dmc->sysctl_active.do_clean &= ~EIO_CLEAN_START;
-	SPIN_UNLOCK_IRQRESTORE(&dmc->cache_spin_lock, flags);
+	spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
 }
 
 /* 
@@ -3112,28 +3105,28 @@ struct bio_vec *setup_bio_vecs(struct bio_vec *bvec, index_t block_index,
 	index_t 	iovec_index;
 
 	switch(block_size) {
-		case BLKSIZE_2K:
-			*num_bvecs = total;
-			iovec_index = block_index;
-			data = &bvec[iovec_index];
-			break;
-			
-		case BLKSIZE_4K:
-			*num_bvecs = total;
-			iovec_index = block_index;
-			data = &bvec[iovec_index];
-			break;
-	
-		case BLKSIZE_8K:
-			/* 
-			 * For 8k data block size, we need 2 bio_vecs
-			 * per data block.
-			 */
-			*num_bvecs = total * 2;
-			iovec_index = block_index * 2;
-			data = &bvec[iovec_index];
-			break;
-		}
+	case BLKSIZE_2K:
+		*num_bvecs = total;
+		iovec_index = block_index;
+		data = &bvec[iovec_index];
+		break;
+		
+	case BLKSIZE_4K:
+		*num_bvecs = total;
+		iovec_index = block_index;
+		data = &bvec[iovec_index];
+		break;
+
+	case BLKSIZE_8K:
+		/* 
+		 * For 8k data block size, we need 2 bio_vecs
+		 * per data block.
+		 */
+		*num_bvecs = total * 2;
+		iovec_index = block_index * 2;
+		data = &bvec[iovec_index];
+		break;
+	}
 
 	return data;
 }
@@ -3445,36 +3438,36 @@ eio_clean_aged_sets(struct work_struct *work)
 		 * This is to make sure that this thread is rescheduled
 		 * once CACHE is ACTIVE again.
 		 */
-		SPIN_LOCK_IRQSAVE(&dmc->dirty_set_lru_lock, flags);
+		spin_lock_irqsave(&dmc->dirty_set_lru_lock, flags);
 		dmc->is_clean_aged_sets_sched = 0;
-		SPIN_UNLOCK_IRQRESTORE(&dmc->dirty_set_lru_lock, flags);
+		spin_unlock_irqrestore(&dmc->dirty_set_lru_lock, flags);
 
 		return;
 	}
 
-	GET_SYSTIME(&cur_time);
+	cur_time=jiffies;
 
 	/* Use the set LRU list to pick up the most aged sets. */
-	SPIN_LOCK_IRQSAVE(&dmc->dirty_set_lru_lock, flags);
+	spin_lock_irqsave(&dmc->dirty_set_lru_lock, flags);
 	do {
 		lru_read_head(dmc->dirty_set_lru, &set_index, &set_time);
 		if (set_index == LRU_NULL) {
 			break;	
 		}
 		
-		if ((CONV_SYSTIME_TO_SECS(cur_time - set_time) <
-				(dmc->sysctl_active.time_based_clean_interval * 60))) {
+		if (((cur_time - set_time)/HZ) <
+				(dmc->sysctl_active.time_based_clean_interval * 60)) {
 			break;
 		}
 		lru_rem(dmc->dirty_set_lru, set_index);
 
 		if (dmc->cache_sets[set_index].nr_dirty > 0) {
-			SPIN_UNLOCK_IRQRESTORE(&dmc->dirty_set_lru_lock, flags);
+			spin_unlock_irqrestore(&dmc->dirty_set_lru_lock, flags);
 			eio_addto_cleanq(dmc, set_index, 1);
-			SPIN_LOCK_IRQSAVE(&dmc->dirty_set_lru_lock, flags);
+			spin_lock_irqsave(&dmc->dirty_set_lru_lock, flags);
 		}
 	} while (1);
-	SPIN_UNLOCK_IRQRESTORE(&dmc->dirty_set_lru_lock, flags);
+	spin_unlock_irqrestore(&dmc->dirty_set_lru_lock, flags);
 	
 	/* Re-schedule the aged set clean, unless the clean has to stop now */
 
@@ -3495,7 +3488,7 @@ eio_touch_set_lru(struct cache_c *dmc, index_t set)
 	u_int64_t	systime;
 	unsigned long	flags;
 
-	GET_SYSTIME(&systime);
+	systime=jiffies;
 	spin_lock_irqsave(&dmc->dirty_set_lru_lock, flags);
 	lru_touch(dmc->dirty_set_lru, set, systime);
 

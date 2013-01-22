@@ -20,7 +20,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "os.h"
+#include "eio.h"
 
 LIST_HEAD(eio_policy_list);
 

@@ -20,7 +20,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "os.h"
+#include "eio.h"
 
 #define	SECTORS_PER_SET		(dmc->assoc * dmc->block_size)
 #define	SECTORS_PER_SET_SHIFT	(dmc->consecutive_shift + dmc->block_shift)

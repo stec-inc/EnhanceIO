@@ -33,6 +33,38 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <asm/atomic.h>
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/list.h>
+#include <linux/blkdev.h>
+#include <linux/bio.h>
+#include <linux/slab.h>
+#include <linux/hash.h>
+#include <linux/spinlock.h>
+#include <linux/workqueue.h>
+#include <linux/pagemap.h>
+#include <linux/random.h>
+#include <linux/hardirq.h>
+#include <linux/sysctl.h>
+#include <linux/version.h>
+#include <linux/reboot.h>
+#include <linux/delay.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#include <linux/device-mapper.h>
+#include <linux/dm-kcopyd.h>
+#include <linux/sort.h>		/* required for eio_subr.c */
+#include <linux/kthread.h>
+#include <linux/jiffies.h>
+#include <linux/vmalloc.h>	/* for sysinfo (mem) variables */
+#include <linux/mm.h>
+#include <scsi/scsi_device.h>	/* required for SSD failure handling */
+/* resolve conflict with scsi/scsi_device.h */
+#ifdef QUEUED
+#undef QUEUED
+#endif
+
 #if defined(__KERNEL__) && !defined(CONFIG_PROC_FS)
 #error "EnhanceIO requires CONFIG_PROC_FS"
 #endif /* __KERNEL__ && !CONFIG_PROC_FS */
@@ -40,6 +72,28 @@
 
 #ifndef EIO_INC_H
 #define EIO_INC_H
+
+#define EIO_DBN_SET(dmc, index, dbn)            ssdcache_dbn_set(dmc, index, dbn)
+#define EIO_DBN_GET(dmc, index)                 ssdcache_dbn_get(dmc, index)
+#define EIO_CACHE_STATE_SET(dmc, index, state)  ssdcache_cache_state_set(dmc, index, state)
+#define EIO_CACHE_STATE_GET(dmc, index)         ssdcache_cache_state_get(dmc, index)
+#define EIO_CACHE_STATE_OFF(dmc, index, bitmask)        ssdcache_cache_state_off(dmc, index, bitmask)
+#define EIO_CACHE_STATE_ON(dmc, index, bitmask) ssdcache_cache_state_on(dmc, index, bitmask)
+
+/* Bit offsets for wait_on_bit_lock() */
+#define EIO_UPDATE_LIST         0
+#define EIO_HANDLE_REBOOT       1
+
+struct eio_control_s {
+        volatile unsigned long synch_flags;
+};
+
+int eio_wait_schedule(void *unused);
+
+
+struct eio_event {
+	struct task_struct *process;	/* handle of the sleeping process */
+};
 
 typedef long int index_t;
 
@@ -57,11 +111,6 @@ typedef long int index_t;
  * Begin Section 1: User space only.
  */
 
-#ifndef __KERNEL__
-typedef u_int64_t sector_t;
-#endif /* !__KERNEL */
-
-#define EIO_MSG_PREFIX		"enhanceio"
 
 /*
  * End Section 1: User space only.
@@ -81,9 +130,10 @@ typedef u_int64_t sector_t;
 #define DIRTY			0x0040	/* Dirty, needs writeback to disk */
 #define QUEUED			0x0080	/* Other requests are queued for this block */
 
-#define BLOCK_IO_INPROG	(DISKREADINPROG | DISKWRITEINPROG | CACHEREADINPROG | CACHEWRITEINPROG)
-#define DIRTY_INPROG	(VALID | DIRTY | CACHEWRITEINPROG) /* block going to be dirty */
-#define CLEAN_INPROG	(VALID | DIRTY | DISKWRITEINPROG) /* ssd->hdd clean is on for the block */
+#define BLOCK_IO_INPROG	(DISKREADINPROG | DISKWRITEINPROG | \
+			 CACHEREADINPROG | CACHEWRITEINPROG)
+#define DIRTY_INPROG	(VALID | DIRTY | CACHEWRITEINPROG) /* block being dirtied */
+#define CLEAN_INPROG	(VALID | DIRTY | DISKWRITEINPROG) /* ongoing clean */
 #define ALREADY_DIRTY	(VALID | DIRTY)	 /* block which is dirty to begin with for an I/O */
 
 /*
@@ -356,52 +406,7 @@ typedef enum dev_notifier {
  * Subsection 3.1: Definitions.
  */
 
-#define DM_MSG_PREFIX		"enhanceio"
-#define DMC_PREFIX		"enhanceio: "
 #define EIO_SB_VERSION		3	/* kernel superblock version */
-
-/*
- * Release version macro: The release version information is derived
- * from eio_version.h header file. This file is created on the fly by
- * the Makefile based on a text file. There are two levels of indirection
- * in the preprocessor macros for concatenating and stringifying because
- * this is how the C preprocessor works.
- */
-#define DOSTR(x)		#x
-#define STR(x)			DOSTR(x)
-#define PASTER(M, m, d, p)	M##.##m##.##d##.##p
-#define EVAL(M, m, d, p, b)	STR(PASTER(M, m, d, p)) " (Build#" STR(b) ")"
-#define EIO_RELEASE		"ENHANCEIO"	
-/*
- * Disabling the EIO_IS_BIO_DO_NOT_CACHE macro for following reasons:-
- *	1. There is a bug in the way we use EIO_BIO_RW_DO_NOT_CACHE flag.
- *	   Till linux-2.6.32-71 kernel, BIO_RW_NOIDLE was the most
- *	   significant bit in bio->bi_rw flag.
- *	   From linux-2.6.32-131.0.15 kernel and higher versions,
- *	   3 more flags have been introduced in bio->bi_rw.
- *	   So, we are currently interpretting bio->bi_rw flag: BIO_RW_FLUSH as
- *	   EIO_BIO_RW_DO_NOT_CACHE. Hence, resulting in an uncached I/O.
- *
- *	2. EIO_DO_NOT_CACHE_BIO() is unused in Linux.
- */
-
-#if 0
-
-/*
- * BIO_RW_NOIDLE is the most significant bit in the bio->bi_rw flag
- * that is used. We take up the next bit to indicate "do not cache"
- * any large sequential IOs.
- */
-#define EIO_BIO_RW_DO_NOT_CACHE		(BIO_RW_NOIDLE + 1)
-#define EIO_DO_NOT_CACHE_BIO(bio)				\
-	do {							\
-		(bio)->bi_rw |= (1 << EIO_BIO_RW_DO_NOT_CACHE);	\
-	} while (0)
-
-#define EIO_IS_BIO_DO_NOT_CACHE(bio)	((bio)->bi_rw & (1 << EIO_BIO_RW_DO_NOT_CACHE))
-#endif	/* #if 0 */
-
-#define EIO_IS_BIO_DO_NOT_CACHE(bio)	(0)
 
 /* kcached/pending job states */
 #define READCACHE		1
@@ -709,7 +714,7 @@ struct cache_c {
 	u_int32_t		bio_nr_pages;		/* number of hardware sectors supported by SSD in terms of PAGE_SIZE */
 
 	spinlock_t		cache_spin_lock;
-	long unsigned int	cache_spin_lock_flags;	/* See comments above SPIN_LOCK_IRQSAVE_FLAGS */
+	long unsigned int	cache_spin_lock_flags;	/* See comments above spin_lock_irqsave_FLAGS */
 	atomic_t		nr_jobs;		/* Number of I/O jobs */
 
 	volatile u_int32_t	cache_flags;
@@ -1068,4 +1073,74 @@ EIO_CACHE_STATE_ON(struct cache_c *dmc, index_t index, u_int8_t bitmask)
 void eio_set_warm_boot(void);
 #endif /* defined(__KERNEL__) */
 
+#include "eio_ioctl.h"
+
+/* resolve conflict with scsi/scsi_device.h */
+#ifdef __KERNEL__
+#ifdef VERIFY
+#undef VERIFY
+#endif
+#define ENABLE_VERIFY
+#ifdef ENABLE_VERIFY
+/* Like ASSERT() but always compiled in */
+#define VERIFY(x) do { \
+	if (unlikely(!(x))) { \
+		dump_stack(); \
+		panic("VERIFY: assertion (%s) failed at %s (%d)\n", \
+		      #x,  __FILE__ , __LINE__);		    \
+	} \
+} while(0)
+#else /* ENABLE_VERIFY */
+#define VERIFY(x) do { } while(0);
+#endif /* ENABLE_VERIFY */
+
+extern sector_t eio_get_device_size(struct eio_bdev *);
+extern sector_t eio_get_device_start_sect(struct eio_bdev *);
+#endif /* __KERNEL__ */
+
+
+#define EIO_INIT_EVENT(ev)						\
+			do {				  		\
+				(ev)->process = NULL;	  		\
+			} while (0)
+
+//Assumes that the macro gets called under the same spinlock as in wait event
+#define EIO_SET_EVENT_AND_UNLOCK(ev, sl, flags)					\
+			do {	  						\
+				struct task_struct	*p = NULL;		\
+				if ((ev)->process) { 				\
+					(p) = (ev)->process;			\
+					(ev)->process = NULL;			\
+				}						\
+				spin_unlock_irqrestore((sl), flags); 		\
+				if (p) {					\
+					(void)wake_up_process(p);		\
+				}						\
+			} while (0)
+
+//Assumes that the spin lock sl is taken while calling this macro
+#define EIO_WAIT_EVENT(ev, sl, flags)						\
+			do {							\
+				(ev)->process = current;			\
+				set_current_state(TASK_INTERRUPTIBLE);		\
+				spin_unlock_irqrestore((sl), flags); 		\
+				(void)schedule_timeout(10 * HZ);		\
+				spin_lock_irqsave((sl), flags);			\
+				(ev)->process = NULL;				\
+			} while (0)
+
+#define EIO_CLEAR_EVENT(ev)							\
+			do {							\
+				(ev)->process = NULL;				\
+			} while (0)
+
+
+#include "eio_setlru.h"
+#include "eio_policy.h"
+#define EIO_CACHE(dmc)          (EIO_MD8(dmc) ? (void *)dmc->cache_md8 : (void *)dmc->cache)
+
+
+
 #endif /* !EIO_INC_H */
+
+

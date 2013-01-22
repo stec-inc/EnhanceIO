@@ -36,7 +36,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-#include "os.h"
+#include "eio.h"
 #include "eio_ttc.h"
 
 #define KMEM_CACHE_JOB		"eio-kcached-jobs"
@@ -301,10 +301,10 @@ eio_sb_store(struct cache_c *dmc)
 	strncpy(sb->sbf.cache_name, dmc->cache_name, DEV_PATHLEN);
 	sb->sbf.cache_name[DEV_PATHLEN-1] = '\0';
 	sb->sbf.mode = dmc->mode;
-	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+	spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 	sb->sbf.repl_policy = dmc->req_policy;
 	sb->sbf.cache_flags = dmc->cache_flags & ~CACHE_FLAGS_INCORE_ONLY;
-	SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+	spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 	if (dmc->sb_version) {
 		sb->sbf.magic = EIO_MAGIC;
 	} else {
@@ -1026,11 +1026,11 @@ eio_md_load(struct cache_c *dmc)
 	 * cold cache will still treat the dirty blocks as hot
 	 */
 	if (dmc->cold_boot != header->sbf.cold_boot) {
-		DMINFO("superblock(%u) and config(%u) cold boot values do not match. Relying on config",
+		pr_info("superblock(%u) and config(%u) cold boot values do not match. Relying on config",
 		       header->sbf.cold_boot, dmc->cold_boot);
 	}
 	if (dmc->cold_boot && !force_warm_boot) {
-		DMINFO("Cold boot is set, starting as if unclean shutdown(only dirty blocks will be hot)");
+		pr_info("Cold boot is set, starting as if unclean shutdown(only dirty blocks will be hot)");
  		clean_shutdown = 0;
 	} else {
 		if (header->sbf.cache_sb_state == CACHE_MD_STATE_DIRTY) {
@@ -1288,7 +1288,7 @@ static int
 eio_clean_thread_init(struct cache_c *dmc)
 {
 	INIT_LIST_HEAD(&dmc->cleanq);
-	SPIN_LOCK_INIT(&dmc->clean_sl);
+	spin_lock_init(&dmc->clean_sl);
 	EIO_INIT_EVENT(&dmc->clean_event);
 	return eio_start_clean_thread(dmc);
 }
@@ -1735,7 +1735,7 @@ init:
 	eio_policy_lru_pushblks(dmc->policy_ops);
 
 
-	SPIN_LOCK_INIT(&dmc->cache_spin_lock);
+	spin_lock_init(&dmc->cache_spin_lock);
 
 	if (dmc->mode == CACHE_MODE_WB) {
 		error = eio_allocate_wb_resources(dmc);
@@ -1874,21 +1874,21 @@ eio_cache_delete(char *cache_name, int do_delete)
 		return -EINVAL;
 	}
 
-	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+	spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 	if (dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG) {
 		pr_err("cache_delete: system shutdown in progress, cannot "
 			"delete cache %s", cache_name);
-		SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 		return -EINVAL;
 	}
 	if (dmc->cache_flags & CACHE_FLAGS_MOD_INPROG) {
 		pr_err("cache_delete: simultaneous edit/delete operation on cache"
 			" %s is not permitted", cache_name);
-		SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 		return -EINVAL;
 	}
 	dmc->cache_flags |= CACHE_FLAGS_MOD_INPROG;
-	SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+	spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 
 	/*
 	 * Earlier attempt to delete failed.
@@ -1901,9 +1901,9 @@ eio_cache_delete(char *cache_name, int do_delete)
 			goto force_delete;
 		} else {
 			if (atomic64_read(&dmc->nr_dirty) != 0) {
-				SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+				spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 				dmc->cache_flags &= ~CACHE_FLAGS_MOD_INPROG;
-				SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+				spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 				pr_err("cache_delete: Stale Cache detected with dirty blocks=%ld.\n",
 						atomic64_read(&dmc->nr_dirty));
 				pr_err("cache_delete: Cache \"%s\" wont be deleted. Deleting will result in data corruption.\n",
@@ -1987,12 +1987,12 @@ out:
 		if (error)
 			pr_err("cache_delete: Failed to restart async tasks. error=%d\n", error);
 	}
-	SPIN_LOCK_IRQSAVE_FLAGS(&dmc->cache_spin_lock);
+	spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 	dmc->cache_flags &= ~CACHE_FLAGS_MOD_INPROG;
 	if (!ret) {
 		dmc->cache_flags |= CACHE_FLAGS_DELETED;
 	}
-	SPIN_UNLOCK_IRQRESTORE_FLAGS(&dmc->cache_spin_lock);
+	spin_unlock_irqrestore(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 
 	if (!ret) {
 		eio_policy_free(dmc);
@@ -2219,7 +2219,7 @@ eio_allocate_wb_resources(struct cache_c *dmc)
 	dmc->dirty_set_lru = NULL;
 	ret = lru_init(&dmc->dirty_set_lru, (dmc->size >> dmc->consecutive_shift));
 	if (ret == 0) {
-		SPIN_LOCK_INIT(&dmc->dirty_set_lru_lock);
+		spin_lock_init(&dmc->dirty_set_lru_lock);
 		ret = eio_clean_thread_init(dmc);
 	}
 	VERIFY(dmc->mdupdate_q == NULL);
@@ -2422,18 +2422,18 @@ eio_notify_ssd_rm(struct notifier_block *nb, unsigned long action, void *data)
 		ssd_list_ptr->action = action;
 		ssd_list_ptr->devt = dev->devt;
 		ssd_list_ptr->note = notify;
-		SPIN_LOCK_IRQSAVE(&ssd_rm_list_lock, flags);
+		spin_lock_irqsave(&ssd_rm_list_lock, flags);
 		list_add_tail(&ssd_list_ptr->list, &ssd_rm_list);
 		ssd_rm_list_not_empty = 1;
-		SPIN_UNLOCK_IRQRESTORE(&ssd_rm_list_lock, flags);
+		spin_unlock_irqrestore(&ssd_rm_list_lock, flags);
 	}
 
-	SPIN_LOCK_IRQSAVE(&ssd_rm_list_lock, flags);
+	spin_lock_irqsave(&ssd_rm_list_lock, flags);
 	if (ssd_rm_list_not_empty) {
-		SPIN_UNLOCK_IRQRESTORE(&ssd_rm_list_lock, flags);
+		spin_unlock_irqrestore(&ssd_rm_list_lock, flags);
 		schedule_work(&_kcached_wq);
 	} else {
-		SPIN_UNLOCK_IRQRESTORE(&ssd_rm_list_lock, flags);
+		spin_unlock_irqrestore(&ssd_rm_list_lock, flags);
 	}
 
 	return 0;
@@ -2541,7 +2541,6 @@ module_exit(eio_exit);
 
 MODULE_DESCRIPTION(DM_NAME "STEC EnhanceIO target");
 MODULE_AUTHOR("STEC, Inc. based on code by Facebook");
-MODULE_VERSION(EIO_RELEASE);
 
 MODULE_LICENSE("GPL");
 
