@@ -339,5 +339,4 @@ module_exit(lru_unregister);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LRU policy for EnhanceIO");
 MODULE_AUTHOR("STEC, Inc. based on code by Facebook");
-MODULE_VERSION(EIO_RELEASE);
 
