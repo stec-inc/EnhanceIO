@@ -31,7 +31,7 @@
 #include <linux/miscdevice.h>
 #include "eio.h"
 #include "eio_ttc.h"
-struct rw_semaphore	eio_ttc_lock[EIO_HASHTBL_SIZE];
+static struct rw_semaphore	eio_ttc_lock[EIO_HASHTBL_SIZE];
 static struct list_head	eio_ttc_list[EIO_HASHTBL_SIZE];
 
 int eio_reboot_notified = 0;
@@ -517,7 +517,7 @@ eio_get_cache_list(unsigned long *arg)
 	cache_rec_short_t		*cache_recs;
 	struct cache_c			*dmc;
 
-	if (copy_from_user(&reclist, (cache_list_t *)arg,
+	if (copy_from_user(&reclist, (cache_list_t __user *)arg,
 			   sizeof (cache_list_t))) {
 		error = -EFAULT;
 		goto out;
@@ -547,13 +547,13 @@ eio_get_cache_list(unsigned long *arg)
 			break;
 	}
 
-	if (copy_to_user((char *)reclist.cachelist,
+	if (copy_to_user((char __user *)reclist.cachelist,
 			 (char *)cache_recs, size)) {
 		error = -EFAULT;
 		goto out;
 	}
 
-	if (copy_to_user((cache_list_t *)arg, &reclist,
+	if (copy_to_user((cache_list_t __user *)arg, &reclist,
 			 sizeof (cache_list_t))) {
 		error = -EFAULT;
 		goto out;
@@ -639,7 +639,7 @@ eio_do_preliminary_checks(struct cache_c *dmc)
 }
 
 /* Use mempool_alloc and free for io in sync_io as well */
-void eio_dec_count(struct eio_context *io, int error)
+static void eio_dec_count(struct eio_context *io, int error)
 {
 
 	if (error)
@@ -660,7 +660,7 @@ void eio_dec_count(struct eio_context *io, int error)
 	}
 }
 
-void eio_endio(struct bio *bio, int error)
+static void eio_endio(struct bio *bio, int error)
 {
 	struct eio_context *io;
 
@@ -672,7 +672,7 @@ void eio_endio(struct bio *bio, int error)
 	eio_dec_count(io, error);
 }
 
-int eio_dispatch_io_pages(struct cache_c *dmc, struct eio_io_region *where, int rw, struct page **pagelist,
+static int eio_dispatch_io_pages(struct cache_c *dmc, struct eio_io_region *where, int rw, struct page **pagelist,
 			struct eio_context *io, int hddio, int num_vecs, int sync)
 {
 	struct bio 	*bio;
@@ -734,7 +734,7 @@ int eio_dispatch_io_pages(struct cache_c *dmc, struct eio_io_region *where, int 
  * fit into single bio.
  */
 
-int eio_dispatch_io(struct cache_c *dmc, struct eio_io_region *where, int rw, struct bio_vec *bvec,
+static int eio_dispatch_io(struct cache_c *dmc, struct eio_io_region *where, int rw, struct bio_vec *bvec,
 			struct eio_context *io, int hddio, int num_vecs, int sync)
 {
 	struct bio 	*bio;
@@ -793,7 +793,7 @@ int eio_dispatch_io(struct cache_c *dmc, struct eio_io_region *where, int rw, st
 }
 
 
-int eio_async_io(struct cache_c *dmc, struct eio_io_region *where, int rw, struct eio_io_request *req)
+static int eio_async_io(struct cache_c *dmc, struct eio_io_region *where, int rw, struct eio_io_request *req)
 {
 	struct eio_context *io;
 	int err = 0;
@@ -840,7 +840,7 @@ retry:
 	return err;
 }
 
-int eio_sync_io(struct cache_c *dmc, struct eio_io_region *where,
+static int eio_sync_io(struct cache_c *dmc, struct eio_io_region *where,
 			int rw, struct eio_io_request *req)
 {
 	int ret = 0;

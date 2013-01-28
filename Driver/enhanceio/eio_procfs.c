@@ -34,7 +34,7 @@
 #define ENHANCEIO_GIT_COMMIT_HASH "unknown-git-version"
 #endif /* !ENHANCEIO_GIT_COMMIT_HASH */
 
-int
+int 
 eio_version_query(size_t buf_sz, char *bufp)
 {
 	if (unlikely(buf_sz == 0) || unlikely(bufp == NULL))
@@ -52,7 +52,7 @@ static struct sysctl_table_dir *sysctl_handle_dir;
 /*
  * eio_zerostats_sysctl
  */
-int
+static int
 eio_zerostats_sysctl(ctl_table *table, int write, void __user *buffer, size_t *length, loff_t *ppos)
 {
 	struct cache_c *dmc = (struct cache_c *)table->extra1;
@@ -116,7 +116,7 @@ eio_zerostats_sysctl(ctl_table *table, int write, void __user *buffer, size_t *l
  * eio_mem_limit_pct_sysctl
  * - sets the eio sysctl mem_limit_pct value
  */
-int
+static int
 eio_mem_limit_pct_sysctl(ctl_table *table, int write, void __user *buffer, size_t *length, loff_t *ppos)
 {
 	struct cache_c *dmc = (struct cache_c *)table->extra1;
@@ -157,32 +157,9 @@ eio_mem_limit_pct_sysctl(ctl_table *table, int write, void __user *buffer, size_
 }
 
 /*
- * eio_error_inject_sysctl
- * - sets the eio sysctl error_inject value
- */
-int
-eio_error_inject_sysctl(ctl_table *table, int write, void __user *buffer, size_t *length, loff_t *ppos)
-{
-	struct cache_c *dmc = (struct cache_c *)table->extra1;
-	unsigned long flags = 0;
-
-	/* fetch the new tunable value or post the existing value */
-
-	if (!write) {
-		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
-		dmc->sysctl_pending.error_inject = dmc->sysctl_active.error_inject;	
-		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
-	}
-
-	proc_dointvec(table, write, buffer, length, ppos);
-
-	return 0;	
-}
-
-/*
  * eio_clean_sysctl
  */
-int
+static int
 eio_clean_sysctl(ctl_table *table, int write, void __user *buffer, size_t *length, loff_t *ppos)
 {
 	struct cache_c *dmc = (struct cache_c *)table->extra1;
@@ -259,7 +236,7 @@ eio_clean_sysctl(ctl_table *table, int write, void __user *buffer, size_t *lengt
 /*
  * eio_dirty_high_threshold_sysctl
  */
-int
+static int
 eio_dirty_high_threshold_sysctl(ctl_table *table, int write, void __user *buffer, size_t *length, loff_t *ppos)
 {
 	struct cache_c *dmc = (struct cache_c *)table->extra1;
@@ -334,7 +311,7 @@ eio_dirty_high_threshold_sysctl(ctl_table *table, int write, void __user *buffer
 /*
  * eio_dirty_low_threshold_sysctl
  */
-int
+static int
 eio_dirty_low_threshold_sysctl(ctl_table *table, int write, void __user *buffer, size_t *length, loff_t *ppos)
 {
 	struct cache_c *dmc = (struct cache_c *)table->extra1;
@@ -415,7 +392,7 @@ eio_dirty_low_threshold_sysctl(ctl_table *table, int write, void __user *buffer,
 /*
  * eio_dirty_set_high_threshold_sysctl
  */
-int
+static int
 eio_dirty_set_high_threshold_sysctl(ctl_table *table, int write, void __user *buffer, size_t *length, loff_t *ppos)
 {
 	struct cache_c *dmc = (struct cache_c *)table->extra1;
@@ -493,7 +470,7 @@ eio_dirty_set_high_threshold_sysctl(ctl_table *table, int write, void __user *bu
 /*
  * eio_dirty_set_low_threshold_sysctl
  */
-int
+static int
 eio_dirty_set_low_threshold_sysctl(ctl_table *table, int write, void __user *buffer, size_t *length, loff_t *ppos)
 {
 	struct cache_c *dmc = (struct cache_c *)table->extra1;
@@ -578,7 +555,7 @@ eio_dirty_set_low_threshold_sysctl(ctl_table *table, int write, void __user *buf
 /*
  * eio_autoclean_threshold_sysctl
  */
-int
+static int
 eio_autoclean_threshold_sysctl(ctl_table *table, int write, void __user *buffer, size_t *length, loff_t *ppos)
 {
 	struct cache_c *dmc = (struct cache_c *)table->extra1;
@@ -647,7 +624,7 @@ eio_autoclean_threshold_sysctl(ctl_table *table, int write, void __user *buffer,
 /*
  * eio_time_based_clean_interval_sysctl
  */
-int
+static int
 eio_time_based_clean_interval_sysctl(ctl_table *table, int write, void __user *buffer, size_t *length, loff_t *ppos)
 {
 	struct cache_c *dmc = (struct cache_c *)table->extra1;
@@ -730,7 +707,7 @@ static void eio_sysctl_unregister_invalidate(struct cache_c *dmc);
 /*
  * eio_control_sysctl
  */
-/* exported */ int
+int
 eio_control_sysctl(ctl_table *table, int write, void __user *buffer, size_t *length, loff_t *ppos)
 {
 	int rv = 0;
@@ -1273,7 +1250,6 @@ eio_procfs_dtr(struct cache_c *dmc)
 
 
 static spinlock_t invalidate_spin_lock;
-u_int64_t invalidate_spin_lock_flags;
 
 /*
  * eio_invalidate_sysctl

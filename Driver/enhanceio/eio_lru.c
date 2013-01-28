@@ -56,7 +56,7 @@ struct eio_lru_cache_block {
 };
 
 /* LRU specifc data structures */
-struct eio_lru eio_lru = {
+static struct eio_lru eio_lru = {
 	.sl_lru_pushblks = eio_lru_pushblks,
 	.sl_reclaim_lru_movetail = eio_reclaim_lru_movetail,
 };
@@ -64,7 +64,7 @@ struct eio_lru eio_lru = {
 /*
  * Context that captures the LRU replacement policy
  */
-struct eio_policy_header eio_lru_ops = {
+static struct eio_policy_header eio_lru_ops = {
 	.sph_name = CACHE_REPL_LRU,
 	.sph_instance_init = eio_lru_instance_init,
 };

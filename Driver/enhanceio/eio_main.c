@@ -137,7 +137,7 @@ eb_endio(struct eio_bio *ebio, int error)
 	kfree(ebio);
 }
 
-int
+static int
 eio_io_async_pages(struct cache_c *dmc, struct eio_io_region *where, int rw,
 			struct page **pages, unsigned nr_pages, eio_notify_fn fn, void *context,
 			int hddio)
@@ -167,7 +167,7 @@ eio_io_async_pages(struct cache_c *dmc, struct eio_io_region *where, int rw,
 	return error;
 }
 
-int
+static int
 eio_io_async_bvec(struct cache_c *dmc, struct eio_io_region *where, int rw,
 			struct bio_vec *pages, unsigned nr_bvecs, eio_notify_fn fn,
 			void *context, int hddio)
@@ -271,7 +271,7 @@ eio_flag_abios(struct cache_c *dmc, struct eio_bio *abio, int invalidated)
 	}
 }
 
-void
+static void
 eio_disk_io_callback(int error, void *context)
 {
 	struct kcached_job *job;
@@ -355,7 +355,7 @@ eio_uncached_read_done(struct kcached_job *job)
 	}
 }
 
-void
+static void
 eio_io_callback(int error, void *context)
 {
 	struct kcached_job *job = (struct kcached_job *)context;
@@ -1096,7 +1096,7 @@ eio_do_mdupdate(struct work_struct *work)
 	int error, j;
 	index_t blk_index;
 	int k;
-	void *pg_virt_addr[2] = {0};
+	void *pg_virt_addr[2] = {NULL};
 	u_int8_t	sector_bits[2] = {0};
 	int	startbit, endbit;
 	int rw_flags = 0;
@@ -1393,7 +1393,7 @@ eio_enq_mdupdate(struct bio_container *bc)
 	index_t set_index;
 	struct eio_bio *ebio;
 	struct cache_c *dmc = bc->bc_dmc;
-	struct cache_set *set = 0;
+	struct cache_set *set = NULL;
 	struct mdupdate_request *mdreq;
 	int	do_schedule;
 
@@ -3151,7 +3151,7 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 	index_t			blkindex;
 	struct bio_vec		*bvecs;
 	unsigned		nr_bvecs, total;
-	void			*pg_virt_addr[2] = {0};
+	void			*pg_virt_addr[2] = {NULL};
 
 	/* Cache is failed mode, do nothing. */
 	if (unlikely(CACHE_FAILED_IS_SET(dmc))) {

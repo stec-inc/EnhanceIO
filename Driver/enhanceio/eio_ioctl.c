@@ -39,6 +39,7 @@ eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 	dev_notifier_t 		note;
 	int			do_delete = 0;
 
+
 	switch(cmd) {
 	case EIO_IOC_CREATE:
 	case EIO_IOC_ENABLE:
@@ -47,7 +48,7 @@ eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 		if (!cache) {
 			return -ENOMEM;
 		}
-		if (copy_from_user(cache, (cache_rec_short_t *)arg,
+		if (copy_from_user(cache, (void __user *)arg,
 				   sizeof (cache_rec_short_t))) {
 			vfree(cache);
 			return -EFAULT;
@@ -65,7 +66,7 @@ eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 		if (!cache) {
 			return -ENOMEM;
 		}
-		if (copy_from_user(cache, (cache_rec_short_t *)arg,
+		if (copy_from_user(cache, (void __user *)arg,
 				   sizeof (cache_rec_short_t))) {
 			vfree(cache);
 			return -EFAULT;
@@ -80,7 +81,7 @@ eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 			return -ENOMEM;
 		}
 
-		if (copy_from_user(cache, (cache_rec_short_t *)arg,
+		if (copy_from_user(cache, (void __user *)arg,
 				   sizeof (cache_rec_short_t))) {
 			vfree(cache);
 			return -EFAULT;
@@ -93,14 +94,14 @@ eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 
 	case EIO_IOC_NCACHES:
 		ncaches = eio_get_cache_count();
-		if (copy_to_user((uint64_t *)arg, &ncaches,
+		if (copy_to_user((uint64_t __user *)arg, &ncaches,
 		                      sizeof (uint64_t))) {
 			return -EFAULT;
 		}
 		break;
 
 	case EIO_IOC_CACHE_LIST:
-		error = eio_get_cache_list((unsigned long *)arg);
+		error = eio_get_cache_list((unsigned long __user *)arg);
 		break;
 
 	case EIO_IOC_SET_WARM_BOOT:
@@ -112,7 +113,7 @@ eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 		if (!cache)
 			return -ENOMEM;
 
-		if (copy_from_user(cache, (cache_rec_short_t *)arg,
+		if (copy_from_user(cache, (void __user *)arg,
 				   sizeof (cache_rec_short_t))) {
 			vfree(cache);
 			return -EFAULT;
@@ -127,7 +128,7 @@ eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 		cache = vmalloc(sizeof (cache_rec_short_t));
 		if (!cache)
 			return -ENOMEM;
-		if (copy_from_user(cache, (cache_rec_short_t *)arg,
+		if (copy_from_user(cache, (void __user *)arg,
 				   sizeof (cache_rec_short_t))) {
 			vfree(cache);
 			return -EFAULT;

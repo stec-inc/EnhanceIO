@@ -44,10 +44,10 @@
 #define KMEM_DMC_BIO_PAIR	"eio-dmc-bio-pair"
 /* #define KMEM_CACHE_PENDING_JOB	"eio-pending-jobs" */
 
-struct cache_c *cache_list_head = NULL;
+static struct cache_c *cache_list_head = NULL;
 struct work_struct _kcached_wq;
 
-struct kmem_cache *_job_cache;
+static struct kmem_cache *_job_cache;
 struct kmem_cache *_io_cache; /* cache of eio_context objects */
 mempool_t *_job_pool;
 mempool_t *_io_pool; /* pool of eio_context object */
@@ -2095,14 +2095,6 @@ out:
 	return r;
 }
 
-
-void
-eio_status_info(struct cache_c *dmc, status_type_t type, char *result, unsigned int maxlen)
-{
-
-	return; /* We already have stats under /proc/.../eio_stats */
-}
-
 /* 
  * Stop the async tasks for a cache(threads, scheduled works).
  * Used during the cache remove
@@ -2441,7 +2433,7 @@ eio_notify_ssd_rm(struct notifier_block *nb, unsigned long action, void *data)
 /*
  * Initiate a cache target.
  */
-int __init
+static int __init
 eio_init(void)
 {
 	int r;
@@ -2489,7 +2481,7 @@ eio_init(void)
 /*
  * Destroy a cache target.
  */
-void
+static void
 eio_exit(void)
 {
 	int r;

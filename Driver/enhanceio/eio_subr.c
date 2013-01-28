@@ -31,14 +31,14 @@
 #include "eio_ttc.h"
 
 static DEFINE_SPINLOCK(_job_lock);
-u_int64_t _job_lock_flags;
+static u_int64_t _job_lock_flags;
 
 extern mempool_t *_job_pool;
 
 extern atomic_t nr_cache_jobs;
 
-LIST_HEAD(_io_jobs);
-LIST_HEAD(_disk_read_jobs);
+static LIST_HEAD(_io_jobs);
+static LIST_HEAD(_disk_read_jobs);
 
 int
 eio_io_empty(void)
@@ -71,7 +71,7 @@ eio_free_cache_job(struct kcached_job *job)
 /*
  * Functions to push and pop a job onto the head of a given job list.
  */
-struct kcached_job *
+static struct kcached_job *
 eio_pop(struct list_head *jobs)
 {
 	struct kcached_job *job = NULL;
@@ -88,7 +88,7 @@ eio_pop(struct list_head *jobs)
 }
 
 
-void
+static void
 eio_push(struct list_head *jobs, struct kcached_job *job)
 {
 	unsigned long flags = 0;
@@ -106,7 +106,7 @@ eio_push_ssdread_failures(struct kcached_job *job)
 	eio_push(&_disk_read_jobs, job);
 }
 
-void
+static void
 eio_push_io(struct kcached_job *job)
 {
 
@@ -212,7 +212,7 @@ eio_new_job(struct cache_c *dmc, struct eio_bio* bio, index_t index)
 	return job;
 }
 
-void
+static void
 eio_sync_endio(struct bio *bio, int error)
 {
         if(error) {

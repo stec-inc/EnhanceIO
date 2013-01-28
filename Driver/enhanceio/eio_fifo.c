@@ -52,7 +52,7 @@ struct eio_fifo_cache_set {
 /*
  * Context that captures the FIFO replacement policy
  */
-struct eio_policy_header eio_fifo_ops = {
+static struct eio_policy_header eio_fifo_ops = {
 	.sph_name = CACHE_REPL_FIFO,
 	.sph_instance_init = eio_fifo_instance_init,
 
