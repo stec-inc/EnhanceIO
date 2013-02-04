@@ -34,7 +34,9 @@ EIO_IOC_EDIT = 0x4504
 EIO_IOC_NCACHES = 0x4505 
 EIO_IOC_CACHE_LIST = 0x4506
 EIO_IOC_SSD_ADD = 0x4507 
+EIO_IOC_SSD_REMOVE = 0x4508 
 EIO_IOC_SRC_ADD = 0x4509
+EIO_IOC_SRC_REMOVE = 0x4500a
 IOC_BLKGETSIZE64 = 0x80081272
 IOC_SECTSIZE = 0x1268
 
@@ -199,20 +201,20 @@ def main():
 	
 	mainparser = ArgumentParser()
 	parser = mainparser.add_subparsers()		
-
+	#delete
 	parser_delete = parser.add_parser('delete', help='used to delete cache')
 	parser_delete.add_argument("-c", action="store", dest= "cache",required=True)
-	
+	#edit
 	parser_edit = parser.add_parser('edit', help='used to edit cache policy or mode or both')
 	parser_edit.add_argument("-c", action="store",  dest="cache",required=True)
 	parser_edit.add_argument("-m", action="store", dest="mode", choices=["wb","wt","ro"], help="cache mode",default="wt")
 	parser_edit.add_argument("-p", action="store", dest="policy", choices=["rand","fifo","lru"], help="cache replacement policy",default="lru")
-	
+	#info
 	parser_info = parser.add_parser('info', help='displays information about currently create caches')
-
+	#clean
 	parser_clean = parser.add_parser('clean', help='clean the drity blocks in the cache (Applicable only to writeback caches)')
 	parser_clean.add_argument("-c", action="store", dest="cache",required=True)
-	
+	#create
 	parser_create = parser.add_parser('create', help="create")
 	parser_create.add_argument("-d", action="store", dest="hdd", required=True, help="name of the source device")
 	parser_create.add_argument("-s", action="store", dest="ssd", required=True, help="name of the ssd device")
@@ -220,9 +222,25 @@ def main():
 	parser_create.add_argument("-m", action="store", dest="mode", choices=["wb","wt","ro"], help="cache mode",default="wt")
 	parser_create.add_argument("-b", action="store", dest="blksize", choices=["2048","4096","8192"], default="4096" ,help="block size for cache")
 	parser_create.add_argument("-c", action="store", dest="cache", required=True)
+	#enable
+	parser_enable = parser.add_parser('enable', help='used to enable cache')
+	parser_enable.add_argument("-d", action="store", dest="hdd", required=True, help="name of the source device")
+	parser_enable.add_argument("-s", action="store", dest="ssd", required=True, help="name of the ssd device")
+	parser_enable.add_argument("-p", action="store", dest="policy", choices=["rand","fifo","lru"], help="cache replacement policy",default="lru")
+	parser_enable.add_argument("-m", action="store", dest="mode", choices=["wb","wt","ro"], help="cache mode",default="wt")
+	parser_enable.add_argument("-b", action="store", dest="blksize", choices=["2048","4096","8192"], default="4096" ,help="block size for cache")
+	parser_enable.add_argument("-c", action="store", dest="cache", required=True)
+
+	#notify
+	parser_notify = parser.add_parser('notify_ssd_add')
+	parser_notify.add_argument("-s", action="store", dest="ssd", help="name of the ssd device")
+	parser_notify.add_argument("-a", action="store", dest="action", help="add/remove/reboot")
+	parser_notify.add_argument("-d", action="store", dest="hdd", required=True, help="name of the source device")
 
 	args = mainparser.parse_args()
 	
+
+
 	if sys.argv[1] == "create":
 		cache = Cache_rec(name = args.cache, src_name = args.hdd, ssd_name = args.ssd, policy = args.policy, mode = args.mode, blksize = args.blksize)
 
@@ -272,9 +290,28 @@ def main():
 		cache.do_eio_ioctl(EIO_IOC_ENABLE)
 	elif sys.argv[1] == "notify":
 		# This command will be fired by udev rule on SSD/Source addition
-		cache = Cache_rec(name = args.cache, )
-		cache.do_eio_ioctl(EIO_IOC_ENABLE)
-		cache = Cache_rec(name = args.cache)
+
+		if args.action == "reboot":
+			cache = Cache_rec(name = "dummy")
+			cache.do_eio_ioctl(EIO_IOC_ENABLE)
+
+		elif args.action == "add": 
+			if args.ssd:
+				cache = Cache_rec(name = args.cache, ssd_name = args.ssd, persistence = 1)
+				cache.do_eio_ioctl(EIO_IOC_SSD_ADD)
+				
+			elif args.hdd:
+				cache = Cache_rec(name = args.cache, ssd_name = args.hdd, persistence = 1)
+				cache.do_eio_ioctl(EIO_IOC_HDD_ADD)
+
+		elif args.action == "remove":
+			if args.ssd:
+				cache = Cache_rec(name = args.cache, ssd_name = args.ssd, persistence = 1)
+				cache.do_eio_ioctl(EIO_SSD_REMOVE)
+			elif args.hdd:
+				cache = Cache_rec(name = args.cache, hdd_name = args.hdd, persistence = 1)
+				cache.do_eio_ioctl(EIO_HDD_REMOVE)
+
 		pass
 
 
