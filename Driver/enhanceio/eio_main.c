@@ -138,36 +138,6 @@ eb_endio(struct eio_bio *ebio, int error)
 }
 
 static int
-eio_io_async_pages(struct cache_c *dmc, struct eio_io_region *where, int rw,
-			struct page **pages, unsigned nr_pages, eio_notify_fn fn, void *context,
-			int hddio)
-{
-	struct eio_io_request req;
-	int error = 0;
-
-	memset((char *)&req, 0, sizeof req);
-
-	if (unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
-		if (where->bdev != dmc->disk_dev->bdev) {
-			pr_err("eio_io_async_pages: Cache is in degraded mode.\n");
-			pr_err("eio_io_async_pages: Can not issue i/o to ssd device.\n");
-			return -ENODEV;
-		}
-	}
-	
-	req.mtype = EIO_PAGES;
-	req.dptr.plist = pages;
-	req.num_bvecs = nr_pages;
-	req.notify = fn;
-	req.context = context;
-	req.hddio = hddio;
-
-	error = eio_do_io(dmc, where, rw, &req);
-
-	return error;
-}
-
-static int
 eio_io_async_bvec(struct cache_c *dmc, struct eio_io_region *where, int rw,
 			struct bio_vec *pages, unsigned nr_bvecs, eio_notify_fn fn,
 			void *context, int hddio)
