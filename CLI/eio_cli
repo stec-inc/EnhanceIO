@@ -40,6 +40,8 @@ EIO_IOC_SRC_REMOVE = 0x4500a
 IOC_BLKGETSIZE64 = 0x80081272
 IOC_SECTSIZE = 0x1268
 
+FIOCMD="fio --rw=randrw --verify=meta --verify_pattern=0x3982 --ioengine=libaio --iodepth=16 --direct=1 --size=1G --bsrange=512-128K --numjobs=10 --group_reporting --time_based --runtime=60 --name=job1 filename="
+
 def run_cmd(cmd):
 	#Utility function that runs a command
 	process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,shell=True)
@@ -56,7 +58,22 @@ def get_caches_list():
 	for name in cache_list:
 		if name == "version":
 			cache_list.remove(name)
-	return cache_list	
+	return cache_list
+
+def sanity(hdd, ssd):
+	# Performs a very basic regression of operations			
+				
+	modes = {3:"Write Through", 1:"Write Back", 2:"Read Only",0:"N/A"}
+	policies = {3:"rand", 1:"fifo", 2:"lru", 0:"N/A"}		
+	blksizes = {"4096":4096, "2048":2048, "8192":8192,"":0}	
+	for mode in ["wb","wt","ro"]:
+		for policy in ["rand","fifo","lru"]:
+			for blksize in ["4096","2048","8192"]:
+				cache = Cache_rec(name = "test_cache", src_name = hdd, ssd_name = ssd, policy = policy, mode = mode, blksize = blksize)
+				cache.create()
+				run_cmd(FIOCMD + hdd)
+				cache.do_eio_ioctl(EIO_IOC_DELETE)				 
+	
 
 # Class that represents cache. Also used to pass ioctl to driver 
 class Cache_rec(Structure):
@@ -161,9 +178,21 @@ class Cache_rec(Structure):
 			status = run_cmd(cmd)
 			self.blksize = int(status.output.split()[1])
 
-			self.assoc = associativity[self.blksize]		 
+			self.assoc = associativity[self.blksize]
+	def create(self):		 
+		src_sz = Dev_info() 
+		src_sz.get_device_size_info(self.src_name)
+		self.src_size = src_sz.dev_size
+		self.src_sector_size = src_sz.dev_sect_size
 
+		ssd_sz = Dev_info()
+		ssd_sz.get_device_size_info(self.ssd_name)
+		self.ssd_size = ssd_sz.dev_size
+		self.ssd_sector_size = ssd_sz.dev_sect_size
 
+		self.print_info()	
+		self.do_eio_ioctl(EIO_IOC_CREATE)		
+						
 						
 	
 class Status:
@@ -237,6 +266,10 @@ def main():
 	parser_notify.add_argument("-a", action="store", dest="action", help="add/remove/reboot")
 	parser_notify.add_argument("-d", action="store", dest="hdd", required=True, help="name of the source device")
 
+	#notify
+	parser_sanity = parser.add_parser('sanity')
+	parser_sanity.add_argument("-s", action="store", dest="ssd", required=True, help="name of the ssd device")
+	parser_sanity.add_argument("-d", action="store", dest="hdd", required=True, help="name of the source device")
 	args = mainparser.parse_args()
 	
 
@@ -244,19 +277,7 @@ def main():
 	if sys.argv[1] == "create":
 		cache = Cache_rec(name = args.cache, src_name = args.hdd, ssd_name = args.ssd, policy = args.policy, mode = args.mode, blksize = args.blksize)
 
-		src_sz = Dev_info() 
-		src_sz.get_device_size_info(cache.src_name)
-		cache.src_size = src_sz.dev_size
-		cache.src_sector_size = src_sz.dev_sect_size
-
-		ssd_sz = Dev_info()
-		ssd_sz.get_device_size_info(cache.ssd_name)
-		cache.ssd_size = ssd_sz.dev_size
-		cache.ssd_sector_size = ssd_sz.dev_sect_size
-
-		cache.print_info()	
-
-		cache.do_eio_ioctl(EIO_IOC_CREATE)
+		cache.create()
 		pass
 	elif sys.argv[1] == "info":
 		cache_list = get_caches_list()
@@ -286,7 +307,8 @@ def main():
 		pass
 	elif sys.argv[1] == "enable":
 		# This command will be fired by udev rule on SSD/Source addition
-		cache = Cache_rec(name = args.cache, persistence = 1)
+		cache = Cache_rec(name = args.cache, src_name = args.hdd, ssd_name = args.ssd, policy = args.policy, mode = args.mode, blksize = args.blksize, persistence = 1)
+
 		cache.do_eio_ioctl(EIO_IOC_ENABLE)
 	elif sys.argv[1] == "notify":
 		# This command will be fired by udev rule on SSD/Source addition
@@ -313,6 +335,9 @@ def main():
 				cache.do_eio_ioctl(EIO_HDD_REMOVE)
 
 		pass
+	elif sys.argv[1] == "sanity":
+		# Performs a basic sanity check
+		sanity(args.hdd, args.ssd)
 
 
 if __name__ == '__main__':
