@@ -550,7 +550,7 @@ out:
 	return error;
 }
 
-static void eio_cache_rec_fill(struct cache_c *dmc, cache_rec_short_t * rec)
+static void eio_cache_rec_fill(struct cache_c *dmc, cache_rec_short_t *rec)
 {
 	strncpy(rec->cr_name, dmc->cache_name, sizeof(rec->cr_name));
 	strncpy(rec->cr_src_devname, dmc->disk_devname,
@@ -918,7 +918,7 @@ static void eio_bio_end_empty_barrier(struct bio *bio, int err)
 
 static void eio_issue_empty_barrier_flush(struct block_device *bdev,
 					  struct bio *orig_bio, int device,
-					  make_request_fn * origmfn,
+					  make_request_fn *origmfn,
 					  int rw_flags)
 {
 	struct bio *bio;

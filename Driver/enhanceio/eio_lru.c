@@ -167,7 +167,7 @@ void eio_lru_exit(void)
  */
 void
 eio_lru_find_reclaim_dbn(struct eio_policy *p_ops,
-			 index_t start_index, index_t * index)
+			 index_t start_index, index_t *index)
 {
 	index_t lru_rel_index;
 	struct eio_lru_cache_set *lru_sets;

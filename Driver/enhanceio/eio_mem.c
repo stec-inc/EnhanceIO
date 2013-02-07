@@ -100,7 +100,7 @@ int eio_mem_init(struct cache_c *dmc)
 /*
  * eio_hash_block
  */
-u_int32_t eio_hash_block(struct cache_c * dmc, sector_t dbn)
+u_int32_t eio_hash_block(struct cache_c *dmc, sector_t dbn)
 {
 	int wrapped;
 	u_int64_t set_number;
@@ -145,7 +145,7 @@ unsigned int eio_shrink_dbn(struct cache_c *dmc, sector_t dbn)
  * Expand a 3-byte "dbn" into a 5-byte "dbn" by adding 16 lower bits
  * of the set number this "dbn" belongs to.
  */
-sector_t eio_expand_dbn(struct cache_c * dmc, u_int64_t index)
+sector_t eio_expand_dbn(struct cache_c *dmc, u_int64_t index)
 {
 	u_int32_t dbn_24;
 	u_int64_t set_number;
@@ -182,7 +182,6 @@ sector_t eio_expand_dbn(struct cache_c * dmc, u_int64_t index)
 
 	return (sector_t)dbn_40;
 }
-
 EXPORT_SYMBOL(eio_expand_dbn);
 
 /*

@@ -1452,7 +1452,7 @@ static void eio_init_srcdev_props(struct cache_c *dmc)
 		dmc->cache_srcdisk_name[0] = '\0';
 }
 
-int eio_cache_create(cache_rec_short_t * cache)
+int eio_cache_create(cache_rec_short_t *cache)
 {
 	struct cache_c *dmc;
 	struct cache_c **nodepp;
@@ -2609,7 +2609,7 @@ sector_t eio_get_device_size(struct eio_bdev *dev)
 /*
  * To get starting sector of the device
  */
-sector_t eio_get_device_start_sect(struct eio_bdev * dev)
+sector_t eio_get_device_start_sect(struct eio_bdev *dev)
 {
 
 	if (dev == NULL || dev->bdev == NULL || dev->bdev->bd_part == NULL)

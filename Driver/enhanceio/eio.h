@@ -810,13 +810,13 @@ struct eio_bio {
 	int eb_iotype;
 	struct bio_container *eb_bc;
 	unsigned eb_cacheset;
-	sector_t eb_sector;             //sector number
-	unsigned eb_size;               //size in bytes
-	struct bio_vec *eb_bv;          //bvec pointer
-	unsigned eb_nbvec;              //number of bio_vecs
-	int eb_dir;                     // io direction
-	struct eio_bio *eb_next;        //used for splitting reads
-	index_t eb_index;               //for read bios
+	sector_t eb_sector;             /*sector number*/
+	unsigned eb_size;               /*size in bytes*/
+	struct bio_vec *eb_bv;          /*bvec pointer*/
+	unsigned eb_nbvec;              /*number of bio_vecs*/
+	int eb_dir;                     /* io direction*/
+	struct eio_bio *eb_next;        /*used for splitting reads*/
+	index_t eb_index;               /*for read bios*/
 	atomic_t eb_holdcount;          /* ebio hold count, currently used only for dirty block I/O */
 	struct bio_vec eb_rbv[0];
 };
@@ -968,7 +968,7 @@ extern void eio_touch_set_lru(struct cache_c *dmc, index_t set);
 extern void eio_inval_range(struct cache_c *dmc, sector_t iosector,
 			    unsigned iosize);
 extern int eio_invalidate_sanity_check(struct cache_c *dmc, u_int64_t iosector,
-				       u_int64_t * iosize);
+				       u_int64_t *iosize);
 /*
  * Invalidates all cached blocks without waiting for them to complete
  * Should be called with incoming IO suspended
@@ -1100,7 +1100,7 @@ extern sector_t eio_get_device_start_sect(struct eio_bdev *);
 		(ev)->process = NULL;			\
 	} while (0)
 
-//Assumes that the macro gets called under the same spinlock as in wait event
+/*Assumes that the macro gets called under the same spinlock as in wait event*/
 #define EIO_SET_EVENT_AND_UNLOCK(ev, sl, flags)					\
 	do {							\
 		struct task_struct      *p = NULL;		\
@@ -1114,7 +1114,7 @@ extern sector_t eio_get_device_start_sect(struct eio_bdev *);
 		}						\
 	} while (0)
 
-//Assumes that the spin lock sl is taken while calling this macro
+/*Assumes that the spin lock sl is taken while calling this macro*/
 #define EIO_WAIT_EVENT(ev, sl, flags)						\
 	do {							\
 		(ev)->process = current;			\

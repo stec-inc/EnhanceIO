@@ -38,12 +38,12 @@ typedef struct lru_ls {
 	lru_elem_t ll_elem[1];
 } lru_list_t;
 
-int lru_init(lru_list_t ** llist, index_t max);
-void lru_uninit(lru_list_t * llist);
-int lru_add(lru_list_t * llist, index_t index, u_int64_t key);
-int lru_rem(lru_list_t * llist, index_t index);
-int lru_touch(lru_list_t * llist, index_t index, u_int64_t key);
-int lru_read_head(lru_list_t * llist, index_t * index, u_int64_t * key);
-int lru_rem_head(lru_list_t * llist, index_t * index, u_int64_t * key);
+int lru_init(lru_list_t **llist, index_t max);
+void lru_uninit(lru_list_t *llist);
+int lru_add(lru_list_t *llist, index_t index, u_int64_t key);
+int lru_rem(lru_list_t *llist, index_t index);
+int lru_touch(lru_list_t *llist, index_t index, u_int64_t key);
+int lru_read_head(lru_list_t *llist, index_t *index, u_int64_t *key);
+int lru_rem_head(lru_list_t *llist, index_t *index, u_int64_t *key);
 
 #endif                          /* _EIO_SETLRU_H_ */

@@ -74,7 +74,7 @@ struct eio_policy {
 	int (*sp_repl_sets_init)(struct eio_policy *);
 	int (*sp_repl_blk_init)(struct eio_policy *);
 	void (*sp_find_reclaim_dbn)(struct eio_policy *,
-				    index_t start_index, index_t * index);
+				    index_t start_index, index_t *index);
 	int (*sp_clean_set)(struct eio_policy *, index_t set, int);
 	struct cache_c *sp_dmc;
 };
@@ -94,7 +94,7 @@ int *eio_repl_init(struct cache_c *);
 int eio_repl_sets_init(struct eio_policy *);
 int eio_repl_blk_init(struct eio_policy *);
 void eio_find_reclaim_dbn(struct eio_policy *, index_t start_index,
-			  index_t * index);
+			  index_t *index);
 int eio_policy_clean_set(struct eio_policy *, index_t, int);
 
 int eio_register_policy(struct eio_policy_header *);

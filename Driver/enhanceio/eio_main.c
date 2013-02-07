@@ -120,7 +120,7 @@ static void eb_endio(struct eio_bio *ebio, int error)
 
 	VERIFY(ebio->eb_bc);
 
-	//Propagate only main io errors and sizes
+	/*Propagate only main io errors and sizes*/
 	if (ebio->eb_iotype == EB_MAIN_IO) {
 		if (error)
 			ebio->eb_bc->bc_error = error;
@@ -321,12 +321,12 @@ static void eio_uncached_read_done(struct kcached_job *job)
 				if (EIO_CACHE_STATE_GET
 					    (dmc,
 					    iebio->eb_index) & CACHEREADINPROG) {
-					//turn off the cache read in prog flag
+					/*turn off the cache read in prog flag*/
 					EIO_CACHE_STATE_OFF(dmc,
 							    iebio->eb_index,
 							    BLOCK_IO_INPROG);
 				} else
-					//Should never reach here
+					/*Should never reach here*/
 					VERIFY(0);
 				spin_unlock_irqrestore(&dmc->
 						       cache_sets[iebio->
@@ -424,8 +424,8 @@ static void eio_post_io_callback(struct work_struct *work)
 
 	case READCACHE:
 
-		//atomic64_inc(&dmc->eio_stats.readcache);
-		//SECTOR_STATS(dmc->eio_stats.ssd_reads, ebio->eb_size);
+		/*atomic64_inc(&dmc->eio_stats.readcache);*/
+		/*SECTOR_STATS(dmc->eio_stats.ssd_reads, ebio->eb_size);*/
 		VERIFY(EIO_DBN_GET(dmc, index) ==
 		       EIO_ROUND_SECTOR(dmc, ebio->eb_sector));
 		cstate = EIO_CACHE_STATE_GET(dmc, index);
@@ -456,8 +456,8 @@ static void eio_post_io_callback(struct work_struct *work)
 
 	case READFILL:
 
-		//atomic64_inc(&dmc->eio_stats.readfill);
-		//SECTOR_STATS(dmc->eio_stats.ssd_writes, ebio->eb_size);
+		/*atomic64_inc(&dmc->eio_stats.readfill);*/
+		/*SECTOR_STATS(dmc->eio_stats.ssd_writes, ebio->eb_size);*/
 		VERIFY(EIO_DBN_GET(dmc, index) == ebio->eb_sector);
 		if (unlikely(error))
 			dmc->eio_errors.ssd_write_errors++;
@@ -472,8 +472,8 @@ static void eio_post_io_callback(struct work_struct *work)
 
 	case WRITECACHE:
 
-		//SECTOR_STATS(dmc->eio_stats.ssd_writes, ebio->eb_size);
-		//atomic64_inc(&dmc->eio_stats.writecache);
+		/*SECTOR_STATS(dmc->eio_stats.ssd_writes, ebio->eb_size);*/
+		/*atomic64_inc(&dmc->eio_stats.writecache);*/
 		cstate = EIO_CACHE_STATE_GET(dmc, index);
 		VERIFY(EIO_DBN_GET(dmc, index) ==
 		       EIO_ROUND_SECTOR(dmc, ebio->eb_sector));
@@ -1021,8 +1021,8 @@ void eio_do_readfill(struct work_struct *work)
 					if ((EIO_CACHE_STATE_GET(dmc, index)
 					     & (VALID | CACHEREADINPROG))
 					    == (VALID | CACHEREADINPROG)) {
-						//turn off the cache read in prog flag
-						//don't need to write the cache block
+						/*turn off the cache read in prog flag
+						don't need to write the cache block*/
 						CTRACE("eio_do_readfill:3\n");
 						EIO_CACHE_STATE_OFF(dmc, index,
 								    BLOCK_IO_INPROG);
@@ -1072,7 +1072,7 @@ static u_int32_t hash_block(struct cache_c *dmc, sector_t dbn)
 
 static void
 find_valid_dbn(struct cache_c *dmc, sector_t dbn,
-	       index_t start_index, index_t * index)
+	       index_t start_index, index_t *index)
 {
 	index_t i;
 	index_t end_index = start_index + dmc->assoc;
@@ -1110,7 +1110,7 @@ static index_t find_invalid_dbn(struct cache_c *dmc, index_t start_index)
 
 /* Search for a slot that we can reclaim */
 static void
-find_reclaim_dbn(struct cache_c *dmc, index_t start_index, index_t * index)
+find_reclaim_dbn(struct cache_c *dmc, index_t start_index, index_t *index)
 {
 	int i;
 	index_t idx;
@@ -1143,14 +1143,14 @@ void eio_set_warm_boot(void)
  * dbn is the starting sector.
  */
 static int
-eio_lookup(struct cache_c *dmc, struct eio_bio *ebio, index_t * index)
+eio_lookup(struct cache_c *dmc, struct eio_bio *ebio, index_t *index)
 {
 	sector_t dbn = EIO_ROUND_SECTOR(dmc, ebio->eb_sector);
 	u_int32_t set_number;
 	index_t invalid, oldest_clean = -1;
 	index_t start_index;
 
-	//ASK it is assumed that the lookup is being done for a single block
+	/*ASK it is assumed that the lookup is being done for a single block*/
 	set_number = hash_block(dmc, dbn);
 	start_index = dmc->assoc * set_number;
 	find_valid_dbn(dmc, dbn, start_index, index);
@@ -1758,7 +1758,7 @@ eio_inval_block_set_range(struct cache_c *dmc, int set, sector_t iosector,
 
 int
 eio_invalidate_sanity_check(struct cache_c *dmc, u_int64_t iosector,
-			    u_int64_t * num_sectors)
+			    u_int64_t *num_sectors)
 {
 	u_int64_t disk_size;
 
@@ -1823,7 +1823,6 @@ eio_invalidate_sector_range(char *cache_name, u_int64_t iosector,
 
 	return ret;
 }
-
 EXPORT_SYMBOL(eio_invalidate_sector_range);
 #endif                          /* VMCACHE */
 
@@ -1878,7 +1877,7 @@ static int eio_inval_block(struct cache_c *dmc, sector_t iosector)
 	u_int32_t bset;
 	int queued;
 
-	//Chop lower bits of iosector
+	/*Chop lower bits of iosector*/
 	iosector = EIO_ROUND_SECTOR(dmc, iosector);
 	bset = hash_block(dmc, iosector);
 	queued = eio_inval_block_set_range(dmc, bset, iosector,
@@ -2167,7 +2166,7 @@ eio_disk_io(struct cache_c *dmc, struct bio *bio,
 	int residual_biovec = 0;
 	int error = 0;
 
-	//disk io happens on whole bio. Reset bi_idx
+	/*disk io happens on whole bio. Reset bi_idx*/
 	bio->bi_idx = 0;
 	ebio =
 		eio_new_ebio(dmc, bio, &residual_biovec, bio->bi_sector,
@@ -2181,7 +2180,7 @@ eio_disk_io(struct cache_c *dmc, struct bio *bio,
 
 	if (force_inval)
 		ebio->eb_iotype |= EB_INVAL;
-	ebio->eb_next = anchored_bios;  //Anchor the ebio list to this super bio
+	ebio->eb_next = anchored_bios;  /*Anchor the ebio list to this super bio*/
 	job = eio_new_job(dmc, ebio, -1);
 
 	if (unlikely(job == NULL)) {
@@ -2225,14 +2224,14 @@ errout:
 	return;
 }
 
-//Given a sector number and biosize, returns cache io size
+/*Given a sector number and biosize, returns cache io size*/
 static unsigned int
 eio_get_iosize(struct cache_c *dmc, sector_t snum, unsigned int biosize)
 {
 	unsigned int iosize;
 	unsigned int swithinblock = snum & (dmc->block_size - 1);
 
-	//Check whether io starts at a cache block boundary
+	/*Check whether io starts at a cache block boundary*/
 	if (swithinblock)
 		iosize = (unsigned int)to_bytes(dmc->block_size - swithinblock);
 	else
@@ -2521,7 +2520,7 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 	unsigned int force_uncached = 0;
 	int data_dir = bio_data_dir(bio);
 
-	//bio list
+	/*bio list*/
 	struct eio_bio *ebegin = NULL;
 	struct eio_bio *eend = NULL;
 	struct eio_bio *enext = NULL;
@@ -2566,7 +2565,7 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 	 * Dont allow I/Os to go through.
 	 */
 	if (unlikely(CACHE_FAILED_IS_SET(dmc))) {
-		//ASK confirm that once failed is set, it's never reset
+		/*ASK confirm that once failed is set, it's never reset*/
 		/* Source device is not available. */
 		CTRACE
 			("eio_map:2 source device is not present. Cache is in Failed state\n");
@@ -3114,7 +3113,7 @@ void eio_clean_all(struct cache_c *dmc)
 		}
 
 		eio_clean_set(dmc, (index_t)(atomic_read(&dmc->clean_index)),
-		              /* whole */ 1, /* force */ 1);
+					/* whole */ 1, /* force */ 1);
 	}
 
 	spin_lock_irqsave(&dmc->cache_spin_lock, flags);
@@ -3317,10 +3316,8 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 	for (i = start_index; i < end_index; i++) {
 		if (EIO_CACHE_STATE_GET(dmc, i) == CLEAN_INPROG) {
 
-			for (j = i;
-			     (j < end_index)
-			     && (EIO_CACHE_STATE_GET(dmc, j) == CLEAN_INPROG);
-			     j++) ;
+			for (j = i; (j < end_index) &&
+			     (EIO_CACHE_STATE_GET(dmc, j) == CLEAN_INPROG); j++);
 
 			blkindex = (i - start_index);
 			total = (j - i);

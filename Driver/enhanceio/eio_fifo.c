@@ -97,7 +97,7 @@ int eio_fifo_cache_sets_init(struct eio_policy *p_ops)
  */
 void
 eio_fifo_find_reclaim_dbn(struct eio_policy *p_ops, index_t start_index,
-			  index_t * index)
+			  index_t *index)
 {
 	index_t end_index;
 	int slots_searched = 0;
