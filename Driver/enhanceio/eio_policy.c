@@ -40,6 +40,7 @@ int eio_register_policy(struct eio_policy_header *new_policy)
 
 	return 0;
 }
+
 EXPORT_SYMBOL(eio_register_policy);
 
 int eio_unregister_policy(struct eio_policy_header *p_ops)
@@ -52,13 +53,14 @@ int eio_unregister_policy(struct eio_policy_header *p_ops)
 		if (curr->sph_name == p_ops->sph_name) {
 			list_del(&curr->sph_list);
 			pr_info("unregister_policy: policy %d removed",
-				(int) p_ops->sph_name);
+				(int)p_ops->sph_name);
 			return 0;
 		}
 	}
 
 	return 1;
 }
+
 EXPORT_SYMBOL(eio_unregister_policy);
 
 struct eio_policy *eio_get_policy(int policy)
@@ -87,8 +89,8 @@ void eio_put_policy(struct eio_policy *p_ops)
 {
 
 	if (p_ops == NULL) {
-		pr_err("put_policy: Cannot decrement reference" \
-				"count of NULL policy");
+		pr_err("put_policy: Cannot decrement reference"
+		       "count of NULL policy");
 		return;
 	}
 	p_ops->sp_repl_exit();
@@ -114,7 +116,7 @@ int eio_repl_blk_init(struct eio_policy *p_ops)
 
 void
 eio_find_reclaim_dbn(struct eio_policy *p_ops,
-		     index_t start_index, index_t *index)
+		     index_t start_index, index_t * index)
 {
 
 	p_ops->sp_find_reclaim_dbn(p_ops, start_index, index);

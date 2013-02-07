@@ -22,7 +22,7 @@
 #include "eio.h"
 
 /* Initialize the lru list */
-int lru_init(lru_list_t **llist, index_t max)
+int lru_init(lru_list_t ** llist, index_t max)
 {
 	index_t i = 0;
 
@@ -46,14 +46,14 @@ int lru_init(lru_list_t **llist, index_t max)
 }
 
 /* Uninitialize the lru list */
-void lru_uninit(lru_list_t *llist)
+void lru_uninit(lru_list_t * llist)
 {
 	if (llist)
 		vfree(llist);
 }
 
 /* Add a new entry to lru list */
-int lru_add(lru_list_t *llist, index_t index, u_int64_t key)
+int lru_add(lru_list_t * llist, index_t index, u_int64_t key)
 {
 	if (!llist || (index >= llist->ll_max))
 		return -EINVAL;
@@ -62,9 +62,9 @@ int lru_add(lru_list_t *llist, index_t index, u_int64_t key)
 	llist->ll_elem[index].le_next = LRU_NULL;
 	llist->ll_elem[index].le_key = key;
 
-	if (llist->ll_tail != LRU_NULL) {
+	if (llist->ll_tail != LRU_NULL)
 		llist->ll_elem[llist->ll_tail].le_next = index;
-	} else {
+	else {
 		VERIFY(llist->ll_head == LRU_NULL);
 		llist->ll_head = index;
 	}
@@ -75,36 +75,32 @@ int lru_add(lru_list_t *llist, index_t index, u_int64_t key)
 }
 
 /* Remove an entry from the lru list */
-int lru_rem(lru_list_t *llist, index_t index)
+int lru_rem(lru_list_t * llist, index_t index)
 {
 	if (!llist || (index >= llist->ll_max) || (index == LRU_NULL))
 		return -EINVAL;
 
-	if (llist->ll_head == LRU_NULL && llist->ll_tail == LRU_NULL) {
+	if (llist->ll_head == LRU_NULL && llist->ll_tail == LRU_NULL)
 		/*
 		 * No element in the list.
 		 */
 		return -EINVAL;
-	}
 
 	if (llist->ll_elem[index].le_prev == LRU_NULL &&
 	    llist->ll_elem[index].le_next == LRU_NULL &&
-	    llist->ll_head != index && llist->ll_tail != index) {
+	    llist->ll_head != index && llist->ll_tail != index)
 		/*
 		 * Element not in list.
 		 */
 		return 0;
-	}
 
-	if (llist->ll_elem[index].le_prev != LRU_NULL) {
+	if (llist->ll_elem[index].le_prev != LRU_NULL)
 		llist->ll_elem[llist->ll_elem[index].le_prev].le_next =
-		    llist->ll_elem[index].le_next;
-	}
+			llist->ll_elem[index].le_next;
 
-	if (llist->ll_elem[index].le_next != LRU_NULL) {
+	if (llist->ll_elem[index].le_next != LRU_NULL)
 		llist->ll_elem[llist->ll_elem[index].le_next].le_prev =
-		    llist->ll_elem[index].le_prev;
-	}
+			llist->ll_elem[index].le_prev;
 
 	if (llist->ll_head == index)
 		llist->ll_head = llist->ll_elem[index].le_next;
@@ -121,14 +117,14 @@ int lru_rem(lru_list_t *llist, index_t index)
 }
 
 /* Move up the given lru element */
-int lru_touch(lru_list_t *llist, index_t index, u_int64_t key)
+int lru_touch(lru_list_t * llist, index_t index, u_int64_t key)
 {
 	if (!llist || (index >= llist->ll_max))
 		return -EINVAL;
 
-	if (llist->ll_tail == index) {
+	if (llist->ll_tail == index)
 		llist->ll_elem[index].le_key = key;
-	} else {
+	else {
 		lru_rem(llist, index);
 		lru_add(llist, index, key);
 	}
@@ -137,7 +133,7 @@ int lru_touch(lru_list_t *llist, index_t index, u_int64_t key)
 }
 
 /* Read the element at the head of the lru */
-int lru_read_head(lru_list_t *llist, index_t *index, u_int64_t *key)
+int lru_read_head(lru_list_t * llist, index_t * index, u_int64_t * key)
 {
 	if (!llist || !index || !key)
 		return -EINVAL;
@@ -155,7 +151,7 @@ int lru_read_head(lru_list_t *llist, index_t *index, u_int64_t *key)
 }
 
 /* Remove the element at the head of the lru */
-int lru_rem_head(lru_list_t *llist, index_t *index, u_int64_t *key)
+int lru_rem_head(lru_list_t * llist, index_t * index, u_int64_t * key)
 {
 	if (!llist || !index || !key)
 		return -EINVAL;

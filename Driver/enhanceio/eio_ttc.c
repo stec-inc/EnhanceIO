@@ -71,17 +71,17 @@ static int eio_release(struct inode *ip, struct file *filp)
 }
 
 static struct file_operations eio_fops = {
-	.open = eio_open,
-	.release = eio_release,
+	.open		= eio_open,
+	.release	= eio_release,
 	.unlocked_ioctl = eio_ioctl,
-	.compat_ioctl = eio_compact_ioctl,
-	.owner = THIS_MODULE,
+	.compat_ioctl	= eio_compact_ioctl,
+	.owner		= THIS_MODULE,
 };
 
 static struct miscdevice eio_misc = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = MISC_DEVICE,
-	.fops = &eio_fops,
+	.minor	= MISC_DYNAMIC_MINOR,
+	.name	= MISC_DEVICE,
+	.fops	= &eio_fops,
 };
 
 int eio_create_misc_device()
@@ -99,6 +99,7 @@ int eio_ttc_get_device(const char *path, fmode_t mode, struct eio_bdev **result)
 	struct block_device *bdev;
 	struct eio_bdev *eio_bdev;
 	unsigned int major, minor;
+
 	dev_t uninitialized_var(dev);
 	static char *eio_holder = "ENHANCE IO";
 
@@ -127,7 +128,7 @@ int eio_ttc_get_device(const char *path, fmode_t mode, struct eio_bdev **result)
 	 * bd_claim_by_disk(bdev, charptr, gendisk)
 	 */
 
-	eio_bdev = (struct eio_bdev *) kzalloc(sizeof(*eio_bdev), GFP_KERNEL);
+	eio_bdev = (struct eio_bdev *)kzalloc(sizeof(*eio_bdev), GFP_KERNEL);
 	if (eio_bdev == NULL) {
 		blkdev_put(bdev, mode);
 		return -ENOMEM;
@@ -192,11 +193,11 @@ int eio_ttc_activate(struct cache_c *dmc)
 
 	dmc->dev_start_sect = bdev->bd_part->start_sect;
 	dmc->dev_end_sect =
-	    bdev->bd_part->start_sect + bdev->bd_part->nr_sects - 1;
+		bdev->bd_part->start_sect + bdev->bd_part->nr_sects - 1;
 
 	pr_debug("eio_ttc_activate: Device/Partition"
 		 " sector_start: %llu, end: %llu\n",
-		 (uint64_t) dmc->dev_start_sect, (uint64_t) dmc->dev_end_sect);
+		 (uint64_t)dmc->dev_start_sect, (uint64_t)dmc->dev_end_sect);
 
 	error = 0;
 	origmfn = NULL;
@@ -232,7 +233,7 @@ int eio_ttc_activate(struct cache_c *dmc)
 		dmc->origmfn = rq->make_request_fn;
 		rq->make_request_fn = eio_make_request_fn;
 		dmc->dev_info =
-		    (wholedisk) ? EIO_DEV_WHOLE_DISK : EIO_DEV_PARTITION;
+			(wholedisk) ? EIO_DEV_WHOLE_DISK : EIO_DEV_PARTITION;
 	}
 
 	list_add_tail(&dmc->cachelist, &eio_ttc_list[index]);
@@ -252,7 +253,7 @@ out:
 	if (error == -EINVAL) {
 		if (wholedisk)
 			pr_err
-			    ("cache_create: A partition of this device is already cached.\n");
+				("cache_create: A partition of this device is already cached.\n");
 		else
 			pr_err("cache_create: Device is already cached.\n");
 	}
@@ -281,14 +282,14 @@ int eio_ttc_deactivate(struct cache_c *dmc, int force)
 			ret = eio_finish_nrdirty(dmc);
 			if (ret) {
 				pr_err
-				    ("ttc_deactivate: nrdirty failed to finish for cache \"%s\".",
-				     dmc->cache_name);
+					("ttc_deactivate: nrdirty failed to finish for cache \"%s\".",
+					dmc->cache_name);
 				return ret;
 			}
 		} else
 			pr_debug
-			    ("ttc_deactivate: Cache \"%s\" failed is already set. Continue with cache delete.",
-			     dmc->cache_name);
+				("ttc_deactivate: Cache \"%s\" failed is already set. Continue with cache delete.",
+				dmc->cache_name);
 	}
 
 	/*
@@ -305,27 +306,27 @@ deactivate:
 
 	if (dmc->dev_info != EIO_DEV_WHOLE_DISK)
 		list_for_each_entry(dmc1, &eio_ttc_list[index], cachelist) {
-		if (dmc == dmc1)
-			continue;
+			if (dmc == dmc1)
+				continue;
 
-		if (dmc1->disk_dev->bdev->bd_contains != bdev->bd_contains)
-			continue;
+			if (dmc1->disk_dev->bdev->bd_contains != bdev->bd_contains)
+				continue;
 
-		VERIFY(dmc1->dev_info == EIO_DEV_PARTITION);
+			VERIFY(dmc1->dev_info == EIO_DEV_PARTITION);
 
-		/*
-		 * There are still other partitions which are cached.
-		 * Do not switch the make_request_fn.
-		 */
+			/*
+			 * There are still other partitions which are cached.
+			 * Do not switch the make_request_fn.
+			 */
 
-		found_partitions = 1;
-		break;
+			found_partitions = 1;
+			break;
 		}
 
-	if ((dmc->dev_info == EIO_DEV_WHOLE_DISK) || (found_partitions == 0))
-		rq->make_request_fn = dmc->origmfn;
-	else {
-	}
+		if ((dmc->dev_info == EIO_DEV_WHOLE_DISK) || (found_partitions == 0))
+			rq->make_request_fn = dmc->origmfn;
+		else {
+		}
 
 	list_del_init(&dmc->cachelist);
 	up_write(&eio_ttc_lock[index]);
@@ -392,7 +393,7 @@ re_lookup:
 			continue;
 
 		if (dmc1->dev_info == EIO_DEV_WHOLE_DISK) {
-			dmc = dmc1;	/* found cached device */
+			dmc = dmc1;     /* found cached device */
 			break;
 		}
 
@@ -405,7 +406,7 @@ re_lookup:
 		    ((bio->bi_sector + to_sector(bio->bi_size) - 1) <=
 		     dmc1->dev_end_sect)) {
 			VERIFY(overlap == 0);
-			dmc = dmc1;	/* found cached partition */
+			dmc = dmc1;     /* found cached partition */
 			break;
 		}
 
@@ -418,9 +419,9 @@ re_lookup:
 		      dmc1->dev_end_sect))) {
 			overlap = 1;
 			pr_err
-			    ("Overlapping I/O detected on %s cache at sector: %llu, size: %u\n",
-			     dmc1->cache_name, (uint64_t) bio->bi_sector,
-			     bio->bi_size);
+				("Overlapping I/O detected on %s cache at sector: %llu, size: %u\n",
+				dmc1->cache_name, (uint64_t)bio->bi_sector,
+				bio->bi_size);
 			break;
 		}
 	}
@@ -429,12 +430,13 @@ re_lookup:
 		up_read(&eio_ttc_lock[index]);
 
 		if (bio_rw_flagged(bio, REQ_DISCARD)) {
-			pr_err("eio_mfn: Overlap I/O with Discard flag received."
-			       " Discard flag is not supported.\n");
+			pr_err
+				("eio_mfn: Overlap I/O with Discard flag received."
+				" Discard flag is not supported.\n");
 			bio_endio(bio, -EOPNOTSUPP);
 		} else
 			ret = eio_overlap_split_bio(q, bio);
-	} else if (dmc) {	/* found cached partition or device */
+	} else if (dmc) {       /* found cached partition or device */
 		/*
 		 * Start sector of cached partition may or may not be
 		 * aligned with cache blocksize.
@@ -502,7 +504,7 @@ int eio_get_cache_list(unsigned long *arg)
 	cache_rec_short_t *cache_recs;
 	struct cache_c *dmc;
 
-	if (copy_from_user(&reclist, (cache_list_t __user *) arg,
+	if (copy_from_user(&reclist, (cache_list_t __user *)arg,
 			   sizeof(cache_list_t))) {
 		error = -EFAULT;
 		goto out;
@@ -532,13 +534,13 @@ int eio_get_cache_list(unsigned long *arg)
 			break;
 	}
 
-	if (copy_to_user((char __user *) reclist.cachelist,
-			 (char *) cache_recs, size)) {
+	if (copy_to_user((char __user *)reclist.cachelist,
+			 (char *)cache_recs, size)) {
 		error = -EFAULT;
 		goto out;
 	}
 
-	if (copy_to_user((cache_list_t __user *) arg, &reclist,
+	if (copy_to_user((cache_list_t __user *)arg, &reclist,
 			 sizeof(cache_list_t))) {
 		error = -EFAULT;
 		goto out;
@@ -548,7 +550,7 @@ out:
 	return error;
 }
 
-static void eio_cache_rec_fill(struct cache_c *dmc, cache_rec_short_t *rec)
+static void eio_cache_rec_fill(struct cache_c *dmc, cache_rec_short_t * rec)
 {
 	strncpy(rec->cr_name, dmc->cache_name, sizeof(rec->cr_name));
 	strncpy(rec->cr_src_devname, dmc->disk_devname,
@@ -557,13 +559,13 @@ static void eio_cache_rec_fill(struct cache_c *dmc, cache_rec_short_t *rec)
 		sizeof(rec->cr_ssd_devname));
 	rec->cr_src_dev_size = eio_get_device_size(dmc->disk_dev);
 	rec->cr_ssd_dev_size = eio_get_device_size(dmc->cache_dev);
-	rec->cr_src_sector_size = 0;	/* unused in userspace */
-	rec->cr_ssd_sector_size = 0;	/* unused in userspace */
+	rec->cr_src_sector_size = 0;    /* unused in userspace */
+	rec->cr_ssd_sector_size = 0;    /* unused in userspace */
 	rec->cr_flags = dmc->cache_flags;
 	rec->cr_policy = dmc->req_policy;
 	rec->cr_mode = dmc->mode;
 	rec->cr_persistence = dmc->persistence;
-	rec->cr_blksize = dmc->block_size;	/* In sectors */
+	rec->cr_blksize = dmc->block_size;      /* In sectors */
 	rec->cr_assoc = dmc->assoc;
 	return;
 }
@@ -672,7 +674,7 @@ static int eio_dispatch_io_pages(struct cache_c *dmc,
 		/* Verify that num_vecs should not cross the threshhold */
 		/* Check how many max bvecs bdev supports */
 		num_bvecs =
-		    min_t(int, bio_get_nr_vecs(where->bdev), remaining_bvecs);
+			min_t(int, bio_get_nr_vecs(where->bdev), remaining_bvecs);
 		bio = bio_alloc(GFP_NOIO, num_bvecs);
 		bio->bi_bdev = where->bdev;
 		bio->bi_sector = where->sector + (where->count - remaining);
@@ -687,7 +689,8 @@ static int eio_dispatch_io_pages(struct cache_c *dmc,
 		while (remaining) {
 			page = pagelist[pindex];
 			len =
-			    min_t(unsigned long, PAGE_SIZE, to_bytes(remaining));
+				min_t(unsigned long, PAGE_SIZE,
+				      to_bytes(remaining));
 			offset = 0;
 
 			if (!bio_add_page(bio, page, len, offset))
@@ -735,7 +738,7 @@ static int eio_dispatch_io(struct cache_c *dmc, struct eio_io_region *where,
 		/* Verify that num_vecs should not cross the threshhold */
 		/* Check how many max bvecs bdev supports */
 		num_bvecs =
-		    min_t(int, bio_get_nr_vecs(where->bdev), remaining_bvecs);
+			min_t(int, bio_get_nr_vecs(where->bdev), remaining_bvecs);
 		bio = bio_alloc(GFP_NOIO, num_bvecs);
 		bio->bi_bdev = where->bdev;
 		bio->bi_sector = where->sector + (where->count - remaining);
@@ -750,8 +753,8 @@ static int eio_dispatch_io(struct cache_c *dmc, struct eio_io_region *where,
 		while (remaining) {
 			page = bvec->bv_page;
 			len =
-			    min_t(unsigned long, bvec->bv_len,
-				  to_bytes(remaining));
+				min_t(unsigned long, bvec->bv_len,
+				      to_bytes(remaining));
 			offset = bvec->bv_offset;
 
 			if (!bio_add_page(bio, page, len, offset))
@@ -778,7 +781,7 @@ static int eio_dispatch_io(struct cache_c *dmc, struct eio_io_region *where,
 }
 
 static int eio_async_io(struct cache_c *dmc, struct eio_io_region *where,
-				int rw,	struct eio_io_request *req)
+			int rw, struct eio_io_request *req)
 {
 	struct eio_context *io;
 	int err = 0;
@@ -788,7 +791,7 @@ static int eio_async_io(struct cache_c *dmc, struct eio_io_region *where,
 		pr_err("eio_async_io: failed to allocate eio_context.\n");
 		return -ENOMEM;
 	}
-	memset((char *) io, 0, sizeof(struct eio_context));
+	memset((char *)io, 0, sizeof(struct eio_context));
 
 	atomic_set(&io->count, 1);
 	io->callback = req->notify;
@@ -798,14 +801,14 @@ static int eio_async_io(struct cache_c *dmc, struct eio_io_region *where,
 	switch (req->mtype) {
 	case EIO_BVECS:
 		err =
-		    eio_dispatch_io(dmc, where, rw, req->dptr.pages, io,
-				    req->hddio, req->num_bvecs, 0);
+			eio_dispatch_io(dmc, where, rw, req->dptr.pages, io,
+					req->hddio, req->num_bvecs, 0);
 		break;
 
 	case EIO_PAGES:
 		err =
-		    eio_dispatch_io_pages(dmc, where, rw, req->dptr.plist, io,
-					  req->hddio, req->num_bvecs, 0);
+			eio_dispatch_io_pages(dmc, where, rw, req->dptr.plist, io,
+					      req->hddio, req->num_bvecs, 0);
 		break;
 	}
 
@@ -834,9 +837,10 @@ static int eio_sync_io(struct cache_c *dmc, struct eio_io_region *where,
 {
 	int ret = 0;
 	struct eio_context io;
+
 	DECLARE_COMPLETION_ONSTACK(wait);
 
-	memset((char *) &io, 0, sizeof(io));
+	memset((char *)&io, 0, sizeof(io));
 
 	atomic_set(&io.count, 1);
 	io.event = &wait;
@@ -913,8 +917,9 @@ static void eio_bio_end_empty_barrier(struct bio *bio, int err)
 }
 
 static void eio_issue_empty_barrier_flush(struct block_device *bdev,
-struct bio *orig_bio, int device, make_request_fn *origmfn,
-					int rw_flags)
+					  struct bio *orig_bio, int device,
+					  make_request_fn * origmfn,
+					  int rw_flags)
 {
 	struct bio *bio;
 
@@ -969,8 +974,8 @@ static int eio_finish_nrdirty(struct cache_c *dmc)
 	do {
 		if (unlikely(CACHE_FAILED_IS_SET(dmc))) {
 			pr_err
-			    ("finish_nrdirty: CACHE \"%s\" is in FAILED state.",
-			     dmc->cache_name);
+				("finish_nrdirty: CACHE \"%s\" is in FAILED state.",
+				dmc->cache_name);
 			ret = -ENODEV;
 			break;
 		}
@@ -991,8 +996,8 @@ static int eio_finish_nrdirty(struct cache_c *dmc)
 		ret = -EINVAL;
 	if (ret)
 		pr_err
-		    ("finish_nrdirty: Failed to finish %lu dirty blocks for cache \"%s\".",
-		     atomic64_read(&dmc->nr_dirty), dmc->cache_name);
+			("finish_nrdirty: Failed to finish %lu dirty blocks for cache \"%s\".",
+			atomic64_read(&dmc->nr_dirty), dmc->cache_name);
 
 	return ret;
 }
@@ -1048,8 +1053,8 @@ int eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 	if (dmc->mode == CACHE_MODE_WB) {
 		if (CACHE_FAILED_IS_SET(dmc)) {
 			pr_err
-			    ("cache_edit:  Can not proceed with edit for Failed cache \"%s\".",
-			     dmc->cache_name);
+				("cache_edit:  Can not proceed with edit for Failed cache \"%s\".",
+				dmc->cache_name);
 			error = -EINVAL;
 			goto out;
 		}
@@ -1061,8 +1066,8 @@ int eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 	if (dmc->mode == CACHE_MODE_WB && mode != CACHE_MODE_WB) {
 		if (CACHE_FAILED_IS_SET(dmc)) {
 			pr_err
-			    ("cache_edit:  Can not proceed with edit for Failed cache \"%s\".",
-			     dmc->cache_name);
+				("cache_edit:  Can not proceed with edit for Failed cache \"%s\".",
+				dmc->cache_name);
 			error = -EINVAL;
 			goto out;
 		}
@@ -1071,8 +1076,8 @@ int eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 		/* This error can mostly occur due to Device removal */
 		if (unlikely(error)) {
 			pr_err
-			    ("cache_edit: nr_dirty FAILED to finish for cache \"%s\".",
-			     dmc->cache_name);
+				("cache_edit: nr_dirty FAILED to finish for cache \"%s\".",
+				dmc->cache_name);
 			goto out;
 		}
 		VERIFY((dmc->sysctl_active.do_clean & EIO_CLEAN_KEEP) &&
@@ -1146,15 +1151,15 @@ out:
 		if (ret) {
 			error = ret;
 			pr_err
-			    ("cache_edit: Failed to restart async tasks. error=%d.\n",
-			     ret);
+				("cache_edit: Failed to restart async tasks. error=%d.\n",
+				ret);
 		}
 		if (dmc->sysctl_active.time_based_clean_interval &&
 		    atomic64_read(&dmc->nr_dirty)) {
 			schedule_delayed_work(&dmc->clean_aged_sets_work,
-					      dmc->sysctl_active.
-					      time_based_clean_interval * 60 *
-					      HZ);
+					      dmc->
+					      sysctl_active.time_based_clean_interval
+					      * 60 * HZ);
 			dmc->is_clean_aged_sets_sched = 1;
 		}
 	}
@@ -1187,7 +1192,7 @@ static int eio_mode_switch(struct cache_c *dmc, u_int32_t mode)
 	} else if (dmc->mode == CACHE_MODE_WB) {
 		eio_free_wb_resources(dmc);
 		dmc->mode = mode;
-	} else {	/* (RO -> WT) or (WT -> RO) */
+	} else {                /* (RO -> WT) or (WT -> RO) */
 		VERIFY(((dmc->mode == CACHE_MODE_RO) && (mode == CACHE_MODE_WT))
 		       || ((dmc->mode == CACHE_MODE_WT) &&
 			   (mode == CACHE_MODE_RO)));
@@ -1196,7 +1201,8 @@ static int eio_mode_switch(struct cache_c *dmc, u_int32_t mode)
 
 out:
 	if (error)
-		pr_err("mode_switch: Failed to switch mode, error: %d\n", error);
+		pr_err("mode_switch: Failed to switch mode, error: %d\n",
+		       error);
 	return error;
 }
 
@@ -1221,14 +1227,14 @@ static int eio_policy_switch(struct cache_c *dmc, u_int32_t policy)
 	error = eio_repl_blk_init(dmc->policy_ops);
 	if (error) {
 		pr_err
-		    ("eio_policy_swtich: Unable to allocate memory for policy cache block");
+			("eio_policy_swtich: Unable to allocate memory for policy cache block");
 		goto out;
 	}
 
 	error = eio_repl_sets_init(dmc->policy_ops);
 	if (error) {
 		pr_err
-		    ("eio_policy_switch: Failed to allocate memory for cache policy");
+			("eio_policy_switch: Failed to allocate memory for cache policy");
 		goto out;
 	}
 
@@ -1238,7 +1244,7 @@ static int eio_policy_switch(struct cache_c *dmc, u_int32_t policy)
 out:
 	eio_policy_free(dmc);
 	dmc->req_policy = CACHE_REPL_RANDOM;
-	(void) eio_policy_init(dmc);
+	(void)eio_policy_init(dmc);
 	return error;
 }
 
@@ -1248,9 +1254,9 @@ void eio_free_wb_pages(struct page **pages, int allocated)
 	if (allocated <= 0)
 		return;
 
-	do {
+	do
 		put_page(pages[--allocated]);
-	} while (allocated);
+	while (allocated);
 
 	*pages = NULL;
 }
@@ -1323,7 +1329,7 @@ int eio_alloc_wb_bvecs(struct bio_vec *bvec, int max, int blksize)
 				page = alloc_page(GFP_KERNEL | __GFP_ZERO);
 				if (unlikely(!page)) {
 					pr_err
-					    ("eio_alloc_wb_bvecs: System memory too low.\n");
+						("eio_alloc_wb_bvecs: System memory too low.\n");
 					goto err;
 				}
 				iovec[i].bv_page = page;
@@ -1335,7 +1341,7 @@ int eio_alloc_wb_bvecs(struct bio_vec *bvec, int max, int blksize)
 				iovec[i].bv_page = page;
 				iovec[i].bv_len = to_bytes(blksize);
 				iovec[i].bv_offset =
-				    PAGE_SIZE - to_bytes(blksize);
+					PAGE_SIZE - to_bytes(blksize);
 
 				/* Mark page NULL here as it is not required anymore. */
 				page = NULL;
@@ -1347,8 +1353,8 @@ int eio_alloc_wb_bvecs(struct bio_vec *bvec, int max, int blksize)
 		case BLKSIZE_8K:
 			page = alloc_page(GFP_KERNEL | __GFP_ZERO);
 			if (unlikely(!page)) {
-				pr_err("eio_alloc_wb_bvecs:" \
-					" System memory too low.\n");
+				pr_err("eio_alloc_wb_bvecs:"
+				       " System memory too low.\n");
 				goto err;
 			}
 			iovec[i].bv_page = page;
@@ -1476,13 +1482,13 @@ int eio_reboot_handling(void)
 	if (eio_reboot_notified == EIO_REBOOT_HANDLING_DONE)
 		return 0;
 
-	(void) wait_on_bit_lock((void *) &eio_control->synch_flags,
-				EIO_HANDLE_REBOOT, eio_wait_schedule,
-				TASK_UNINTERRUPTIBLE);
+	(void)wait_on_bit_lock((void *)&eio_control->synch_flags,
+			       EIO_HANDLE_REBOOT, eio_wait_schedule,
+			       TASK_UNINTERRUPTIBLE);
 	if (eio_reboot_notified == EIO_REBOOT_HANDLING_DONE) {
-		clear_bit(EIO_HANDLE_REBOOT, (void *) &eio_control->synch_flags);
+		clear_bit(EIO_HANDLE_REBOOT, (void *)&eio_control->synch_flags);
 		smp_mb__after_clear_bit();
-		wake_up_bit((void *) &eio_control->synch_flags,
+		wake_up_bit((void *)&eio_control->synch_flags,
 			    EIO_HANDLE_REBOOT);
 		return 0;
 	}
@@ -1497,9 +1503,10 @@ int eio_reboot_handling(void)
 			tempdmc = NULL;
 			if (unlikely(CACHE_FAILED_IS_SET(dmc)) ||
 			    unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
-				pr_err("Cache \"%s\" is in failed/degraded mode."
-				       " Cannot mark cache read only.\n",
-				       dmc->cache_name);
+				pr_err
+					("Cache \"%s\" is in failed/degraded mode."
+					" Cannot mark cache read only.\n",
+					dmc->cache_name);
 				continue;
 			}
 
@@ -1519,7 +1526,8 @@ int eio_reboot_handling(void)
 			spin_lock_irqsave(&dmc->cache_spin_lock,
 					  dmc->cache_spin_lock_flags);
 			VERIFY(!
-			       (dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG));
+			       (dmc->
+				cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG));
 			dmc->cache_flags |= CACHE_FLAGS_SHUTDOWN_INPROG;
 			spin_unlock_irqrestore(&dmc->cache_spin_lock,
 					       dmc->cache_spin_lock_flags);
@@ -1542,10 +1550,10 @@ int eio_reboot_handling(void)
 				continue;
 			}
 			old_time_thresh =
-			    dmc->sysctl_active.time_based_clean_interval;
+				dmc->sysctl_active.time_based_clean_interval;
 			eio_stop_async_tasks(dmc);
 			dmc->sysctl_active.time_based_clean_interval =
-			    old_time_thresh;
+				old_time_thresh;
 
 			dmc->cache_rdonly = 1;
 			pr_info("Cache \"%s\" marked read only\n",
@@ -1555,9 +1563,9 @@ int eio_reboot_handling(void)
 			if (dmc->cold_boot && atomic64_read(&dmc->nr_dirty) &&
 			    !eio_force_warm_boot) {
 				pr_info
-				    ("Cold boot set for cache %s: Draining dirty blocks: %ld",
-				     dmc->cache_name,
-				     atomic64_read(&dmc->nr_dirty));
+					("Cold boot set for cache %s: Draining dirty blocks: %ld",
+					dmc->cache_name,
+					atomic64_read(&dmc->nr_dirty));
 				eio_clean_for_reboot(dmc);
 			}
 
@@ -1581,9 +1589,9 @@ int eio_reboot_handling(void)
 	}
 
 	eio_reboot_notified = EIO_REBOOT_HANDLING_DONE;
-	clear_bit(EIO_HANDLE_REBOOT, (void *) &eio_control->synch_flags);
+	clear_bit(EIO_HANDLE_REBOOT, (void *)&eio_control->synch_flags);
 	smp_mb__after_clear_bit();
-	wake_up_bit((void *) &eio_control->synch_flags, EIO_HANDLE_REBOOT);
+	wake_up_bit((void *)&eio_control->synch_flags, EIO_HANDLE_REBOOT);
 	return 0;
 }
 
@@ -1619,7 +1627,7 @@ static int eio_overlap_split_bio(struct request_queue *q, struct bio *bio)
 	bvec_consumed = 0;
 	for (i = 0; i < nbios; i++) {
 		bioptr[i] =
-		    eio_split_new_bio(bio, bc, &bvec_idx, &bvec_consumed, snum);
+			eio_split_new_bio(bio, bc, &bvec_idx, &bvec_consumed, snum);
 		if (!bioptr[i])
 			break;
 		snum++;
@@ -1643,8 +1651,8 @@ out:
 }
 
 static struct bio *eio_split_new_bio(struct bio *bio, struct bio_container *bc,
-				     unsigned *bvec_idx, unsigned *bvec_consumed,
-				     sector_t snum)
+				     unsigned *bvec_idx,
+				     unsigned *bvec_consumed, sector_t snum)
 {
 	struct bio *cbio;
 	unsigned iosize = 1 << SECTOR_SHIFT;
@@ -1664,7 +1672,7 @@ static struct bio *eio_split_new_bio(struct bio *bio, struct bio_container *bc,
 
 	cbio->bi_io_vec[0].bv_page = bio->bi_io_vec[*bvec_idx].bv_page;
 	cbio->bi_io_vec[0].bv_offset =
-	    bio->bi_io_vec[*bvec_idx].bv_offset + *bvec_consumed;
+		bio->bi_io_vec[*bvec_idx].bv_offset + *bvec_consumed;
 	cbio->bi_io_vec[0].bv_len = iosize;
 	*bvec_consumed += iosize;
 
@@ -1682,6 +1690,7 @@ static struct bio *eio_split_new_bio(struct bio *bio, struct bio_container *bc,
 static void eio_split_endio(struct bio *bio, int error)
 {
 	struct bio_container *bc = bio->bi_private;
+
 	if (error)
 		bc->bc_error = error;
 	bio_put(bio);

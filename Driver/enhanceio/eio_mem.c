@@ -22,22 +22,22 @@
 
 #include "eio.h"
 
-#define	SECTORS_PER_SET		(dmc->assoc * dmc->block_size)
-#define	SECTORS_PER_SET_SHIFT	(dmc->consecutive_shift + dmc->block_shift)
-#define	SECTORS_PER_SET_MASK	(SECTORS_PER_SET - 1)
+#define SECTORS_PER_SET         (dmc->assoc * dmc->block_size)
+#define SECTORS_PER_SET_SHIFT   (dmc->consecutive_shift + dmc->block_shift)
+#define SECTORS_PER_SET_MASK    (SECTORS_PER_SET - 1)
 
-#define	EIO_DBN_TO_SET(dmc, dbn, set_number, wrapped)	do {		\
-	u_int64_t value;						\
-	u_int64_t mid_i;						\
-	value = (dbn) >> SECTORS_PER_SET_SHIFT;				\
-	mid_i = (value) & (dmc)->num_sets_mask;				\
-	if (mid_i >= (dmc)->num_sets) {					\
-		(wrapped) = 1;						\
-		(set_number) = mid_i - (dmc)->num_sets;			\
-	} else {							\
-		(wrapped) = 0;						\
-		(set_number) = mid_i;					\
-	}								\
+#define EIO_DBN_TO_SET(dmc, dbn, set_number, wrapped)   do {		\
+		u_int64_t value;						\
+		u_int64_t mid_i;						\
+		value = (dbn) >> SECTORS_PER_SET_SHIFT;				\
+		mid_i = (value) & (dmc)->num_sets_mask;				\
+		if (mid_i >= (dmc)->num_sets) {					\
+			(wrapped) = 1;						\
+			(set_number) = mid_i - (dmc)->num_sets;			\
+		} else {							\
+			(wrapped) = 0;						\
+			(set_number) = mid_i;					\
+		}								\
 } while (0)
 
 /*
@@ -46,7 +46,7 @@
 int eio_mem_init(struct cache_c *dmc)
 {
 	u_int32_t lsb_bits;
-	u_int32_t msb_bits_24;   /* most significant bits in shrunk dbn */
+	u_int32_t msb_bits_24;  /* most significant bits in shrunk dbn */
 	u_int64_t max_dbn;
 	u_int64_t num_sets_64;
 
@@ -55,9 +55,9 @@ int eio_mem_init(struct cache_c *dmc)
 	 */
 	num_sets_64 = dmc->size / dmc->assoc;
 	if (num_sets_64 > UINT_MAX) {
-		pr_err("Number of cache sets (%lu) greater than maximum" \
+		pr_err("Number of cache sets (%lu) greater than maximum"
 		       "allowed (%u)",
-		       (long unsigned int) num_sets_64, UINT_MAX);
+		       (long unsigned int)num_sets_64, UINT_MAX);
 		return -1;
 	}
 
@@ -65,9 +65,9 @@ int eio_mem_init(struct cache_c *dmc)
 	 * Find the number of bits required to encode the set number and
 	 * its corresponding mask value.
 	 */
-	dmc->num_sets = (u_int32_t) num_sets_64;
+	dmc->num_sets = (u_int32_t)num_sets_64;
 	for (dmc->num_sets_bits = 0; (dmc->num_sets >> dmc->num_sets_bits) != 0;
-	     dmc->num_sets_bits++);
+	     dmc->num_sets_bits++) ;
 	dmc->num_sets_mask = ULLONG_MAX >> (64 - dmc->num_sets_bits);
 
 	/*
@@ -85,9 +85,9 @@ int eio_mem_init(struct cache_c *dmc)
 	 * if the source volume is smaller.
 	 */
 	lsb_bits = dmc->consecutive_shift + dmc->block_shift;
-	msb_bits_24 = 24 - 1 - lsb_bits;	/* 1 for wrapped bit */
+	msb_bits_24 = 24 - 1 - lsb_bits;        /* 1 for wrapped bit */
 	max_dbn =
-	    ((u_int64_t) 1) << (msb_bits_24 + dmc->num_sets_bits + lsb_bits);
+		((u_int64_t)1) << (msb_bits_24 + dmc->num_sets_bits + lsb_bits);
 	if (to_sector(eio_get_device_size(dmc->disk_dev)) > max_dbn) {
 		dmc->cache_flags |= CACHE_FLAGS_MD8;
 		pr_info("Source volume too big to use small metadata");
@@ -100,7 +100,7 @@ int eio_mem_init(struct cache_c *dmc)
 /*
  * eio_hash_block
  */
-u_int32_t eio_hash_block(struct cache_c *dmc, sector_t dbn)
+u_int32_t eio_hash_block(struct cache_c * dmc, sector_t dbn)
 {
 	int wrapped;
 	u_int64_t set_number;
@@ -108,7 +108,7 @@ u_int32_t eio_hash_block(struct cache_c *dmc, sector_t dbn)
 	EIO_DBN_TO_SET(dmc, dbn, set_number, wrapped);
 	VERIFY(set_number < dmc->num_sets);
 
-	return (u_int32_t) set_number;
+	return (u_int32_t)set_number;
 }
 
 /*
@@ -133,8 +133,8 @@ unsigned int eio_shrink_dbn(struct cache_c *dmc, sector_t dbn)
 	EIO_DBN_TO_SET(dmc, dbn, set_number, wrapped);
 	msb = dbn >> (dmc->num_sets_bits + SECTORS_PER_SET_SHIFT);
 	dbn_24 =
-	    (unsigned int) (lsb | (wrapped << SECTORS_PER_SET_SHIFT) |
-			    (msb << (SECTORS_PER_SET_SHIFT + 1)));
+		(unsigned int)(lsb | (wrapped << SECTORS_PER_SET_SHIFT) |
+			       (msb << (SECTORS_PER_SET_SHIFT + 1)));
 
 	return dbn_24;
 }
@@ -145,7 +145,7 @@ unsigned int eio_shrink_dbn(struct cache_c *dmc, sector_t dbn)
  * Expand a 3-byte "dbn" into a 5-byte "dbn" by adding 16 lower bits
  * of the set number this "dbn" belongs to.
  */
-sector_t eio_expand_dbn(struct cache_c *dmc, u_int64_t index)
+sector_t eio_expand_dbn(struct cache_c * dmc, u_int64_t index)
 {
 	u_int32_t dbn_24;
 	u_int64_t set_number;
@@ -158,17 +158,16 @@ sector_t eio_expand_dbn(struct cache_c *dmc, u_int64_t index)
 	 * Expanding "dbn" zero?
 	 */
 	if (index == dmc->index_zero &&
-	    dmc->index_zero < (u_int64_t) dmc->assoc) {
+	    dmc->index_zero < (u_int64_t)dmc->assoc)
 		return 0;
-	}
 
 	dbn_24 = dmc->cache[index].md4_md & EIO_MD4_DBN_MASK;
 	if (dbn_24 == 0 && EIO_CACHE_STATE_GET(dmc, index) == INVALID)
-		return (sector_t) 0;
+		return (sector_t)0;
 
 	set_number = index / dmc->assoc;
 	lsb = dbn_24 & SECTORS_PER_SET_MASK;
-	msb = dbn_24 >> (SECTORS_PER_SET_SHIFT + 1);	/* 1 for wrapped */
+	msb = dbn_24 >> (SECTORS_PER_SET_SHIFT + 1);    /* 1 for wrapped */
 	/* had we wrapped? */
 	if ((dbn_24 & SECTORS_PER_SET) != 0) {
 		dbn_40 = msb << (dmc->num_sets_bits + SECTORS_PER_SET_SHIFT);
@@ -181,8 +180,9 @@ sector_t eio_expand_dbn(struct cache_c *dmc, u_int64_t index)
 	}
 	VERIFY(unlikely(dbn_40 < EIO_MAX_SECTOR));
 
-	return (sector_t) dbn_40;
+	return (sector_t)dbn_40;
 }
+
 EXPORT_SYMBOL(eio_expand_dbn);
 
 /*
@@ -210,11 +210,10 @@ void eio_md4_dbn_set(struct cache_c *dmc, u_int64_t index, u_int32_t dbn_24)
 	dmc->cache[index].md4_md |= dbn_24;
 
 	/* XXX excessive debugging */
-	if (dmc->index_zero < (u_int64_t) dmc->assoc &&	/* sector 0 cached */
-	    index == dmc->index_zero &&	/* we're accessing sector 0 */
-	    dbn_24 != 0) {	/* we're replacing sector 0 */
+	if (dmc->index_zero < (u_int64_t)dmc->assoc &&  /* sector 0 cached */
+	    index == dmc->index_zero &&                 /* we're accessing sector 0 */
+	    dbn_24 != 0)                                /* we're replacing sector 0 */
 		dmc->index_zero = dmc->assoc;
-	}
 }
 
 /*
@@ -230,9 +229,8 @@ void eio_md8_dbn_set(struct cache_c *dmc, u_int64_t index, sector_t dbn)
 	dmc->cache_md8[index].md8_md |= dbn;
 
 	/* XXX excessive debugging */
-	if (dmc->index_zero < (u_int64_t) dmc->assoc &&	/* sector 0 cached */
-	    index == dmc->index_zero &&	/* we're accessing sector 0 */
-	    dbn != 0) {	/* we're replacing sector 0 */
+	if (dmc->index_zero < (u_int64_t)dmc->assoc &&  /* sector 0 cached */
+	    index == dmc->index_zero &&                 /* we're accessing sector 0 */
+	    dbn != 0)                                   /* we're replacing sector 0 */
 		dmc->index_zero = dmc->assoc;
-	}
 }

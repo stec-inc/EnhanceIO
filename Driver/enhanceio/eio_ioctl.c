@@ -46,7 +46,7 @@ long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 		if (!cache)
 			return -ENOMEM;
 
-		if (copy_from_user(cache, (void __user *) arg,
+		if (copy_from_user(cache, (void __user *)arg,
 				   sizeof(cache_rec_short_t))) {
 			vfree(cache);
 			return -EFAULT;
@@ -64,7 +64,7 @@ long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 		if (!cache)
 			return -ENOMEM;
 
-		if (copy_from_user(cache, (void __user *) arg,
+		if (copy_from_user(cache, (void __user *)arg,
 				   sizeof(cache_rec_short_t))) {
 			vfree(cache);
 			return -EFAULT;
@@ -78,27 +78,26 @@ long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 		if (!cache)
 			return -ENOMEM;
 
-		if (copy_from_user(cache, (void __user *) arg,
+		if (copy_from_user(cache, (void __user *)arg,
 				   sizeof(cache_rec_short_t))) {
 			vfree(cache);
 			return -EFAULT;
 		}
 		error = eio_cache_edit(cache->cr_name,
-				       (u_int32_t) cache->cr_mode,
-				       (u_int32_t) cache->cr_policy);
+				       (u_int32_t)cache->cr_mode,
+				       (u_int32_t)cache->cr_policy);
 		vfree(cache);
 		break;
 
 	case EIO_IOC_NCACHES:
 		ncaches = eio_get_cache_count();
-		if (copy_to_user((uint64_t __user *) arg, &ncaches,
-				 sizeof(uint64_t))) {
+		if (copy_to_user((uint64_t __user *)arg, &ncaches,
+				 sizeof(uint64_t)))
 			return -EFAULT;
-		}
 		break;
 
 	case EIO_IOC_CACHE_LIST:
-		error = eio_get_cache_list((unsigned long __user *) arg);
+		error = eio_get_cache_list((unsigned long __user *)arg);
 		break;
 
 	case EIO_IOC_SET_WARM_BOOT:
@@ -110,15 +109,15 @@ long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 		if (!cache)
 			return -ENOMEM;
 
-		if (copy_from_user(cache, (void __user *) arg,
+		if (copy_from_user(cache, (void __user *)arg,
 				   sizeof(cache_rec_short_t))) {
 			vfree(cache);
 			return -EFAULT;
 		}
 		note = NOTIFY_SSD_ADD;
 		error =
-		    eio_handle_ssd_message(cache->cr_name,
-					   cache->cr_ssd_devname, note);
+			eio_handle_ssd_message(cache->cr_name,
+					       cache->cr_ssd_devname, note);
 		vfree(cache);
 
 		break;
@@ -127,15 +126,15 @@ long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 		cache = vmalloc(sizeof(cache_rec_short_t));
 		if (!cache)
 			return -ENOMEM;
-		if (copy_from_user(cache, (void __user *) arg,
+		if (copy_from_user(cache, (void __user *)arg,
 				   sizeof(cache_rec_short_t))) {
 			vfree(cache);
 			return -EFAULT;
 		}
 		note = NOTIFY_SSD_REMOVED;
 		error =
-		    eio_handle_ssd_message(cache->cr_name,
-					   cache->cr_ssd_devname, note);
+			eio_handle_ssd_message(cache->cr_name,
+					       cache->cr_ssd_devname, note);
 		vfree(cache);
 		break;
 

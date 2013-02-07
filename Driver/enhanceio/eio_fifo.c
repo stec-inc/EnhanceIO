@@ -51,8 +51,8 @@ struct eio_fifo_cache_set {
  * Context that captures the FIFO replacement policy
  */
 static struct eio_policy_header eio_fifo_ops = {
-	.sph_name = CACHE_REPL_FIFO,
-	.sph_instance_init = eio_fifo_instance_init,
+	.sph_name		= CACHE_REPL_FIFO,
+	.sph_instance_init	= eio_fifo_instance_init,
 };
 
 /*
@@ -74,17 +74,17 @@ int eio_fifo_cache_sets_init(struct eio_policy *p_ops)
 	struct eio_fifo_cache_set *cache_sets;
 
 	pr_info("Initializing fifo cache sets\n");
-	order =  (dmc->size >> dmc->consecutive_shift) *
+	order = (dmc->size >> dmc->consecutive_shift) *
 		sizeof(struct eio_fifo_cache_set);
 
 	dmc->sp_cache_set =
-		(struct eio_fifo_cache_set *) vmalloc((size_t) order);
+		(struct eio_fifo_cache_set *)vmalloc((size_t)order);
 	if (dmc->sp_cache_set == NULL)
 		return -ENOMEM;
 
-	cache_sets = (struct eio_fifo_cache_set *) dmc->sp_cache_set;
+	cache_sets = (struct eio_fifo_cache_set *)dmc->sp_cache_set;
 
-	for (i = 0; i < (int) (dmc->size >> dmc->consecutive_shift); i++) {
+	for (i = 0; i < (int)(dmc->size >> dmc->consecutive_shift); i++) {
 		cache_sets[i].set_fifo_next = i * dmc->assoc;
 		cache_sets[i].set_clean_next = i * dmc->assoc;
 	}
@@ -97,7 +97,7 @@ int eio_fifo_cache_sets_init(struct eio_policy *p_ops)
  */
 void
 eio_fifo_find_reclaim_dbn(struct eio_policy *p_ops, index_t start_index,
-			  index_t *index)
+			  index_t * index)
 {
 	index_t end_index;
 	int slots_searched = 0;
@@ -108,10 +108,10 @@ eio_fifo_find_reclaim_dbn(struct eio_policy *p_ops, index_t start_index,
 
 	set = start_index / dmc->assoc;
 	end_index = start_index + dmc->assoc;
-	cache_sets = (struct eio_fifo_cache_set *) dmc->sp_cache_set;
+	cache_sets = (struct eio_fifo_cache_set *)dmc->sp_cache_set;
 
 	i = cache_sets[set].set_fifo_next;
-	while (slots_searched < (int) dmc->assoc) {
+	while (slots_searched < (int)dmc->assoc) {
 		VERIFY(i >= start_index);
 		VERIFY(i < end_index);
 		if (EIO_CACHE_STATE_GET(dmc, i) == VALID) {
@@ -142,12 +142,12 @@ int eio_fifo_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
 	struct cache_c *dmc;
 
 	dmc = p_ops->sp_dmc;
-	cache_sets = (struct eio_fifo_cache_set *) dmc->sp_cache_set;
+	cache_sets = (struct eio_fifo_cache_set *)dmc->sp_cache_set;
 	start_index = set * dmc->assoc;
 	end_index = start_index + dmc->assoc;
 	i = cache_sets[set].set_clean_next;
 
-	while ((scanned < (int) dmc->assoc) && (nr_writes < to_clean)) {
+	while ((scanned < (int)dmc->assoc) && (nr_writes < to_clean)) {
 		if ((EIO_CACHE_STATE_GET(dmc, i) & (DIRTY | BLOCK_IO_INPROG)) ==
 		    DIRTY) {
 			EIO_CACHE_STATE_ON(dmc, i, DISKWRITEINPROG);
@@ -178,7 +178,7 @@ struct eio_policy *eio_fifo_instance_init(void)
 {
 	struct eio_policy *new_instance;
 
-	new_instance = (struct eio_policy *) vmalloc(sizeof(struct eio_policy));
+	new_instance = (struct eio_policy *)vmalloc(sizeof(struct eio_policy));
 	if (new_instance == NULL) {
 		pr_err("ssdscache_fifo_instance_init: vmalloc failed");
 		return NULL;

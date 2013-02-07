@@ -56,16 +56,16 @@ struct eio_lru_cache_block {
 
 /* LRU specifc data structures */
 static struct eio_lru eio_lru = {
-	.sl_lru_pushblks = eio_lru_pushblks,
-	.sl_reclaim_lru_movetail = eio_reclaim_lru_movetail,
+	.sl_lru_pushblks		= eio_lru_pushblks,
+	.sl_reclaim_lru_movetail	= eio_reclaim_lru_movetail,
 };
 
 /*
  * Context that captures the LRU replacement policy
  */
 static struct eio_policy_header eio_lru_ops = {
-	.sph_name = CACHE_REPL_LRU,
-	.sph_instance_init = eio_lru_instance_init,
+	.sph_name		= CACHE_REPL_LRU,
+	.sph_instance_init	= eio_lru_instance_init,
 };
 
 /*
@@ -87,17 +87,16 @@ int eio_lru_cache_sets_init(struct eio_policy *p_ops)
 	struct eio_lru_cache_set *cache_sets;
 
 	order =
-	    (dmc->size >> dmc->consecutive_shift) *
-	    sizeof(struct eio_lru_cache_set);
+		(dmc->size >> dmc->consecutive_shift) *
+		sizeof(struct eio_lru_cache_set);
 
-	dmc->sp_cache_set =
-	    (struct eio_lru_cache_set *) vmalloc((size_t) order);
+	dmc->sp_cache_set = (struct eio_lru_cache_set *)vmalloc((size_t)order);
 	if (dmc->sp_cache_set == NULL)
 		return -ENOMEM;
 
-	cache_sets = (struct eio_lru_cache_set *) dmc->sp_cache_set;
+	cache_sets = (struct eio_lru_cache_set *)dmc->sp_cache_set;
 
-	for (i = 0; i < (int) (dmc->size >> dmc->consecutive_shift); i++) {
+	for (i = 0; i < (int)(dmc->size >> dmc->consecutive_shift); i++) {
 		cache_sets[i].lru_tail = EIO_LRU_NULL;
 		cache_sets[i].lru_head = EIO_LRU_NULL;
 	}
@@ -117,7 +116,7 @@ int eio_lru_cache_blk_init(struct eio_policy *p_ops)
 	order = dmc->size * sizeof(struct eio_lru_cache_block);
 
 	dmc->sp_cache_blk =
-	    (struct eio_lru_cache_block *) vmalloc((size_t) order);
+		(struct eio_lru_cache_block *)vmalloc((size_t)order);
 	if (dmc->sp_cache_blk == NULL)
 		return -ENOMEM;
 
@@ -131,7 +130,7 @@ struct eio_policy *eio_lru_instance_init(void)
 {
 	struct eio_policy *new_instance;
 
-	new_instance = (struct eio_policy *) vmalloc(sizeof(struct eio_policy));
+	new_instance = (struct eio_policy *)vmalloc(sizeof(struct eio_policy));
 	if (new_instance == NULL) {
 		pr_err("eio_lru_instance_init: vmalloc failed");
 		return NULL;
@@ -168,7 +167,7 @@ void eio_lru_exit(void)
  */
 void
 eio_lru_find_reclaim_dbn(struct eio_policy *p_ops,
-			 index_t start_index, index_t *index)
+			 index_t start_index, index_t * index)
 {
 	index_t lru_rel_index;
 	struct eio_lru_cache_set *lru_sets;
@@ -177,13 +176,13 @@ eio_lru_find_reclaim_dbn(struct eio_policy *p_ops,
 	index_t set;
 
 	set = start_index / dmc->assoc;
-	lru_sets = (struct eio_lru_cache_set *) (dmc->sp_cache_set);
+	lru_sets = (struct eio_lru_cache_set *)(dmc->sp_cache_set);
 
 	lru_rel_index = lru_sets[set].lru_head;
 	while (lru_rel_index != EIO_LRU_NULL) {
 		lru_blk =
-		    ((struct eio_lru_cache_block *) dmc->sp_cache_blk +
-		     lru_rel_index + start_index);
+			((struct eio_lru_cache_block *)dmc->sp_cache_blk +
+			 lru_rel_index + start_index);
 		if (EIO_CACHE_STATE_GET(dmc, (lru_rel_index + start_index)) ==
 		    VALID) {
 			VERIFY((lru_blk - (struct eio_lru_cache_block *)
@@ -212,17 +211,17 @@ int eio_lru_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
 	index_t dmc_idx;
 	index_t start_index;
 
-	lru_cache_sets = (struct eio_lru_cache_set *) dmc->sp_cache_set;
+	lru_cache_sets = (struct eio_lru_cache_set *)dmc->sp_cache_set;
 	start_index = set * dmc->assoc;
 	lru_rel_index = lru_cache_sets[set].lru_head;
 
 	while ((lru_rel_index != EIO_LRU_NULL) && (nr_writes < to_clean)) {
 		dmc_idx = lru_rel_index + start_index;
 		lru_cacheblk =
-		    ((struct eio_lru_cache_block *) dmc->sp_cache_blk +
-		     lru_rel_index + start_index);
+			((struct eio_lru_cache_block *)dmc->sp_cache_blk +
+			 lru_rel_index + start_index);
 		VERIFY((lru_cacheblk -
-			(struct eio_lru_cache_block *) dmc->sp_cache_blk) ==
+			(struct eio_lru_cache_block *)dmc->sp_cache_blk) ==
 		       (lru_rel_index + start_index));
 		if ((EIO_CACHE_STATE_GET(dmc, dmc_idx) &
 		     (DIRTY | BLOCK_IO_INPROG)) == DIRTY) {
@@ -250,21 +249,21 @@ eio_reclaim_lru_movetail(struct cache_c *dmc, index_t index,
 	struct eio_lru_cache_block *blkptr;
 
 	cacheblk =
-	    (((struct eio_lru_cache_block *) (dmc->sp_cache_blk)) + index);
-	cache_sets = (struct eio_lru_cache_set *) dmc->sp_cache_set;
-	blkptr = (struct eio_lru_cache_block *) (dmc->sp_cache_blk);
+		(((struct eio_lru_cache_block *)(dmc->sp_cache_blk)) + index);
+	cache_sets = (struct eio_lru_cache_set *)dmc->sp_cache_set;
+	blkptr = (struct eio_lru_cache_block *)(dmc->sp_cache_blk);
 
 	/* Remove from LRU */
 	if (likely((cacheblk->lru_prev != EIO_LRU_NULL) ||
 		   (cacheblk->lru_next != EIO_LRU_NULL))) {
 		if (cacheblk->lru_prev != EIO_LRU_NULL)
 			blkptr[cacheblk->lru_prev + start_index].lru_next =
-			    cacheblk->lru_next;
+				cacheblk->lru_next;
 		else
 			cache_sets[set].lru_head = cacheblk->lru_next;
 		if (cacheblk->lru_next != EIO_LRU_NULL)
 			blkptr[cacheblk->lru_next + start_index].lru_prev =
-			    cacheblk->lru_prev;
+				cacheblk->lru_prev;
 		else
 			cache_sets[set].lru_tail = cacheblk->lru_prev;
 	}
@@ -272,11 +271,11 @@ eio_reclaim_lru_movetail(struct cache_c *dmc, index_t index,
 	cacheblk->lru_next = EIO_LRU_NULL;
 	cacheblk->lru_prev = cache_sets[set].lru_tail;
 	if (cache_sets[set].lru_tail == EIO_LRU_NULL)
-		cache_sets[set].lru_head = (u_int16_t) my_index;
+		cache_sets[set].lru_head = (u_int16_t)my_index;
 	else
 		blkptr[cache_sets[set].lru_tail + start_index].lru_next =
-		    (u_int16_t) my_index;
-	cache_sets[set].lru_tail = (u_int16_t) my_index;
+			(u_int16_t)my_index;
+	cache_sets[set].lru_tail = (u_int16_t)my_index;
 }
 
 void eio_lru_pushblks(struct eio_policy *p_ops)
@@ -286,7 +285,7 @@ void eio_lru_pushblks(struct eio_policy *p_ops)
 	int i;
 
 	cache_block = dmc->sp_cache_blk;
-	for (i = 0; i < (int) dmc->size; i++) {
+	for (i = 0; i < (int)dmc->size; i++) {
 		cache_block[i].lru_prev = EIO_LRU_NULL;
 		cache_block[i].lru_next = EIO_LRU_NULL;
 		eio_reclaim_lru_movetail(dmc, i, p_ops);
