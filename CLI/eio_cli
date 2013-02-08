@@ -40,7 +40,7 @@ EIO_IOC_SRC_REMOVE = 0x4500a
 IOC_BLKGETSIZE64 = 0x80081272
 IOC_SECTSIZE = 0x1268
 
-FIOCMD="fio --rw=randrw --verify=meta --verify_pattern=0x3982 --ioengine=libaio --iodepth=16 --direct=1 --size=1G --bsrange=512-128K --numjobs=10 --group_reporting --time_based --runtime=60 --name=job1 filename="
+FIOCMD="fio --rw=randrw --verify=meta --verify_pattern=0x3982 --ioengine=libaio --iodepth=16 --direct=1 --size=1G --bsrange=512-128K --numjobs=10 --group_reporting --time_based --runtime=60 --name=job1 --filename="
 
 def run_cmd(cmd):
 	#Utility function that runs a command
