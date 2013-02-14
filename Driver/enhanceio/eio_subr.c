@@ -31,11 +31,6 @@
 #include "eio_ttc.h"
 
 static DEFINE_SPINLOCK(_job_lock);
-
-extern mempool_t *_job_pool;
-
-extern atomic_t nr_cache_jobs;
-
 static LIST_HEAD(_io_jobs);
 static LIST_HEAD(_disk_read_jobs);
 
@@ -303,7 +298,7 @@ void eio_plug_disk_device(struct cache_c *dmc)
  * by the kernel proper. We will get an IO error if an IO is done on a
  * device that does not exist.
  */
-void eio_suspend_caching(struct cache_c *dmc, dev_notifier_t note)
+void eio_suspend_caching(struct cache_c *dmc, enum dev_notifier note)
 {
 
 	spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);

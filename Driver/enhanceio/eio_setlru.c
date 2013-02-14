@@ -22,12 +22,12 @@
 #include "eio.h"
 
 /* Initialize the lru list */
-int lru_init(lru_list_t **llist, index_t max)
+int lru_init(struct lru_ls **llist, index_t max)
 {
 	index_t i = 0;
 
 	VERIFY(max > 0);
-	*llist = vmalloc((sizeof(lru_list_t) + (max - 1) * sizeof(lru_elem_t)));
+	*llist = vmalloc((sizeof(struct lru_ls) + (max - 1) * sizeof(struct lru_elem)));
 	if (*llist == NULL)
 		return -ENOMEM;
 
@@ -46,14 +46,14 @@ int lru_init(lru_list_t **llist, index_t max)
 }
 
 /* Uninitialize the lru list */
-void lru_uninit(lru_list_t *llist)
+void lru_uninit(struct lru_ls *llist)
 {
 	if (llist)
 		vfree(llist);
 }
 
 /* Add a new entry to lru list */
-int lru_add(lru_list_t *llist, index_t index, u_int64_t key)
+int lru_add(struct lru_ls *llist, index_t index, u_int64_t key)
 {
 	if (!llist || (index >= llist->ll_max))
 		return -EINVAL;
@@ -75,7 +75,7 @@ int lru_add(lru_list_t *llist, index_t index, u_int64_t key)
 }
 
 /* Remove an entry from the lru list */
-int lru_rem(lru_list_t *llist, index_t index)
+int lru_rem(struct lru_ls *llist, index_t index)
 {
 	if (!llist || (index >= llist->ll_max) || (index == LRU_NULL))
 		return -EINVAL;
@@ -117,7 +117,7 @@ int lru_rem(lru_list_t *llist, index_t index)
 }
 
 /* Move up the given lru element */
-int lru_touch(lru_list_t *llist, index_t index, u_int64_t key)
+int lru_touch(struct lru_ls *llist, index_t index, u_int64_t key)
 {
 	if (!llist || (index >= llist->ll_max))
 		return -EINVAL;
@@ -133,7 +133,7 @@ int lru_touch(lru_list_t *llist, index_t index, u_int64_t key)
 }
 
 /* Read the element at the head of the lru */
-int lru_read_head(lru_list_t *llist, index_t *index, u_int64_t *key)
+int lru_read_head(struct lru_ls *llist, index_t *index, u_int64_t *key)
 {
 	if (!llist || !index || !key)
 		return -EINVAL;
@@ -151,7 +151,7 @@ int lru_read_head(lru_list_t *llist, index_t *index, u_int64_t *key)
 }
 
 /* Remove the element at the head of the lru */
-int lru_rem_head(lru_list_t *llist, index_t *index, u_int64_t *key)
+int lru_rem_head(struct lru_ls *llist, index_t *index, u_int64_t *key)
 {
 	if (!llist || !index || !key)
 		return -EINVAL;

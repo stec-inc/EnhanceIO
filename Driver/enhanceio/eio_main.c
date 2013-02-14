@@ -76,10 +76,6 @@ static void eio_check_dirty_cache_thresholds(struct cache_c *dmc);
 static void eio_post_mdupdate(struct work_struct *work);
 static void eio_post_io_callback(struct work_struct *work);
 
-extern int eio_force_warm_boot;
-
-extern struct work_struct _kcached_wq;
-
 static void bc_addfb(struct bio_container *bc, struct eio_bio *ebio)
 {
 

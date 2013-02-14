@@ -63,23 +63,23 @@ struct eio_context {
 int eio_do_io(struct cache_c *dmc, struct eio_io_region *where, int rw,
 	      struct eio_io_request *io_req);
 
-typedef enum eio_device {
+enum eio_device {
 	EIO_HDD_DEVICE = 1,
 	EIO_SSD_DEVICE,
-} eio_device_t;
+};
 
-typedef enum eio_dev_info {
+enum eio_dev_info {
 	EIO_DEV_PARTITION = 1,
 	EIO_DEV_WHOLE_DISK
-} eio_dev_info_t;
+};
 
-typedef enum eio_cache_state {
+enum eio_cache_state {
 	DMC_TTC_INITIALIZING = 1,
 	DMC_TTC_READY,
 	DMC_TTC_IO_FREEZE,
 	DMC_TTC_UNINITIALIZING,
 	DMC_TTC_UNINITIALIZED
-} eio_cache_state_t;
+};
 
 #ifdef __KERNEL__
 
@@ -116,13 +116,13 @@ extern int eio_ttc_activate(struct cache_c *);
 extern int eio_ttc_deactivate(struct cache_c *, int);
 extern void eio_ttc_init(void);
 
-extern int eio_cache_create(cache_rec_short_t *);
+extern int eio_cache_create(struct cache_rec_short *);
 extern int eio_cache_delete(char *, int);
 extern uint64_t eio_get_cache_count(void);
 extern int eio_get_cache_list(unsigned long *);
 
 extern int eio_handle_ssd_message(char *cache_name, char *ssd_name,
-				  dev_notifier_t note);
+				  enum dev_notifier note);
 
 int eio_do_preliminary_checks(struct cache_c *);
 

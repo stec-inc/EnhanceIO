@@ -35,17 +35,13 @@ static struct rw_semaphore eio_ttc_lock[EIO_HASHTBL_SIZE];
 static struct list_head eio_ttc_list[EIO_HASHTBL_SIZE];
 
 int eio_reboot_notified;
-extern int eio_force_warm_boot;
 
 extern long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg);
 extern long eio_compact_ioctl(struct file *filp, unsigned cmd,
 			      unsigned long arg);
 
-extern mempool_t *_io_pool;
-extern struct eio_control_s *eio_control;
-
 static void eio_make_request_fn(struct request_queue *, struct bio *);
-static void eio_cache_rec_fill(struct cache_c *, cache_rec_short_t *);
+static void eio_cache_rec_fill(struct cache_c *, struct cache_rec_short *);
 static void eio_bio_end_empty_barrier(struct bio *, int);
 static void eio_issue_empty_barrier_flush(struct block_device *, struct bio *,
 					  int, make_request_fn *, int rw_flags);
@@ -500,17 +496,17 @@ int eio_get_cache_list(unsigned long *arg)
 {
 	int error = 0;
 	unsigned int size, i, j;
-	cache_list_t reclist;
-	cache_rec_short_t *cache_recs;
+	struct cache_list reclist;
+	struct cache_rec_short *cache_recs;
 	struct cache_c *dmc;
 
-	if (copy_from_user(&reclist, (cache_list_t __user *)arg,
-			   sizeof(cache_list_t))) {
+	if (copy_from_user(&reclist, (struct cache_list __user *)arg,
+			   sizeof(struct cache_list))) {
 		error = -EFAULT;
 		goto out;
 	}
 
-	size = reclist.ncaches * sizeof(cache_rec_short_t);
+	size = reclist.ncaches * sizeof(struct cache_rec_short);
 	cache_recs = vmalloc(size);
 	if (!cache_recs) {
 		error = -ENOMEM;
@@ -540,8 +536,8 @@ int eio_get_cache_list(unsigned long *arg)
 		goto out;
 	}
 
-	if (copy_to_user((cache_list_t __user *)arg, &reclist,
-			 sizeof(cache_list_t))) {
+	if (copy_to_user((struct cache_list __user *)arg, &reclist,
+			 sizeof(struct cache_list))) {
 		error = -EFAULT;
 		goto out;
 	}
@@ -550,7 +546,7 @@ out:
 	return error;
 }
 
-static void eio_cache_rec_fill(struct cache_c *dmc, cache_rec_short_t *rec)
+static void eio_cache_rec_fill(struct cache_c *dmc, struct cache_rec_short *rec)
 {
 	strncpy(rec->cr_name, dmc->cache_name, sizeof(rec->cr_name));
 	strncpy(rec->cr_src_devname, dmc->disk_devname,

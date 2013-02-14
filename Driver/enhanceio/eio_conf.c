@@ -54,7 +54,6 @@ mempool_t *_io_pool;            /* pool of eio_context object */
 
 atomic_t nr_cache_jobs;
 
-extern int eio_reboot_notified;
 
 LIST_HEAD(ssd_rm_list);
 int ssd_rm_list_not_empty;
@@ -243,7 +242,7 @@ static void eio_kcached_client_destroy(struct cache_c *dmc)
 /* Store the cache superblock on ssd */
 int eio_sb_store(struct cache_c *dmc)
 {
-	eio_superblock_t *sb = NULL;
+	union eio_superblock *sb = NULL;
 	struct eio_io_region where;
 	int error;
 
@@ -273,7 +272,7 @@ int eio_sb_store(struct cache_c *dmc)
 
 	nr_pages = page_count;
 	page_index = 0;
-	sb = (eio_superblock_t *)kmap(sb_pages[page_index].bv_page);
+	sb = (union eio_superblock *)kmap(sb_pages[page_index].bv_page);
 
 	sb->sbf.cache_sb_state = dmc->sb_state;
 	sb->sbf.block_size = dmc->block_size;
@@ -573,7 +572,7 @@ sb_store:
 static int eio_md_create(struct cache_c *dmc, int force, int cold)
 {
 	struct flash_cacheblock *next_ptr;
-	eio_superblock_t *header;
+	union eio_superblock *header;
 	struct eio_io_region where;
 	sector_t i;
 	int j, error;
@@ -598,7 +597,7 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 	}
 
 	VERIFY(page_count = 1);
-	header = (eio_superblock_t *)kmap(header_page[0].bv_page);
+	header = (union eio_superblock *)kmap(header_page[0].bv_page);
 
 	/*
 	 * Apart from normal cache creation, eio_md_create() is also called when
@@ -954,7 +953,7 @@ free_header:
 static int eio_md_load(struct cache_c *dmc)
 {
 	struct flash_cacheblock *meta_data_cacheblock, *next_ptr;
-	eio_superblock_t *header;
+	union eio_superblock *header;
 	struct eio_io_region where;
 	int i;
 	index_t j, slots_read;
@@ -980,7 +979,7 @@ static int eio_md_load(struct cache_c *dmc)
 	}
 
 	VERIFY(page_count == 1);
-	header = (eio_superblock_t *)kmap(header_page[0].bv_page);
+	header = (union eio_superblock *)kmap(header_page[0].bv_page);
 
 	if (CACHE_FAILED_IS_SET(dmc) || CACHE_DEGRADED_IS_SET(dmc)) {
 		pr_err
@@ -1375,7 +1374,7 @@ static int eio_clean_thread_init(struct cache_c *dmc)
 }
 
 int
-eio_handle_ssd_message(char *cache_name, char *ssd_name, dev_notifier_t note)
+eio_handle_ssd_message(char *cache_name, char *ssd_name, enum dev_notifier note)
 {
 	struct cache_c *dmc;
 
@@ -1452,7 +1451,7 @@ static void eio_init_srcdev_props(struct cache_c *dmc)
 		dmc->cache_srcdisk_name[0] = '\0';
 }
 
-int eio_cache_create(cache_rec_short_t *cache)
+int eio_cache_create(struct cache_rec_short *cache)
 {
 	struct cache_c *dmc;
 	struct cache_c **nodepp;
@@ -2459,7 +2458,7 @@ eio_notify_ssd_rm(struct notifier_block *nb, unsigned long action, void *data)
 	unsigned long int flags = 0;
 	struct ssd_rm_list *ssd_list_ptr;
 	unsigned check_src = 0, check_ssd = 0;
-	dev_notifier_t notify = NOTIFY_INITIALIZER;
+	enum dev_notifier notify = NOTIFY_INITIALIZER;
 
 	if (likely(action != BUS_NOTIFY_DEL_DEVICE))
 		return 0;

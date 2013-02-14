@@ -95,6 +95,14 @@ struct eio_event {
 
 typedef long int index_t;
 
+extern int eio_reboot_notified;
+extern mempool_t *_io_pool;
+extern struct eio_control_s *eio_control;
+extern struct work_struct _kcached_wq;
+extern int eio_force_warm_boot;
+extern atomic_t nr_cache_jobs;
+extern mempool_t *_job_pool;
+
 /*
  * This file has three sections as follows:
  *
@@ -192,7 +200,7 @@ typedef long int index_t;
 #define EIO_SB_VERSION          3       /* kernel superblock version */
 #define EIO_SB_MAGIC_VERSION    3       /* version in which magic number was introduced */
 
-typedef union eio_superblock {
+union eio_superblock {
 	struct superblock_fields {
 		sector_t size;                  /* Cache size */
 		u_int32_t block_size;           /* Cache block size */
@@ -224,7 +232,7 @@ typedef union eio_superblock {
 		u_int32_t autoclean_threshold;
 	} sbf;
 	u_int8_t padding[EIO_SUPERBLOCK_SIZE];
-} eio_superblock_t;
+};
 
 /*
  * For EnhanceIO, we move the superblock from sector 0 to 128
@@ -379,12 +387,12 @@ struct flash_cacheblock {
 #define BOOT_FLAG_COLD_ENABLE           (1 << 0)        /* enable the cache as cold */
 #define BOOT_FLAG_FORCE_WARM            (1 << 1)        /* override the cold enable flag */
 
-typedef enum dev_notifier {
+enum dev_notifier {
 	NOTIFY_INITIALIZER,
 	NOTIFY_SSD_ADD,
 	NOTIFY_SSD_REMOVED,
 	NOTIFY_SRC_REMOVED
-} dev_notifier_t;
+};
 
 /*
  * End Section 2: User space and kernel.
@@ -873,7 +881,7 @@ struct ssd_rm_list {
 	struct cache_c *dmc;
 	int action;
 	dev_t devt;
-	dev_notifier_t note;
+	enum dev_notifier note;
 	struct list_head list;
 };
 
@@ -927,7 +935,7 @@ int dm_io_async_bvec(unsigned int num_regions, struct eio_io_region *where,
 		     int rw, struct bio_vec *bvec, eio_notify_fn fn,
 		     void *context);
 void eio_put_cache_device(struct cache_c *dmc);
-void eio_suspend_caching(struct cache_c *dmc, dev_notifier_t note);
+void eio_suspend_caching(struct cache_c *dmc, enum dev_notifier note);
 void eio_resume_caching(struct cache_c *dmc, char *dev);
 int eio_ctr_ssd_add(struct cache_c *dmc, char *dev);
 
@@ -1006,7 +1014,7 @@ extern int eio_io_sync_vm(struct cache_c *dmc, struct eio_io_region *where,
 			  int rw, struct bio_vec *bvec, int nbvec);
 extern void eio_unplug_cache_device(struct cache_c *dmc);
 extern void eio_put_cache_device(struct cache_c *dmc);
-extern void eio_suspend_caching(struct cache_c *dmc, dev_notifier_t note);
+extern void eio_suspend_caching(struct cache_c *dmc, enum dev_notifier note);
 extern void eio_resume_caching(struct cache_c *dmc, char *dev);
 
 static __inline__ void

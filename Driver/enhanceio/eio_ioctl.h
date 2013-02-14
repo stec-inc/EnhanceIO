@@ -41,7 +41,7 @@
 
 #define EIO_IOC         ('E' << 8)
 
-typedef enum eio_ioc {
+enum eio_ioc {
 	EIO_IOC_CREATE = EIO_IOC,
 	EIO_IOC_DELETE,
 	EIO_IOC_ENABLE,
@@ -56,9 +56,9 @@ typedef enum eio_ioc {
 	EIO_IOC_NOTIFY_REBOOT,
 	EIO_IOC_SET_WARM_BOOT,
 	EIO_IOC_UNUSED
-} eio_ioc_t;
+};
 
-typedef struct cache_rec_short {
+struct cache_rec_short {
 	char cr_name[CACHE_NAME_SZ];
 	char cr_src_devname[NAME_SZ];
 	char cr_ssd_devname[NAME_SZ];
@@ -74,12 +74,12 @@ typedef struct cache_rec_short {
 	char cr_cold_boot;
 	uint64_t cr_blksize;
 	uint64_t cr_assoc;
-} cache_rec_short_t;
+};
 
-typedef struct cache_list {
+struct cache_list {
 	uint64_t ncaches;
-	cache_rec_short_t *cachelist;
-} cache_list_t;
+	struct cache_rec_short *cachelist;
+};
 
 #ifdef __KERNEL__
 long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg);

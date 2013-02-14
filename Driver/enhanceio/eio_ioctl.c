@@ -33,21 +33,21 @@
 long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 {
 	int error = 0;
-	cache_rec_short_t *cache;
+	struct cache_rec_short *cache;
 	uint64_t ncaches;
-	dev_notifier_t note;
+	enum dev_notifier note;
 	int do_delete = 0;
 
 	switch (cmd) {
 	case EIO_IOC_CREATE:
 	case EIO_IOC_ENABLE:
 
-		cache = vmalloc(sizeof(cache_rec_short_t));
+		cache = vmalloc(sizeof(struct cache_rec_short));
 		if (!cache)
 			return -ENOMEM;
 
 		if (copy_from_user(cache, (void __user *)arg,
-				   sizeof(cache_rec_short_t))) {
+				   sizeof(struct cache_rec_short))) {
 			vfree(cache);
 			return -EFAULT;
 		}
@@ -60,12 +60,12 @@ long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 
 	case EIO_IOC_DISABLE:
 
-		cache = vmalloc(sizeof(cache_rec_short_t));
+		cache = vmalloc(sizeof(struct cache_rec_short));
 		if (!cache)
 			return -ENOMEM;
 
 		if (copy_from_user(cache, (void __user *)arg,
-				   sizeof(cache_rec_short_t))) {
+				   sizeof(struct cache_rec_short))) {
 			vfree(cache);
 			return -EFAULT;
 		}
@@ -74,12 +74,12 @@ long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 		break;
 
 	case EIO_IOC_EDIT:
-		cache = vmalloc(sizeof(cache_rec_short_t));
+		cache = vmalloc(sizeof(struct cache_rec_short));
 		if (!cache)
 			return -ENOMEM;
 
 		if (copy_from_user(cache, (void __user *)arg,
-				   sizeof(cache_rec_short_t))) {
+				   sizeof(struct cache_rec_short))) {
 			vfree(cache);
 			return -EFAULT;
 		}
@@ -105,12 +105,12 @@ long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 		break;
 
 	case EIO_IOC_SSD_ADD:
-		cache = vmalloc(sizeof(cache_rec_short_t));
+		cache = vmalloc(sizeof(struct cache_rec_short));
 		if (!cache)
 			return -ENOMEM;
 
 		if (copy_from_user(cache, (void __user *)arg,
-				   sizeof(cache_rec_short_t))) {
+				   sizeof(struct cache_rec_short))) {
 			vfree(cache);
 			return -EFAULT;
 		}
@@ -123,11 +123,11 @@ long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 		break;
 
 	case EIO_IOC_SSD_REMOVE:
-		cache = vmalloc(sizeof(cache_rec_short_t));
+		cache = vmalloc(sizeof(struct cache_rec_short));
 		if (!cache)
 			return -ENOMEM;
 		if (copy_from_user(cache, (void __user *)arg,
-				   sizeof(cache_rec_short_t))) {
+				   sizeof(struct cache_rec_short))) {
 			vfree(cache);
 			return -EFAULT;
 		}
