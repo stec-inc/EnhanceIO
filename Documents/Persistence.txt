@@ -7,5 +7,5 @@ Use the 94-Enhanceio-template file to create a per cache udev-rule file named /e
 
 2) Change <source_match_expr> to ENV{ID_SERIAL}=="<ID SERIAL OF YOUR HARD DISK>", ENV{DEVTYPE}==<DEVICE TYPE OF YOUR SOURCE DEVICE>
 
-3) Replace all instances of <cache_name> with the name of your cache
-    	
+3) Replace all instances of <cache_name> with the name of your cache.
+   Change <mode> and <block_size> to the mode and block size of your cache.
