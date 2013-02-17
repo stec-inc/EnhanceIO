@@ -553,6 +553,7 @@ out:
 static void eio_cache_rec_fill(struct cache_c *dmc, cache_rec_short_t *rec)
 {
 	strncpy(rec->cr_name, dmc->cache_name, sizeof(rec->cr_name));
+	rec->cr_name[sizeof(rec->cr_name)-1] = '\0';
 	strncpy(rec->cr_src_devname, dmc->disk_devname,
 		sizeof(rec->cr_src_devname));
 	strncpy(rec->cr_ssd_devname, dmc->cache_devname,
