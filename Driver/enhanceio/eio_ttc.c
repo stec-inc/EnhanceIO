@@ -552,11 +552,11 @@ out:
 
 static void eio_cache_rec_fill(struct cache_c *dmc, cache_rec_short_t *rec)
 {
-	strncpy(rec->cr_name, dmc->cache_name, sizeof(rec->cr_name));
+	strncpy(rec->cr_name, dmc->cache_name, sizeof(rec->cr_name) - 1);
 	strncpy(rec->cr_src_devname, dmc->disk_devname,
-		sizeof(rec->cr_src_devname));
+		sizeof(rec->cr_src_devname) - 1);
 	strncpy(rec->cr_ssd_devname, dmc->cache_devname,
-		sizeof(rec->cr_ssd_devname));
+		sizeof(rec->cr_ssd_devname) - 1);
 	rec->cr_src_dev_size = eio_get_device_size(dmc->disk_dev);
 	rec->cr_ssd_dev_size = eio_get_device_size(dmc->cache_dev);
 	rec->cr_src_sector_size = 0;    /* unused in userspace */
