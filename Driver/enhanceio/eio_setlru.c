@@ -26,7 +26,7 @@ int lru_init(struct lru_ls **llist, index_t max)
 {
 	index_t i = 0;
 
-	VERIFY(max > 0);
+	EIO_ASSERT(max > 0);
 	*llist = vmalloc((sizeof(struct lru_ls) + (max - 1) * sizeof(struct lru_elem)));
 	if (*llist == NULL)
 		return -ENOMEM;
@@ -65,7 +65,7 @@ int lru_add(struct lru_ls *llist, index_t index, u_int64_t key)
 	if (llist->ll_tail != LRU_NULL)
 		llist->ll_elem[llist->ll_tail].le_next = index;
 	else {
-		VERIFY(llist->ll_head == LRU_NULL);
+		EIO_ASSERT(llist->ll_head == LRU_NULL);
 		llist->ll_head = index;
 	}
 	llist->ll_tail = index;
@@ -110,7 +110,7 @@ int lru_rem(struct lru_ls *llist, index_t index)
 
 	llist->ll_elem[index].le_prev = LRU_NULL;
 	llist->ll_elem[index].le_next = LRU_NULL;
-	VERIFY(llist->ll_size != 0);
+	EIO_ASSERT(llist->ll_size != 0);
 	llist->ll_size--;
 
 	return 0;

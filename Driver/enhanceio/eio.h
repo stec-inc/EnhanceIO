@@ -810,7 +810,7 @@ struct job_io_regions {
 #define EB_SUBORDINATE_IO 2
 #define EB_INVAL 4
 #define GET_BIO_FLAGS(ebio)             ((ebio)->eb_bc->bc_bio->bi_rw)
-#define VERIFY_BIO_FLAGS(ebio)          VERIFY((ebio) && (ebio)->eb_bc && (ebio)->eb_bc->bc_bio)
+#define VERIFY_BIO_FLAGS(ebio)          EIO_ASSERT((ebio) && (ebio)->eb_bc && (ebio)->eb_bc->bc_bio)
 
 #define SET_BARRIER_FLAGS(rw_flags) (rw_flags |= (REQ_WRITE | REQ_FLUSH))
 
@@ -1082,22 +1082,12 @@ void eio_set_warm_boot(void);
 
 /* resolve conflict with scsi/scsi_device.h */
 #ifdef __KERNEL__
-#ifdef VERIFY
-#undef VERIFY
+
+#ifdef EIO_ASSERT 
+#undef EIO_ASSERT
 #endif
-#define ENABLE_VERIFY
-#ifdef ENABLE_VERIFY
-/* Like ASSERT() but always compiled in */
-#define VERIFY(x) do { \
-		if (unlikely(!(x))) { \
-			dump_stack(); \
-			panic("VERIFY: assertion (%s) failed at %s (%d)\n", \
-			      # x,  __FILE__, __LINE__);		    \
-		} \
-} while (0)
-#else                           /* ENABLE_VERIFY */
-#define VERIFY(x) do { } while (0);
-#endif                          /* ENABLE_VERIFY */
+/*Always compiled in*/
+#define EIO_ASSERT(x)    BUG_ON(unlikely(!(x)))
 
 extern sector_t eio_get_device_size(struct eio_bdev *);
 extern sector_t eio_get_device_start_sect(struct eio_bdev *);

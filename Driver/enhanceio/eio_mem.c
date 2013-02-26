@@ -106,7 +106,7 @@ u_int32_t eio_hash_block(struct cache_c *dmc, sector_t dbn)
 	u_int64_t set_number;
 
 	EIO_DBN_TO_SET(dmc, dbn, set_number, wrapped);
-	VERIFY(set_number < dmc->num_sets);
+	EIO_ASSERT(set_number < dmc->num_sets);
 
 	return (u_int32_t)set_number;
 }
@@ -125,7 +125,7 @@ unsigned int eio_shrink_dbn(struct cache_c *dmc, sector_t dbn)
 	sector_t msb;
 	sector_t set_number;
 
-	VERIFY(!EIO_MD8(dmc));
+	EIO_ASSERT(!EIO_MD8(dmc));
 	if (unlikely(dbn == 0))
 		return 0;
 
@@ -153,7 +153,7 @@ sector_t eio_expand_dbn(struct cache_c *dmc, u_int64_t index)
 	sector_t msb;
 	sector_t dbn_40;
 
-	VERIFY(!EIO_MD8(dmc));
+	EIO_ASSERT(!EIO_MD8(dmc));
 	/*
 	 * Expanding "dbn" zero?
 	 */
@@ -178,7 +178,7 @@ sector_t eio_expand_dbn(struct cache_c *dmc, u_int64_t index)
 		dbn_40 |= set_number << SECTORS_PER_SET_SHIFT;
 		dbn_40 |= lsb;
 	}
-	VERIFY(unlikely(dbn_40 < EIO_MAX_SECTOR));
+	EIO_ASSERT(unlikely(dbn_40 < EIO_MAX_SECTOR));
 
 	return (sector_t)dbn_40;
 }
@@ -202,7 +202,7 @@ void eio_invalidate_md(struct cache_c *dmc, u_int64_t index)
 void eio_md4_dbn_set(struct cache_c *dmc, u_int64_t index, u_int32_t dbn_24)
 {
 
-	VERIFY((dbn_24 & ~EIO_MD4_DBN_MASK) == 0);
+	EIO_ASSERT((dbn_24 & ~EIO_MD4_DBN_MASK) == 0);
 
 	/* retain "cache_state" */
 	dmc->cache[index].md4_md &= ~EIO_MD4_DBN_MASK;
@@ -221,7 +221,7 @@ void eio_md4_dbn_set(struct cache_c *dmc, u_int64_t index, u_int32_t dbn_24)
 void eio_md8_dbn_set(struct cache_c *dmc, u_int64_t index, sector_t dbn)
 {
 
-	VERIFY((dbn & ~EIO_MD8_DBN_MASK) == 0);
+	EIO_ASSERT((dbn & ~EIO_MD8_DBN_MASK) == 0);
 
 	/* retain "cache_state" */
 	dmc->cache_md8[index].md8_md &= ~EIO_MD8_DBN_MASK;

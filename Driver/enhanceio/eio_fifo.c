@@ -112,8 +112,8 @@ eio_fifo_find_reclaim_dbn(struct eio_policy *p_ops, index_t start_index,
 
 	i = cache_sets[set].set_fifo_next;
 	while (slots_searched < (int)dmc->assoc) {
-		VERIFY(i >= start_index);
-		VERIFY(i < end_index);
+		EIO_ASSERT(i >= start_index);
+		EIO_ASSERT(i < end_index);
 		if (EIO_CACHE_STATE_GET(dmc, i) == VALID) {
 			*index = i;
 			break;
