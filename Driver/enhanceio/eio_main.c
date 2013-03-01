@@ -543,7 +543,7 @@ static void eio_post_io_callback(struct work_struct *work)
 		 */
 
 		/*
-		 * Harish: TBD
+		 * TBD
 		 * NO_SSD_IO_INPROG need to be differently handled, in case block is DIRTY
 		 */
 		if ((cstate & NO_SSD_IO_INPROG) == NO_SSD_IO_INPROG)
@@ -1297,7 +1297,7 @@ static void eio_do_mdupdate(struct work_struct *work)
 
 	/*
 	 * Initiate the I/O to SSD for on-disk md update.
-	 * Harish: TBD. Optimize to write only the affected blocks
+	 * TBD. Optimize to write only the affected blocks
 	 */
 
 	region.bdev = dmc->cache_dev->bdev;
@@ -1859,7 +1859,7 @@ int eio_invalidate_cache(struct cache_c *dmc)
 	/* invalidate the whole cache */
 	for (i = 0; i < (dmc->size >> dmc->consecutive_shift); i++) {
 		spin_lock_irqsave(&dmc->cache_sets[i].cs_lock, flags);
-		/* Harish: TBD. Apply proper fix for the cast to disk_dev_size */
+		/* TBD. Apply proper fix for the cast to disk_dev_size */
 		(void)eio_inval_block_set_range(dmc, (int)i, 0,
 						(unsigned)disk_dev_size, 0);
 		spin_unlock_irqrestore(&dmc->cache_sets[i].cs_lock, flags);
@@ -1908,7 +1908,7 @@ static int eio_uncached_write(struct cache_c *dmc, struct eio_bio *ebio)
 		/*
 		 * Treat the dirty block cache write failure as
 		 * I/O failure for the entire I/O
-		 * Harish: TBD
+		 * TBD
 		 * Can we live without this restriction
 		 */
 		ebio->eb_iotype = EB_MAIN_IO;
@@ -1948,7 +1948,7 @@ static int eio_uncached_write(struct cache_c *dmc, struct eio_bio *ebio)
 		if (EIO_CACHE_STATE_GET(dmc, ebio->eb_index) == ALREADY_DIRTY)
 			/*
 			 * Treat I/O failure on a DIRTY block as failure of entire I/O.
-			 * Harish: TBD
+			 * TBD
 			 * Can do better error handling by invalidation of the dirty
 			 * block, if the cache block write failed, but disk write succeeded
 			 */
@@ -1994,7 +1994,7 @@ eio_cached_write(struct cache_c *dmc, struct eio_bio *ebio, int rw_flags)
 	EIO_ASSERT(dmc->mode == CACHE_MODE_WB);
 
 	/*
-	 * Harish: TBD
+	 * TBD
 	 * Possibly don't need the spinlock-unlock here
 	 */
 	spin_lock_irqsave(&dmc->cache_sets[ebio->eb_cacheset].cs_lock, flags);
@@ -2808,7 +2808,7 @@ out:
 
 	/*
 	 * Enqueue clean set if there is no room in the set
-	 * Harish: TBD
+	 * TBD
 	 * Ensure, a force clean
 	 */
 	if (res < 0)
@@ -2918,7 +2918,7 @@ out:
 
 	/*
 	 * Enqueue clean set if there is no room in the set
-	 * Harish: TBD
+	 * TBD
 	 * Ensure, a force clean
 	 */
 	if (res < 0)
@@ -3412,7 +3412,7 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 
 	/* 6. update on-disk cache metadata */
 
-	/* Harish: TBD. Do we have to consider sector alignment here ? */
+	/* TBD. Do we have to consider sector alignment here ? */
 
 	/*
 	 * md_size = dmc->assoc * sizeof(struct flash_cacheblock);

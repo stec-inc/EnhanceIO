@@ -544,7 +544,7 @@ int eio_md_store(struct cache_c *dmc)
 sb_store:
 	error = eio_sb_store(dmc);
 	if (error) {
-		/* Harish: TBD. should we return error */
+		/* TBD. should we return error */
 		write_errors++;
 		pr_err("md_store: superblock store failed(error %d)", error);
 	}
@@ -1052,7 +1052,7 @@ static int eio_md_load(struct cache_c *dmc)
 	dmc->sb_version = EIO_SB_VERSION;
 
 	/*
-	 * Harish: TBD
+	 * TBD
 	 * For writeback, only when the dirty blocks are non-zero
 	 * and header state is unexpected, we should treat it as md corrupted.
 	 * Otherwise, a bad write in last shutdown, can lead to data inaccessible
@@ -1101,7 +1101,7 @@ static int eio_md_load(struct cache_c *dmc)
 			pr_info("Both clean and dirty blocks exist in cache");
 			clean_shutdown = 1;
 		} else {
-			/* Harish: Won't reach here, but TBD may change the previous if condition */
+			/* Won't reach here, but TBD may change the previous if condition */
 			pr_info
 				("cache state is %d. Treating as unclean shutdown",
 				header->sbf.cache_sb_state);

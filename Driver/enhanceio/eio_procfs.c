@@ -1356,7 +1356,7 @@ eio_invalidate_sysctl(ctl_table *table, int write, void __user *buffer,
 	rv = 0;
 
 	if (write) {
-		/* Harish: TBD. Need to put appropriate sanity checks */
+		/* TBD. Need to put appropriate sanity checks */
 
 		/* update the active value with the new tunable value */
 		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
