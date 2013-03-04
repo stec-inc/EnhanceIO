@@ -47,7 +47,7 @@ Specifies the SSD device\&.
 Specifies the Cache name \&.
 .RE
 .PP
-\fR\fB\f\[-p <policy>]\fR\fR
+\fR\fB\f\[\-p <policy>]\fR\fR
 .RS 4
 Cache block replacement policy\&. Policies are: 
 \fBlru\fR,
@@ -55,7 +55,7 @@ Cache block replacement policy\&. Policies are:
 \fBrand(random)\fR\&.
 .RE
 .PP
-\fR\fB\f\[-m <cache mode>]\fR\fR
+\fR\fB\f\[\-m <cache mode>]\fR\fR
 .RS 4
 Specifies the caching mode\&. Supported caching modes are: 
 \fBro(Read-Only)\fR,
@@ -63,7 +63,7 @@ Specifies the caching mode\&. Supported caching modes are:
 \fBwb(Write-Back)\fR\&.
 .RE
 .PP
-\fR\fB\f\[-b <block size>]\fR\fR
+\fR\fB\f\[\-b <block size>]\fR\fR
 .RS 4
 Specifies the block size of each single cache entry\&. Block size are:
 \fB2048\fR,
@@ -108,7 +108,7 @@ Modifies the properties of a cache\&.
 Specifies the Cache name \&.
 .RE
 .PP
-\fR\fB\f\[-p <policy>]\fR\fR
+\fR\fB\f\[\-p <policy>]\fR\fR
 .RS 4
 Cache block replacement policy\&. Policies are: 
 \fBlru\fR,
@@ -116,7 +116,7 @@ Cache block replacement policy\&. Policies are:
 \fBrand(random)\fR\&.
 .RE
 .PP
-\fR\fB\f\[-m <cache mode>]\fR\fR
+\fR\fB\f\[\-m <cache mode>]\fR\fR
 .RS 4
 Specifies the caching mode\&. Supported caching modes are: 
 \fBro(Read-Only)\fR,
@@ -128,22 +128,22 @@ Specifies the caching mode\&. Supported caching modes are:
 .SH EXAMPLES
 
 # Create a cache 
-    $ eio_cli create -d /dev/sdg -s /dev/sdf -p lru -m wt -c SDG_CACHE
-    $ eio_cli create -d /dev/sdm -s /dev/sdk -c SDM_CACHE
-    $ eio_cli create -d /dev/sdc1 -s /dev/sdd1 -c SDC1_CACHE
+    $ eio_cli create \-d /dev/sdg \-s /dev/sdf \-p lru \-m wt \-c SDG_CACHE
+    $ eio_cli create \-d /dev/sdm \-s /dev/sdk \-c SDM_CACHE
+    $ eio_cli create \-d /dev/sdc1 \-s /dev/sdd1 \-c SDC1_CACHE
 
 # Display properties of the cache devices 
     $ eio_cli info 
 
 # Edit the properties of the cache SDG_CACHE
-    $ eio_cli edit -p fifo -c SDG_CACHE
-    $ eio_cli edit -p rand -m ro -c SDG_CACHE
+    $ eio_cli edit \-p fifo \-c SDG_CACHE
+    $ eio_cli edit \-p rand \-m ro \-c SDG_CACHE
 
 # Delete the cache SDG_CACHE
-    $ eio_cli clean -c SDG_CACHE
+    $ eio_cli clean \-c SDG_CACHE
 
 # Clean the cache SDG_CACHE
-    $ eio_cli clean -c SDG_CACHE
+    $ eio_cli clean \-c SDG_CACHE
 
 
 
