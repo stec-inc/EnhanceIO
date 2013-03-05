@@ -117,7 +117,7 @@ static inline int eio_mem_available(struct cache_c *dmc, size_t size)
 /* create a new thread and call the specified function */
 void *eio_create_thread(int (*func)(void *), void *context, char *name)
 {
-	return kthread_run(func, context, name);
+	return kthread_run(func, context, "%s", name);
 }
 
 /* wait for the given thread to exit */
