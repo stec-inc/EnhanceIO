@@ -53,7 +53,7 @@ int eio_mem_init(struct cache_c *dmc)
 	/*
 	 * Sanity check the number of sets.
 	 */
-	num_sets_64 = dmc->size / dmc->assoc;
+	num_sets_64 = EIO_DIV(dmc->size, dmc->assoc);
 	if (num_sets_64 > UINT_MAX) {
 		pr_err("Number of cache sets (%lu) greater than maximum"
 		       "allowed (%u)",
@@ -165,7 +165,7 @@ sector_t eio_expand_dbn(struct cache_c *dmc, u_int64_t index)
 	if (dbn_24 == 0 && EIO_CACHE_STATE_GET(dmc, index) == INVALID)
 		return (sector_t)0;
 
-	set_number = index / dmc->assoc;
+	set_number = EIO_DIV(index, dmc->assoc);
 	lsb = dbn_24 & SECTORS_PER_SET_MASK;
 	msb = dbn_24 >> (SECTORS_PER_SET_SHIFT + 1);    /* 1 for wrapped */
 	/* had we wrapped? */
