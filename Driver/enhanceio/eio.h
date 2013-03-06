@@ -72,16 +72,29 @@
 #ifndef EIO_INC_H
 #define EIO_INC_H
 
-#define EIO_DBN_SET(dmc, index, dbn)            ssdcache_dbn_set(dmc, index, dbn)
-#define EIO_DBN_GET(dmc, index)                 ssdcache_dbn_get(dmc, index)
-#define EIO_CACHE_STATE_SET(dmc, index, state)  ssdcache_cache_state_set(dmc, index, state)
-#define EIO_CACHE_STATE_GET(dmc, index)         ssdcache_cache_state_get(dmc, index)
-#define EIO_CACHE_STATE_OFF(dmc, index, bitmask)        ssdcache_cache_state_off(dmc, index, bitmask)
-#define EIO_CACHE_STATE_ON(dmc, index, bitmask) ssdcache_cache_state_on(dmc, index, bitmask)
-
 /* Bit offsets for wait_on_bit_lock() */
 #define EIO_UPDATE_LIST         0
 #define EIO_HANDLE_REBOOT       1
+
+
+static __inline__ uint32_t
+EIO_DIV(uint64_t dividend_64, uint32_t divisor_32)
+{
+	uint64_t result;
+	result = dividend_64;
+	do_div(result, divisor_32);
+	return result;
+}
+
+
+static __inline__ uint32_t
+EIO_REM(uint64_t dividend_64, uint32_t divisor_32)
+{
+	uint64_t temp;
+	temp = dividend_64;
+	return do_div(temp, divisor_32);
+}
+
 
 struct eio_control_s {
 	unsigned long synch_flags;
@@ -202,34 +215,30 @@ extern mempool_t *_job_pool;
 
 union eio_superblock {
 	struct superblock_fields {
-		sector_t size;                  /* Cache size */
-		u_int32_t block_size;           /* Cache block size */
-		u_int32_t assoc;                /* Cache associativity */
-		u_int32_t cache_sb_state;       /* Clean shutdown ? */
+		__le64 size;                  /* Cache size */
+		__le32 block_size;           /* Cache block size */
+		__le32 assoc;                /* Cache associativity */
+		__le32 cache_sb_state;       /* Clean shutdown ? */
 		char cache_devname[DEV_PATHLEN];
-		sector_t cache_devsize;
+		__le64 cache_devsize;
 		char disk_devname[DEV_PATHLEN];
-		sector_t disk_devsize;
-		u_int32_t cache_version;
+		__le64 disk_devsize;
+		__le32 cache_version;
 		char cache_name[DEV_PATHLEN];
-		u_int32_t mode;
-		u_int32_t repl_policy;
-		u_int32_t cache_flags;
-		/*
-		 * Version 1.1 superblock ends here.
-		 * Don't modify any of the above fields.
-		 */
-		u_int32_t magic;                /* Has to be the 1st field afer 1.1 superblock */
-		u_int32_t cold_boot;            /* cache to be started as cold after boot */
+		__le32 mode;
+		__le32 repl_policy;
+		__le32 cache_flags;
+		__le32 magic;                
+		__le32 cold_boot;            /* cache to be started as cold after boot */
 		char ssd_uuid[DEV_PATHLEN];
-		sector_t cache_md_start_sect;   /* cache metadata start (8K aligned) */
-		sector_t cache_data_start_sect; /* cache data start (8K aligned) */
-		u_int32_t dirty_high_threshold;
-		u_int32_t dirty_low_threshold;
-		u_int32_t dirty_set_high_threshold;
-		u_int32_t dirty_set_low_threshold;
-		u_int32_t time_based_clean_interval;
-		u_int32_t autoclean_threshold;
+		__le64 cache_md_start_sect;   /* cache metadata start (8K aligned) */
+		__le64 cache_data_start_sect; /* cache data start (8K aligned) */
+		__le32 dirty_high_threshold;
+		__le32 dirty_low_threshold;
+		__le32 dirty_set_high_threshold;
+		__le32 dirty_set_low_threshold;
+		__le32 time_based_clean_interval;
+		__le32 autoclean_threshold;
 	} sbf;
 	u_int8_t padding[EIO_SUPERBLOCK_SIZE];
 };
@@ -311,8 +320,8 @@ struct flash_cacheblock {
 #define INDEX_TO_MD_PAGE_OFFSET(INDEX)          ((INDEX) % MD_BLOCKS_PER_PAGE)
 
 #define MD_BLOCKS_PER_SECTOR                    (512 / (sizeof(struct flash_cacheblock)))
-#define INDEX_TO_MD_SECTOR(INDEX)               ((INDEX) / MD_BLOCKS_PER_SECTOR)
-#define INDEX_TO_MD_SECTOR_OFFSET(INDEX)        ((INDEX) % MD_BLOCKS_PER_SECTOR)
+#define INDEX_TO_MD_SECTOR(INDEX)               (EIO_DIV((INDEX), MD_BLOCKS_PER_SECTOR))
+#define INDEX_TO_MD_SECTOR_OFFSET(INDEX)        (EIO_REM((INDEX), MD_BLOCKS_PER_SECTOR))
 #define MD_BLOCKS_PER_CBLOCK(dmc)               (MD_BLOCKS_PER_SECTOR * (dmc)->block_size)
 
 #define METADATA_IO_BLOCKSIZE                   (256 * 1024)
@@ -764,8 +773,8 @@ struct cache_c {
 	 ((dmc)->sysctl_active.autoclean_threshold == 0))
 
 #define DIRTY_CACHE_THRESHOLD_CROSSED(dmc)	\
-	(((atomic64_read(&(dmc)->nr_dirty) - atomic64_read(&(dmc)->clean_pendings)) >= \
-	  (int64_t)((dmc)->sysctl_active.dirty_high_threshold * (dmc)->size) / 100) && \
+	((atomic64_read(&(dmc)->nr_dirty) - atomic64_read(&(dmc)->clean_pendings)) >= \
+	  (int64_t)((dmc)->sysctl_active.dirty_high_threshold * EIO_DIV((dmc)->size, 100)) && \
 	 ((dmc)->sysctl_active.dirty_high_threshold > (dmc)->sysctl_active.dirty_low_threshold))
 
 #define DIRTY_SET_THRESHOLD_CROSSED(dmc, set)	\

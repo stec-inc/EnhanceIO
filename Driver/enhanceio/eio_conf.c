@@ -117,7 +117,7 @@ static inline int eio_mem_available(struct cache_c *dmc, size_t size)
 /* create a new thread and call the specified function */
 void *eio_create_thread(int (*func)(void *), void *context, char *name)
 {
-	return kthread_run(func, context, name);
+	return kthread_run(func, context, "%s", name);
 }
 
 /* wait for the given thread to exit */
@@ -274,44 +274,45 @@ int eio_sb_store(struct cache_c *dmc)
 	page_index = 0;
 	sb = (union eio_superblock *)kmap(sb_pages[page_index].bv_page);
 
-	sb->sbf.cache_sb_state = dmc->sb_state;
-	sb->sbf.block_size = dmc->block_size;
-	sb->sbf.size = dmc->size;
-	sb->sbf.assoc = dmc->assoc;
-	sb->sbf.cache_md_start_sect = dmc->md_start_sect;
-	sb->sbf.cache_data_start_sect = dmc->md_sectors;
+	sb->sbf.cache_sb_state = cpu_to_le32(dmc->sb_state);
+	sb->sbf.block_size = cpu_to_le32(dmc->block_size);
+	sb->sbf.size = cpu_to_le32(dmc->size);
+	sb->sbf.assoc = cpu_to_le32(dmc->assoc);
+	sb->sbf.cache_md_start_sect = cpu_to_le64(dmc->md_start_sect);
+	sb->sbf.cache_data_start_sect = cpu_to_le64(dmc->md_sectors);
 	strncpy(sb->sbf.disk_devname, dmc->disk_devname, DEV_PATHLEN);
 	strncpy(sb->sbf.cache_devname, dmc->cache_devname, DEV_PATHLEN);
 	strncpy(sb->sbf.ssd_uuid, dmc->ssd_uuid, DEV_PATHLEN - 1);
-	sb->sbf.cache_devsize = to_sector(eio_get_device_size(dmc->cache_dev));
-	sb->sbf.disk_devsize = to_sector(eio_get_device_size(dmc->disk_dev));
-	sb->sbf.cache_version = dmc->sb_version;
+	sb->sbf.cache_devsize = cpu_to_le64(to_sector(eio_get_device_size(dmc->cache_dev)));
+	sb->sbf.disk_devsize = cpu_to_le64(to_sector(eio_get_device_size(dmc->disk_dev)));
+	sb->sbf.cache_version = cpu_to_le32(dmc->sb_version);
 	strncpy(sb->sbf.cache_name, dmc->cache_name, DEV_PATHLEN);
 	sb->sbf.cache_name[DEV_PATHLEN - 1] = '\0';
-	sb->sbf.mode = dmc->mode;
+	sb->sbf.mode = cpu_to_le32(dmc->mode);
 	spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
-	sb->sbf.repl_policy = dmc->req_policy;
-	sb->sbf.cache_flags = dmc->cache_flags & ~CACHE_FLAGS_INCORE_ONLY;
+	sb->sbf.repl_policy = cpu_to_le32(dmc->req_policy);
+	sb->sbf.cache_flags = cpu_to_le32(dmc->cache_flags & ~CACHE_FLAGS_INCORE_ONLY);
 	spin_unlock_irqrestore(&dmc->cache_spin_lock,
 			       dmc->cache_spin_lock_flags);
 	if (dmc->sb_version)
-		sb->sbf.magic = EIO_MAGIC;
+		sb->sbf.magic = cpu_to_le32(EIO_MAGIC);
 	else
-		sb->sbf.magic = EIO_BAD_MAGIC;
+		sb->sbf.magic = cpu_to_le32(EIO_BAD_MAGIC);
 
-	sb->sbf.cold_boot = dmc->cold_boot;
-	if (sb->sbf.cold_boot && eio_force_warm_boot)
-		sb->sbf.cold_boot |= BOOT_FLAG_FORCE_WARM;
+	sb->sbf.cold_boot = cpu_to_le32(dmc->cold_boot);
+	if (le32_to_cpu(sb->sbf.cold_boot) && eio_force_warm_boot)
+		sb->sbf.cold_boot = cpu_to_le32(le32_to_cpu(sb->sbf.cold_boot) |
+			       			BOOT_FLAG_FORCE_WARM);
 
-	sb->sbf.dirty_high_threshold = dmc->sysctl_active.dirty_high_threshold;
-	sb->sbf.dirty_low_threshold = dmc->sysctl_active.dirty_low_threshold;
+	sb->sbf.dirty_high_threshold = cpu_to_le32(dmc->sysctl_active.dirty_high_threshold);
+	sb->sbf.dirty_low_threshold = cpu_to_le32(dmc->sysctl_active.dirty_low_threshold);
 	sb->sbf.dirty_set_high_threshold =
-		dmc->sysctl_active.dirty_set_high_threshold;
+		cpu_to_le32(dmc->sysctl_active.dirty_set_high_threshold);
 	sb->sbf.dirty_set_low_threshold =
-		dmc->sysctl_active.dirty_set_low_threshold;
+		cpu_to_le32(dmc->sysctl_active.dirty_set_low_threshold);
 	sb->sbf.time_based_clean_interval =
-		dmc->sysctl_active.time_based_clean_interval;
-	sb->sbf.autoclean_threshold = dmc->sysctl_active.autoclean_threshold;
+		cpu_to_le32(dmc->sysctl_active.time_based_clean_interval);
+	sb->sbf.autoclean_threshold = cpu_to_le32(dmc->sysctl_active.autoclean_threshold);
 
 	/* write out to ssd */
 	where.bdev = dmc->cache_dev->bdev;
@@ -512,8 +513,8 @@ int eio_md_store(struct cache_c *dmc)
 	}
 
 	/* Debug Tests */
-	sectors_expected = dmc->size / MD_BLOCKS_PER_SECTOR;
-	if (dmc->size % MD_BLOCKS_PER_SECTOR)
+	sectors_expected = EIO_DIV(dmc->size, MD_BLOCKS_PER_SECTOR);
+	if (EIO_REM(dmc->size, MD_BLOCKS_PER_SECTOR))
 		sectors_expected++;
 	EIO_ASSERT(sectors_expected == sectors_written);
 	/* XXX: should we call eio_sb_store() on error ?? */
@@ -629,9 +630,9 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 	}
 
 	if (!force &&
-	    ((header->sbf.cache_sb_state == CACHE_MD_STATE_DIRTY) ||
-	     (header->sbf.cache_sb_state == CACHE_MD_STATE_CLEAN) ||
-	     (header->sbf.cache_sb_state == CACHE_MD_STATE_FASTCLEAN))) {
+	    ((le32_to_cpu(header->sbf.cache_sb_state) == CACHE_MD_STATE_DIRTY) ||
+	     (le32_to_cpu(header->sbf.cache_sb_state) == CACHE_MD_STATE_CLEAN) ||
+	     (le32_to_cpu(header->sbf.cache_sb_state) == CACHE_MD_STATE_FASTCLEAN))) {
 		pr_err
 			("md_create: Existing cache detected, use force to re-create.\n");
 		ret = -EINVAL;
@@ -647,12 +648,12 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 	 */
 	dmc->md_start_sect = EIO_METADATA_START(dmc->cache_dev_start_sect);
 	dmc->md_sectors =
-		INDEX_TO_MD_SECTOR(dmc->size / (sector_t)dmc->block_size);
+		INDEX_TO_MD_SECTOR(EIO_DIV(dmc->size, (sector_t)dmc->block_size));
 	dmc->md_sectors +=
 		EIO_EXTRA_SECTORS(dmc->cache_dev_start_sect, dmc->md_sectors);
 	dmc->size -= dmc->md_sectors;   /* total sectors available for cache */
-	dmc->size /= dmc->block_size;
-	dmc->size = (dmc->size / (sector_t)dmc->assoc) * (sector_t)dmc->assoc;
+	do_div(dmc->size, dmc->block_size);
+	dmc->size = EIO_DIV(dmc->size, dmc->assoc) * (sector_t)dmc->assoc;
 	/* Recompute since dmc->size was possibly trunc'ed down */
 	dmc->md_sectors = INDEX_TO_MD_SECTOR(dmc->size);
 	dmc->md_sectors +=
@@ -886,8 +887,8 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 		}
 
 		/* Debug Tests */
-		sectors_expected = dmc->size / MD_BLOCKS_PER_SECTOR;
-		if (dmc->size % MD_BLOCKS_PER_SECTOR)
+		sectors_expected = EIO_DIV(dmc->size, MD_BLOCKS_PER_SECTOR);
+		if (EIO_REM(dmc->size, MD_BLOCKS_PER_SECTOR))
 			sectors_expected++;
 		if (sectors_expected != sectors_written) {
 			pr_err
@@ -1001,12 +1002,12 @@ static int eio_md_load(struct cache_c *dmc)
 	}
 
 	/* check ondisk superblock version */
-	if (header->sbf.cache_version != EIO_SB_VERSION) {
+	if (le32_to_cpu(header->sbf.cache_version) != EIO_SB_VERSION) {
 		pr_info("md_load: Cache superblock mismatch detected."
 			" (current: %u, ondisk: %u)", EIO_SB_VERSION,
 			header->sbf.cache_version);
 
-		if (header->sbf.cache_version == 0) {
+		if (le32_to_cpu(header->sbf.cache_version) == 0) {
 			pr_err("md_load: Can't enable cache %s. Either "
 			       "superblock version is invalid or cache has"
 			       " been deleted", header->sbf.cache_name);
@@ -1014,21 +1015,21 @@ static int eio_md_load(struct cache_c *dmc)
 			goto free_header;
 		}
 
-		if (header->sbf.cache_version > EIO_SB_VERSION) {
+		if (le32_to_cpu(header->sbf.cache_version) > EIO_SB_VERSION) {
 			pr_err("md_load: Can't enable cache %s with newer "
 			       " superblock version.", header->sbf.cache_name);
 			ret = 1;
 			goto free_header;
 		}
 
-		if (header->sbf.mode == CACHE_MODE_WB) {
+		if (le32_to_cpu(header->sbf.mode) == CACHE_MODE_WB) {
 			pr_err("md_load: Can't enable write-back cache %s"
 			       " with newer superblock version.",
 			       header->sbf.cache_name);
 			ret = 1;
 			goto free_header;
-		} else if ((header->sbf.mode == CACHE_MODE_RO) ||
-			   (header->sbf.mode == CACHE_MODE_WT)) {
+		} else if ((le32_to_cpu(header->sbf.mode) == CACHE_MODE_RO) ||
+			   (le32_to_cpu(header->sbf.mode) == CACHE_MODE_WT)) {
 			dmc->persistence = CACHE_FORCECREATE;
 			pr_info("md_load: Can't enable cache, recreating"
 				" cache %s with newer superblock version.",
@@ -1040,11 +1041,11 @@ static int eio_md_load(struct cache_c *dmc)
 
 	/* check ondisk magic number */
 
-	if (header->sbf.cache_version >= EIO_SB_MAGIC_VERSION &&
-	    header->sbf.magic != EIO_MAGIC) {
+	if (le32_to_cpu(header->sbf.cache_version) >= EIO_SB_MAGIC_VERSION &&
+	    le32_to_cpu(header->sbf.magic) != EIO_MAGIC) {
 		pr_err("md_load: Magic number mismatch in superblock detected."
 		       " (current: %u, ondisk: %u)", EIO_MAGIC,
-		       header->sbf.magic);
+		      le32_to_cpu(header->sbf.magic));
 		ret = 1;
 		goto free_header;
 	}
@@ -1058,17 +1059,18 @@ static int eio_md_load(struct cache_c *dmc)
 	 * Otherwise, a bad write in last shutdown, can lead to data inaccessible
 	 * in writeback case.
 	 */
-	if (!((header->sbf.cache_sb_state == CACHE_MD_STATE_DIRTY) ||
-	      (header->sbf.cache_sb_state == CACHE_MD_STATE_CLEAN) ||
-	      (header->sbf.cache_sb_state == CACHE_MD_STATE_FASTCLEAN))) {
+	if (!((le32_to_cpu(header->sbf.cache_sb_state) == CACHE_MD_STATE_DIRTY) ||
+	      (le32_to_cpu(header->sbf.cache_sb_state) == CACHE_MD_STATE_CLEAN) ||
+	      (le32_to_cpu(header->sbf.cache_sb_state) == CACHE_MD_STATE_FASTCLEAN))) {
 		pr_err("md_load: Corrupt cache superblock");
 		ret = -EINVAL;
 		goto free_header;
 	}
 
-	if (header->sbf.cold_boot & BOOT_FLAG_FORCE_WARM) {
+	if (le32_to_cpu(header->sbf.cold_boot) & BOOT_FLAG_FORCE_WARM) {
 		force_warm_boot = 1;
-		header->sbf.cold_boot &= ~BOOT_FLAG_FORCE_WARM;
+		header->sbf.cold_boot = cpu_to_le32(le32_to_cpu(header->sbf.cold_boot) &
+							~BOOT_FLAG_FORCE_WARM);
 	}
 
 	/*
@@ -1077,25 +1079,25 @@ static int eio_md_load(struct cache_c *dmc)
 	 * - else if it is unclean shutdown, start as cold cache
 	 * cold cache will still treat the dirty blocks as hot
 	 */
-	if (dmc->cold_boot != header->sbf.cold_boot) {
+	if (dmc->cold_boot != le32_to_cpu(header->sbf.cold_boot)) {
 		pr_info
 			("superblock(%u) and config(%u) cold boot values do not match. Relying on config",
-			header->sbf.cold_boot, dmc->cold_boot);
+			le32_to_cpu(header->sbf.cold_boot), dmc->cold_boot);
 	}
 	if (dmc->cold_boot && !force_warm_boot) {
 		pr_info
 			("Cold boot is set, starting as if unclean shutdown(only dirty blocks will be hot)");
 		clean_shutdown = 0;
 	} else {
-		if (header->sbf.cache_sb_state == CACHE_MD_STATE_DIRTY) {
+		if (le32_to_cpu(header->sbf.cache_sb_state) == CACHE_MD_STATE_DIRTY) {
 			pr_info("Unclean shutdown detected");
 			pr_info("Only dirty blocks exist in cache");
 			clean_shutdown = 0;
-		} else if (header->sbf.cache_sb_state == CACHE_MD_STATE_CLEAN) {
+		} else if (le32_to_cpu(header->sbf.cache_sb_state) == CACHE_MD_STATE_CLEAN) {
 			pr_info("Slow (clean) shutdown detected");
 			pr_info("Only clean blocks exist in cache");
 			clean_shutdown = 1;
-		} else if (header->sbf.cache_sb_state ==
+		} else if (le32_to_cpu(header->sbf.cache_sb_state) ==
 			   CACHE_MD_STATE_FASTCLEAN) {
 			pr_info("Fast (clean) shutdown detected");
 			pr_info("Both clean and dirty blocks exist in cache");
@@ -1104,43 +1106,43 @@ static int eio_md_load(struct cache_c *dmc)
 			/* Won't reach here, but TBD may change the previous if condition */
 			pr_info
 				("cache state is %d. Treating as unclean shutdown",
-				header->sbf.cache_sb_state);
+				le32_to_cpu(header->sbf.cache_sb_state));
 			pr_info("Only dirty blocks exist in cache");
 			clean_shutdown = 0;
 		}
 	}
 
 	if (!dmc->mode)
-		dmc->mode = header->sbf.mode;
+		dmc->mode = le32_to_cpu(header->sbf.mode);
 	if (!dmc->req_policy)
-		dmc->req_policy = header->sbf.repl_policy;
+		dmc->req_policy = le32_to_cpu(header->sbf.repl_policy);
 
 	if (!dmc->cache_flags)
-		dmc->cache_flags = header->sbf.cache_flags;
+		dmc->cache_flags = le32_to_cpu(header->sbf.cache_flags);
 
 	(void)eio_policy_init(dmc);
 
-	dmc->block_size = header->sbf.block_size;
+	dmc->block_size = le64_to_cpu(header->sbf.block_size);
 	dmc->block_shift = ffs(dmc->block_size) - 1;
 	dmc->block_mask = dmc->block_size - 1;
-	dmc->size = header->sbf.size;
-	dmc->cache_size = header->sbf.cache_devsize;
-	dmc->assoc = header->sbf.assoc;
+	dmc->size = le32_to_cpu(header->sbf.size);
+	dmc->cache_size = le64_to_cpu(header->sbf.cache_devsize);
+	dmc->assoc = le32_to_cpu(header->sbf.assoc);
 	dmc->consecutive_shift = ffs(dmc->assoc) - 1;
-	dmc->md_start_sect = header->sbf.cache_md_start_sect;
-	dmc->md_sectors = header->sbf.cache_data_start_sect;
+	dmc->md_start_sect = le64_to_cpu(header->sbf.cache_md_start_sect);
+	dmc->md_sectors = le64_to_cpu(header->sbf.cache_data_start_sect);
 	dmc->sysctl_active.dirty_high_threshold =
-		header->sbf.dirty_high_threshold;
+		le32_to_cpu(header->sbf.dirty_high_threshold);
 	dmc->sysctl_active.dirty_low_threshold =
-		header->sbf.dirty_low_threshold;
+		le32_to_cpu(header->sbf.dirty_low_threshold);
 	dmc->sysctl_active.dirty_set_high_threshold =
-		header->sbf.dirty_set_high_threshold;
+		le32_to_cpu(header->sbf.dirty_set_high_threshold);
 	dmc->sysctl_active.dirty_set_low_threshold =
-		header->sbf.dirty_set_low_threshold;
+		le32_to_cpu(header->sbf.dirty_set_low_threshold);
 	dmc->sysctl_active.time_based_clean_interval =
-		header->sbf.time_based_clean_interval;
+		le32_to_cpu(header->sbf.time_based_clean_interval);
 	dmc->sysctl_active.autoclean_threshold =
-		header->sbf.autoclean_threshold;
+		le32_to_cpu(header->sbf.autoclean_threshold);
 
 	if ((i = eio_mem_init(dmc)) == -1) {
 		pr_err("eio_md_load: Failed to initialize memory.");
@@ -1298,8 +1300,8 @@ static int eio_md_load(struct cache_c *dmc)
 	}
 
 	/* Debug Tests */
-	sectors_expected = dmc->size / MD_BLOCKS_PER_SECTOR;
-	if (dmc->size % MD_BLOCKS_PER_SECTOR)
+	sectors_expected = EIO_DIV(dmc->size, MD_BLOCKS_PER_SECTOR);
+	if (EIO_REM(dmc->size, MD_BLOCKS_PER_SECTOR))
 		sectors_expected++;
 	if (sectors_expected != sectors_read) {
 		pr_err
@@ -1677,7 +1679,7 @@ int eio_cache_create(struct cache_rec_short *cache)
 		goto init;      /* Skip reading cache parameters from command line */
 
 	if (cache->cr_blksize && cache->cr_ssd_sector_size) {
-		dmc->block_size = cache->cr_blksize / cache->cr_ssd_sector_size;
+		dmc->block_size = EIO_DIV(cache->cr_blksize, cache->cr_ssd_sector_size);
 		if (dmc->block_size & (dmc->block_size - 1)) {
 			strerr = "Invalid block size";
 			error = -EINVAL;
@@ -1705,7 +1707,7 @@ int eio_cache_create(struct cache_rec_short *cache)
 	if (dmc->size == 0) {
 		if (cache->cr_ssd_dev_size && cache->cr_ssd_sector_size)
 			dmc->size =
-				cache->cr_ssd_dev_size / cache->cr_ssd_sector_size;
+				EIO_DIV(cache->cr_ssd_dev_size, cache->cr_ssd_sector_size);
 
 		if (dmc->size == 0) {
 			strerr = "Invalid cache size or can't be fetched";
@@ -1853,9 +1855,9 @@ init:
 		if (EIO_CACHE_STATE_GET(dmc, i) & VALID)
 			atomic64_inc(&dmc->eio_stats.cached_blocks);
 		if (EIO_CACHE_STATE_GET(dmc, i) & DIRTY) {
-			dmc->cache_sets[i / dmc->assoc].nr_dirty++;
+			dmc->cache_sets[EIO_DIV(i, dmc->assoc)].nr_dirty++;
 			atomic64_inc(&dmc->nr_dirty);
-			cur_set = i / dmc->assoc;
+			cur_set = EIO_DIV(i, dmc->assoc);
 			if (prev_set != cur_set) {
 				/* Move the given set at the head of the set LRU list */
 				eio_touch_set_lru(dmc, cur_set);
@@ -2536,11 +2538,6 @@ static int __init eio_init(void)
 {
 	int r;
 	extern struct bus_type scsi_bus_type;
-
-	if (sizeof(sector_t) != 8 || sizeof(index_t) != 8) {
-		pr_err("init: EnhanceIO runs only in 64-bit architectures");
-		return -EPERM;
-	}
 
 	eio_ttc_init();
 	r = eio_create_misc_device();

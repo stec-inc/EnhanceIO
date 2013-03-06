@@ -1594,8 +1594,8 @@ static void eio_check_dirty_cache_thresholds(struct cache_c *dmc)
 
 		/* Clean needs to be triggered on the cache */
 		required_cleans = atomic64_read(&dmc->nr_dirty) -
-				  ((dmc->sysctl_active.dirty_low_threshold * dmc->size) /
-				   100);
+				  (EIO_DIV((dmc->sysctl_active.dirty_low_threshold * dmc->size), 
+				   100));
 		enqueued_cleans = 0;
 
 		spin_lock_irqsave(&dmc->dirty_set_lru_lock, flags);
@@ -3548,7 +3548,7 @@ void eio_clean_aged_sets(struct work_struct *work)
 		if (set_index == LRU_NULL)
 			break;
 
-		if (((cur_time - set_time) / HZ) <
+		if ((EIO_DIV((cur_time - set_time), HZ)) <
 		    (dmc->sysctl_active.time_based_clean_interval * 60))
 			break;
 		lru_rem(dmc->dirty_set_lru, set_index);
