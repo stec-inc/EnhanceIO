@@ -42,6 +42,92 @@ IOC_SECTSIZE = 0x1268
 
 FIOCMD="fio --rw=randrw --verify=meta --verify_pattern=0x3982 --ioengine=libaio --iodepth=16 --direct=1 --size=1G --bsrange=512-128K --numjobs=10 --group_reporting --time_based --runtime=180 --name=job1 --filename="
 
+udev_template = """
+ACTION!="add|change", GOTO="EIO_EOF"
+SUBSYSTEM!="block", GOTO="EIO_EOF"
+
+<cache_match_expr>, GOTO="EIO_CACHE"
+
+<source_match_expr>, GOTO="EIO_SOURCE"
+
+# If none of the rules above matched then it isn't an EnhanceIO device so ignore it.
+GOTO="EIO_EOF"
+
+# If we just found the cache device and the source already exists then we can setup
+LABEL="EIO_CACHE"
+	TEST!="/dev/enhanceio/<cache_name>", PROGRAM="/bin/mkdir -p /dev/enhanceio/<cache_name>"
+	PROGRAM="/bin/sh -c 'echo $kernel > /dev/enhanceio/<cache_name>/.ssd_name'"
+
+	TEST=="/dev/enhanceio/<cache_name>/.disk_name", GOTO="EIO_SETUP"
+GOTO="EIO_EOF"
+
+# If we just found the source device and the cache already exists then we can setup
+LABEL="EIO_SOURCE"
+	TEST!="/dev/enhanceio/<cache_name>", PROGRAM="/bin/mkdir -p /dev/enhanceio/<cache_name>"
+	PROGRAM="/bin/sh -c 'echo $kernel > /dev/enhanceio/<cache_name>/.disk_name'"
+	
+	TEST=="/dev/enhanceio/<cache_name>/.ssd_name", GOTO="EIO_SETUP"
+	PROGRAM="/bin/sh -c 'blockdev --setro $kernel'"  
+GOTO="EIO_EOF"
+
+LABEL="EIO_SETUP"
+	PROGRAM="/bin/sh -c 'cat /dev/enhanceio/<cache_name>/.ssd_name'", ENV{ssd_name}="%c"
+	PROGRAM="/bin/sh -c 'cat /dev/enhanceio/<cache_name>/.disk_name'", ENV{disk_name}="%c"
+
+	TEST!="/proc/enhanceio/<cache_name>", RUN+="/sbin/eio_cli enable -d /dev/$env{disk_name} -s /dev/$env{ssd_name} -m <mode> -b <block_size> -c <cache_name>"
+LABEL="EIO_EOF"
+"""
+
+def make_udev_match_expr(dev_path, cache_name):
+	dict_udev = {}
+	status = run_cmd("udevadm info --query=property --name=" + dev_path)
+	for line in status.output.split('\n'):
+		if line is not '':
+			temp = line.split("=", 1)
+			dict_udev[temp[0]] = temp[1]
+
+	# DM devices
+	if dict_udev["DEVTYPE"] == "disk" and "DM_UUID" in dict_udev:
+		match_expr='ENV{DM_UUID}=="'+ dict_udev["DM_UUID"] + '", ENV{DEVTYPE}=="' + dict_udev["DEVTYPE"] +'"'
+		return	match_expr
+
+	# MD devices
+	if "MD_UUID" in dict_udev:
+		if "DEVTYPE" == "disk": 
+			match_expr='ENV{MD_UUID}=="' + dict_udev["MD_UUID"] + '", ENV{DEVTYPE}=="' + dict_udev[DEVTYPE] +'", ENV{MD_DEV_UUID}=="' + dict_dev["MD_DEV_UUID"] + '"'
+			return match_expr
+
+		elif dict_udev["DEVTYPE"] == "partition":
+			try:
+				with open("/sys" + dict_udev["DEVPATH"] + "/partition") as f:
+					partition_num = f.read()
+					match_expr='ENV{ID_SERIAL}=="' + dict_udev[ID_SERIAL]+'", ATTR{partition}=="' + partition_num + '"'
+					return match_expr	
+			except IOError as e:
+				pass
+
+	# Partition
+	if dict_udev["DEVTYPE"] == "partition" and "ID_SERIAL" in dict_udev:
+		try:
+			with open("/sys" + dict_udev["DEVPATH"] + "/partition") as f:
+				partition_num = f.read()
+				match_expr='ENV{ID_SERIAL}=="' + 'dict_udev[ID_SERIAL]"'+', ATTR{partition}=="' + partition_num + '"'
+				return match_expr
+		except IOError as e:
+			pass
+
+
+	# Disk
+	if dict_udev["DEVTYPE"] == "disk" and "ID_SERIAL" in dict_udev :
+		match_expr='ENV{ID_SERIAL}=="'+ dict_udev["ID_SERIAL"] + '", ENV{DEVTYPE}=="'+ dict_udev["DEVTYPE"] +'"'
+		return match_expr
+
+	# Partition or disk w/ filesystem
+	if "ID_FS_UUID" in dict_udev:
+		match_expr= 'ENV{DM_NAME}!="' + cache_name + '", ENV{ID_FS_UUID}=="' + dict_udev["ID_FS_UUID"] + '"'
+		return match_expr
+
+
 def run_cmd(cmd):
 	#Utility function that runs a command
 	process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,shell=True)
@@ -49,6 +135,7 @@ def run_cmd(cmd):
 	ret = process.wait()
 	status = Status(output,ret)
 	return status
+
 
 
 def get_caches_list():
@@ -72,7 +159,7 @@ def sanity(hdd, ssd):
 				cache = Cache_rec(name = "test_cache", src_name = hdd, ssd_name = ssd, policy = policy, mode = mode, blksize = blksize)
 				cache.create()
 				run_cmd(FIOCMD + hdd)
-				cache.do_eio_ioctl(EIO_IOC_DELETE)				 
+				cache.do_eio_ioctl(EIO_IOC_DELETE)
 	
 
 # Class that represents cache. Also used to pass ioctl to driver 
@@ -120,7 +207,6 @@ class Cache_rec(Structure):
 		# Display Cache info 
 		modes = {3:"Write Through", 1:"Write Back", 2:"Read Only",0:"N/A"}
 		policies = {3:"rand", 1:"fifo", 2:"lru", 0:"N/A"}
-
 
 		print "Cache Name       : " + self.name 
 		print "Source Device    : " + self.src_name 
@@ -180,6 +266,7 @@ class Cache_rec(Structure):
 
 			self.assoc = associativity[self.blksize]
 	def create(self):		 
+
 		src_sz = Dev_info() 
 		src_sz.get_device_size_info(self.src_name)
 		self.src_size = src_sz.dev_size
@@ -191,9 +278,31 @@ class Cache_rec(Structure):
 		self.ssd_sector_size = ssd_sz.dev_sect_size
 
 		self.print_info()	
-		self.do_eio_ioctl(EIO_IOC_CREATE)		
+		if self.do_eio_ioctl(EIO_IOC_CREATE) == 0:
+			create_rules()
+			
+
+	def create_rules(self):
+
+		source_match_expr = make_udev_match_expr(self.src_name, self.name)
+		print source_match_expr
+		cache_match_expr = make_udev_match_expr(self.ssd_name, self.name)
+		print cache_match_expr
+		modes = {3:"wt", 1:"wb", 2:"ro",0:"N/A"}
+		
+		udev_rule = udev_template.replace("<cache_name>",self.name).replace("<source_match_expr>", source_match_expr).replace("<cache_match_expr>", cache_match_expr).replace("<mode>", modes[self.mode]).replace("<block_size>", str(self.blksize))
+
+		# write rule file
+		rule_file_path = "/etc/udev/rules.d/94-enhanceio-" + self.name + ".rules" 
+		rule_file =open(rule_file_path, "w")
+		rule_file.write(udev_rule)	
 						
-						
+	def delete_rules(self):
+				
+		rule_file_path = "/etc/udev/rules.d/94-enhanceio-" + self.name + ".rules" 
+		print "removing file" + rule_file_path
+		os.remove(rule_file_path)	
+
 	
 class Status:
 	output = ""
@@ -279,6 +388,8 @@ def main():
 		cache = Cache_rec(name = args.cache, src_name = args.hdd, ssd_name = args.ssd, policy = args.policy, mode = args.mode, blksize = args.blksize)
 
 		cache.create()
+		cache.create_rules()
+
 		pass
 	elif sys.argv[1] == "info":
 		cache_list = get_caches_list()
@@ -301,6 +412,7 @@ def main():
 	elif sys.argv[1] == "delete":
 		cache = Cache_rec(name = args.cache)
 		cache.do_eio_ioctl(EIO_IOC_DELETE)
+		cache.delete_rules()
 		pass
 	elif sys.argv[1] == "clean":
 		cache = Cache_rec(name = args.cache)
