@@ -84,7 +84,7 @@ def make_udev_match_expr(dev_path, cache_name):
 	for line in status.output.split('\n'):
 		if line is not '':
 			temp = line.split("=", 1)
-			dict_udev[temp[0]] = temp[1]
+			dict_udev[temp[0].strip()] = temp[1].strip()
 
 	# DM devices
 	if dict_udev["DEVTYPE"] == "disk" and "DM_UUID" in dict_udev:
