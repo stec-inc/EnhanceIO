@@ -101,7 +101,7 @@ def make_udev_match_expr(dev_path, cache_name):
 			try:
 				with open("/sys" + dict_udev["DEVPATH"] + "/partition") as f:
 					partition_num = f.read()
-					match_expr='ENV{ID_SERIAL}=="' + dict_udev[ID_SERIAL]+'", ATTR{partition}=="' + partition_num + '"'
+					match_expr='ENV{ID_SERIAL}=="' + dict_udev["ID_SERIAL"]+'", ATTR{partition}=="' + partition_num + '"'
 					return match_expr	
 			except IOError as e:
 				pass
@@ -110,8 +110,8 @@ def make_udev_match_expr(dev_path, cache_name):
 	if dict_udev["DEVTYPE"] == "partition" and "ID_SERIAL" in dict_udev:
 		try:
 			with open("/sys" + dict_udev["DEVPATH"] + "/partition") as f:
-				partition_num = f.read()
-				match_expr='ENV{ID_SERIAL}=="' + 'dict_udev[ID_SERIAL]"'+', ATTR{partition}=="' + partition_num + '"'
+				partition_num = f.read().strip()
+				match_expr='ENV{ID_SERIAL}=="' + dict_udev["ID_SERIAL"] +'", ATTR{partition}=="' + partition_num + '"'
 				return match_expr
 		except IOError as e:
 			pass
