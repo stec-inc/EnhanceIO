@@ -84,7 +84,7 @@ def make_udev_match_expr(dev_path, cache_name):
 	for line in status.output.split('\n'):
 		if line is not '':
 			temp = line.split("=", 1)
-			dict_udev[temp[0]] = temp[1]
+			dict_udev[temp[0].strip()] = temp[1].strip()
 
 	# DM devices
 	if dict_udev["DEVTYPE"] == "disk" and "DM_UUID" in dict_udev:
@@ -100,8 +100,8 @@ def make_udev_match_expr(dev_path, cache_name):
 		elif dict_udev["DEVTYPE"] == "partition":
 			try:
 				with open("/sys" + dict_udev["DEVPATH"] + "/partition") as f:
-					partition_num = f.read()
-					match_expr='ENV{ID_SERIAL}=="' + dict_udev[ID_SERIAL]+'", ATTR{partition}=="' + partition_num + '"'
+					partition_num = f.read().strip()
+					match_expr='ENV{ID_SERIAL}=="' + dict_udev["ID_SERIAL"]+'", ATTR{partition}=="' + partition_num + '"'
 					return match_expr	
 			except IOError as e:
 				pass
@@ -110,8 +110,8 @@ def make_udev_match_expr(dev_path, cache_name):
 	if dict_udev["DEVTYPE"] == "partition" and "ID_SERIAL" in dict_udev:
 		try:
 			with open("/sys" + dict_udev["DEVPATH"] + "/partition") as f:
-				partition_num = f.read()
-				match_expr='ENV{ID_SERIAL}=="' + 'dict_udev[ID_SERIAL]"'+', ATTR{partition}=="' + partition_num + '"'
+				partition_num = f.read().strip()
+				match_expr='ENV{ID_SERIAL}=="' + dict_udev["ID_SERIAL"] +'", ATTR{partition}=="' + partition_num + '"'
 				return match_expr
 		except IOError as e:
 			pass
