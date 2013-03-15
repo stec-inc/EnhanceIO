@@ -321,8 +321,8 @@ int eio_sb_store(struct cache_c *dmc)
 	error = eio_io_sync_vm(dmc, &where, WRITE, sb_pages, nr_pages);
 	if (error) {
 		pr_err
-			("sb_store: Could not write out superblock to sector %lu (error %d) for cache \"%s\".\n",
-			where.sector, error, dmc->cache_name);
+			("sb_store: Could not write out superblock to sector %llu (error %d) for cache \"%s\".\n",
+			(unsigned long long)where.sector, error, dmc->cache_name);
 	}
 
 	/* free the allocated pages here */
@@ -454,8 +454,8 @@ int eio_md_store(struct cache_c *dmc)
 				if (error) {
 					write_errors++;
 					pr_err
-						("md_store: Could not write out metadata to sector %lu (error %d)",
-						where.sector, error);
+						("md_store: Could not write out metadata to sector %llu (error %d)",
+						(unsigned long long)where.sector, error);
 				}
 				where.sector += where.count;    /* Advance offset */
 			}
@@ -507,8 +507,8 @@ int eio_md_store(struct cache_c *dmc)
 		if (error) {
 			write_errors++;
 			pr_err
-				("md_store: Could not write out metadata to sector %lu (error %d)",
-				where.sector, error);
+				("md_store: Could not write out metadata to sector %llu (error %d)",
+				(unsigned long long)where.sector, error);
 		}
 	}
 
@@ -520,8 +520,8 @@ int eio_md_store(struct cache_c *dmc)
 	/* XXX: should we call eio_sb_store() on error ?? */
 	if (sectors_expected != sectors_written) {
 		pr_err
-			("md_store: Sector mismatch! sectors_expected=%ld, sectors_written=%ld\n",
-			sectors_expected, sectors_written);
+			("md_store: Sector mismatch! sectors_expected=%llu, sectors_written=%llu\n",
+			(unsigned long long)sectors_expected, (unsigned long long)sectors_written);
 	}
 
 	for (k = 0; k < nr_pages; k++)
@@ -564,8 +564,8 @@ sb_store:
 				num_dirty);
 	}
 
-	pr_info("Valid blocks: %d, Dirty blocks: %d, Metadata sectors: %lu",
-		num_valid, num_dirty, (long unsigned int)dmc->md_sectors);
+	pr_info("Valid blocks: %d, Dirty blocks: %d, Metadata sectors: %llu",
+		num_valid, num_dirty, (long long unsigned int)dmc->md_sectors);
 
 	return 0;
 }
@@ -623,8 +623,8 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 	error = eio_io_sync_vm(dmc, &where, READ, header_page, 1);
 	if (error) {
 		pr_err
-			("md_create: Could not read superblock sector %lu error %d for cache \"%s\".\n",
-			where.sector, error, dmc->cache_name);
+			("md_create: Could not read superblock sector %llu error %d for cache \"%s\".\n",
+			(unsigned long long)where.sector, error, dmc->cache_name);
 		ret = -EINVAL;
 		goto free_header;
 	}
@@ -676,8 +676,8 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 	cache_size = dmc->md_sectors + (dmc->size * dmc->block_size);
 	if (cache_size > dev_size) {
 		pr_err
-			("md_create: Requested cache size exceeds the cache device's capacity (%lu > %lu)",
-			cache_size, dev_size);
+			("md_create: Requested cache size exceeds the cache device's capacity (%llu > %llu)",
+			(unsigned long long)cache_size, (unsigned long long)dev_size);
 		ret = -EINVAL;
 		goto free_header;
 	}
@@ -688,10 +688,11 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 		 sizeof(struct cacheblock));
 	i = EIO_MD8(dmc) ? sizeof(struct cacheblock_md8) : sizeof(struct
 								  cacheblock);
-	pr_info("Allocate %luKB (%luB per) mem for %lu-entry cache "
-		"(capacity:%luMB, associativity:%u, block size:%u bytes)",
-		order >> 10, i, (long unsigned int)dmc->size,
-		(cache_size >> (20 - SECTOR_SHIFT)), dmc->assoc,
+	pr_info("Allocate %lluKB (%lluB per) mem for %llu-entry cache "
+		"(capacity:%lluMB, associativity:%u, block size:%u bytes)",
+		(unsigned long long)order >> 10, (unsigned long long)i,
+	       	(long long unsigned int)dmc->size,
+		(unsigned long long)(cache_size >> (20 - SECTOR_SHIFT)), dmc->assoc,
 		dmc->block_size << SECTOR_SHIFT);
 
 	if (!eio_mem_available(dmc, order) && !CACHE_SSD_ADD_INPROG_IS_SET(dmc)) {
@@ -823,8 +824,8 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 							    (dmc))
 							vfree(EIO_CACHE(dmc));
 						pr_err
-							("md_create: Could not write cache metadata sector %lu error %d.\n for cache \"%s\".\n",
-							where.sector, error,
+							("md_create: Could not write cache metadata sector %llu error %d.\n for cache \"%s\".\n",
+							(unsigned long long)where.sector, error,
 							dmc->cache_name);
 						ret = -EIO;
 						goto free_md;
@@ -879,8 +880,8 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 				if (!CACHE_SSD_ADD_INPROG_IS_SET(dmc))
 					vfree((void *)EIO_CACHE(dmc));
 				pr_err
-					("md_create: Could not write cache metadata sector %lu error %d for cache \"%s\".\n",
-					where.sector, error, dmc->cache_name);
+					("md_create: Could not write cache metadata sector %llu error %d for cache \"%s\".\n",
+					(unsigned long long)where.sector, error, dmc->cache_name);
 				ret = -EIO;
 				goto free_md;
 			}
@@ -892,8 +893,8 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 			sectors_expected++;
 		if (sectors_expected != sectors_written) {
 			pr_err
-				("md_create: Sector mismatch! sectors_expected=%ld, sectors_written=%ld for cache \"%s\".\n",
-				sectors_expected, sectors_written,
+				("md_create: Sector mismatch! sectors_expected=%llu, sectors_written=%llu for cache \"%s\".\n",
+				(unsigned long long)sectors_expected, (unsigned long long)sectors_written,
 				dmc->cache_name);
 			ret = -EIO;
 			goto free_md;
@@ -995,8 +996,8 @@ static int eio_md_load(struct cache_c *dmc)
 	error = eio_io_sync_vm(dmc, &where, READ, header_page, 1);
 	if (error) {
 		pr_err
-			("md_load: Could not read cache superblock sector %lu error %d",
-			where.sector, error);
+			("md_load: Could not read cache superblock sector %llu error %d",
+			(unsigned long long)where.sector, error);
 		ret = -EINVAL;
 		goto free_header;
 	}
@@ -1158,10 +1159,11 @@ static int eio_md_load(struct cache_c *dmc)
 	size =
 		EIO_MD8(dmc) ? sizeof(struct cacheblock_md8) : sizeof(struct
 								      cacheblock);
-	pr_info("Allocate %luKB (%ldB per) mem for %lu-entry cache "
-		"(capacity:%luMB, associativity:%u, block size:%u bytes)",
-		order >> 10, size, (long unsigned int)dmc->size,
-		(long unsigned int)(dmc->md_sectors + data_size) >> (20 -
+	pr_info("Allocate %lluKB (%lluB per) mem for %llu-entry cache "
+		"(capacity:%lluMB, associativity:%u, block size:%u bytes)",
+		(unsigned long long)order >> 10, (unsigned long long)size,
+	       	(long long unsigned int)dmc->size,
+		(long long unsigned int)(dmc->md_sectors + data_size) >> (20 -
 								     SECTOR_SHIFT),
 		dmc->assoc, dmc->block_size << SECTOR_SHIFT);
 
@@ -1245,8 +1247,8 @@ static int eio_md_load(struct cache_c *dmc)
 		if (error) {
 			vfree((void *)EIO_CACHE(dmc));
 			pr_err
-				("md_load: Could not read cache metadata sector %lu error %d",
-				where.sector, error);
+				("md_load: Could not read cache metadata sector %llu error %d",
+				(unsigned long long)where.sector, error);
 			ret = -EIO;
 			goto free_md;
 		}
@@ -1305,8 +1307,8 @@ static int eio_md_load(struct cache_c *dmc)
 		sectors_expected++;
 	if (sectors_expected != sectors_read) {
 		pr_err
-			("md_load: Sector mismatch! sectors_expected=%ld, sectors_read=%ld\n",
-			sectors_expected, sectors_read);
+			("md_load: Sector mismatch! sectors_expected=%llu, sectors_read=%llu\n",
+			(unsigned long long)sectors_expected, (unsigned long long)sectors_read);
 		vfree((void *)EIO_CACHE(dmc));
 		ret = -EIO;
 		goto free_md;
@@ -1989,8 +1991,8 @@ int eio_cache_delete(char *cache_name, int do_delete)
 						       dmc->
 						       cache_spin_lock_flags);
 				pr_err
-					("cache_delete: Stale Cache detected with dirty blocks=%ld.\n",
-					atomic64_read(&dmc->nr_dirty));
+					("cache_delete: Stale Cache detected with dirty blocks=%lld.\n",
+					(long long)atomic64_read(&dmc->nr_dirty));
 				pr_err
 					("cache_delete: Cache \"%s\" wont be deleted. Deleting will result in data corruption.\n",
 					dmc->cache_name);
@@ -2132,9 +2134,9 @@ int eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 
 	/* sanity check */
 	if (dmc->cache_size != to_sector(eio_get_device_size(dmc->cache_dev))) {
-		pr_err("ctr_ssd_add: Cache device size has changed, expected (%lu) found (%lu) \
-				continuing in degraded mode", dmc->cache_size,
-		       to_sector(eio_get_device_size(dmc->cache_dev)));
+		pr_err("ctr_ssd_add: Cache device size has changed, expected (%llu) found (%llu) \
+				continuing in degraded mode", (unsigned long long)dmc->cache_size,
+		       (unsigned long long)to_sector(eio_get_device_size(dmc->cache_dev)));
 		r = -EINVAL;
 		goto out;
 	}
@@ -2143,8 +2145,9 @@ int eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 	if (dmc->cache_dev_start_sect !=
 	    eio_get_device_start_sect(dmc->cache_dev)) {
 		pr_err("ctr_ssd_add: Cache device starting sector changed, \
-				expected (%lu) found (%lu) continuing in \
-				degraded mode", dmc->cache_dev_start_sect, eio_get_device_start_sect(dmc->cache_dev));
+				expected (%llu) found (%llu) continuing in \
+				degraded mode", (unsigned long long)dmc->cache_dev_start_sect,
+			       	(unsigned long long)eio_get_device_start_sect(dmc->cache_dev));
 		r = -EINVAL;
 		goto out;
 	}
@@ -2406,8 +2409,8 @@ eio_notify_reboot(struct notifier_block *this, unsigned long code, void *x)
 		if (dmc->cold_boot && atomic64_read(&dmc->nr_dirty)
 		    && !eio_force_warm_boot) {
 			pr_info
-				("Cold boot set for cache %s: Draining dirty blocks: %ld",
-				dmc->cache_name, atomic64_read(&dmc->nr_dirty));
+				("Cold boot set for cache %s: Draining dirty blocks: %lld",
+				dmc->cache_name, (long long)atomic64_read(&dmc->nr_dirty));
 			eio_clean_for_reboot(dmc);
 		}
 		eio_md_store(dmc);

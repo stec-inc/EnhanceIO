@@ -276,8 +276,10 @@ static void eio_disk_io_callback(int error, void *context)
 	spin_unlock_irqrestore(&dmc->cache_sets[eb_cacheset].cs_lock, flags);
 
 	if (unlikely(error))
-		pr_err("disk_io_callback: io error %d block %lu action %d",
-		       error, job->job_io_regions.disk.sector, job->action);
+		pr_err("disk_io_callback: io error %d block %llu action %d",
+		       error,
+		       (unsigned long long)job->job_io_regions.disk.sector,
+		       job->action);
 
 	eb_endio(ebio, error);
 	ebio = NULL;
@@ -382,8 +384,10 @@ static void eio_post_io_callback(struct work_struct *work)
 
 	eb_cacheset = ebio->eb_cacheset;
 	if (error)
-		pr_err("io_callback: io error %d block %lu action %d",
-		       error, job->job_io_regions.disk.sector, job->action);
+		pr_err("io_callback: io error %d block %llu action %d",
+		       error, 
+		       (unsigned long long)job->job_io_regions.disk.sector,
+		       job->action);
 
 	switch (job->action) {
 	case WRITEDISK:
@@ -2319,6 +2323,7 @@ static int eio_acquire_set_locks(struct cache_c *dmc, struct bio_container *bc)
 	end_sector = bio->bi_sector + to_sector(bio->bi_size);
 	first_set = -1;
 	last_set = -1;
+	cur_set= -1;
 	bc->bc_setspan = NULL;
 
 	while (round_sector < end_sector) {
@@ -3243,7 +3248,7 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 	int pindex, k;
 	index_t blkindex;
 	struct bio_vec *bvecs;
-	unsigned nr_bvecs, total;
+	unsigned nr_bvecs = 0, total;
 	void *pg_virt_addr[2] = { NULL };
 
 	/* Cache is failed mode, do nothing. */

@@ -992,8 +992,8 @@ static int eio_finish_nrdirty(struct cache_c *dmc)
 		ret = -EINVAL;
 	if (ret)
 		pr_err
-			("finish_nrdirty: Failed to finish %lu dirty blocks for cache \"%s\".",
-			atomic64_read(&dmc->nr_dirty), dmc->cache_name);
+			("finish_nrdirty: Failed to finish %llu dirty blocks for cache \"%s\".",
+			(unsigned long long)atomic64_read(&dmc->nr_dirty), dmc->cache_name);
 
 	return ret;
 }
@@ -1559,9 +1559,9 @@ int eio_reboot_handling(void)
 			if (dmc->cold_boot && atomic64_read(&dmc->nr_dirty) &&
 			    !eio_force_warm_boot) {
 				pr_info
-					("Cold boot set for cache %s: Draining dirty blocks: %ld",
+					("Cold boot set for cache %s: Draining dirty blocks: %llu",
 					dmc->cache_name,
-					atomic64_read(&dmc->nr_dirty));
+					(unsigned long long)atomic64_read(&dmc->nr_dirty));
 				eio_clean_for_reboot(dmc);
 			}
 
