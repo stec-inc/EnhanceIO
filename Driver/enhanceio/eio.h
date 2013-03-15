@@ -282,7 +282,7 @@ union eio_superblock {
  */
 struct flash_cacheblock {
 	sector_t dbn;           /* Sector number of the cached block */
-	u_int32_t cache_state;
+	u_int64_t cache_state;
 };
 
 /* blksize in terms of no. of sectors */
