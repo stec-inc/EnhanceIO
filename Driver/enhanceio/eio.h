@@ -750,8 +750,8 @@ struct cache_c {
 
 #define EIO_CACHE_IOSIZE                0
 
-#define EIO_ROUND_SECTOR(dmc, sector) (sector & (~(unsigned)(dmc->block_size - 1)))
-#define EIO_ROUND_SET_SECTOR(dmc, sector) (sector & (~(unsigned)((dmc->block_size * dmc->assoc) - 1)))
+#define EIO_ROUND_SECTOR(dmc, sector) (sector & (~(unsigned long)(dmc->block_size - 1)))
+#define EIO_ROUND_SET_SECTOR(dmc, sector) (sector & (~(unsigned long)((dmc->block_size * dmc->assoc) - 1)))
 
 /*
  * The bit definitions are exported to the user space and are in the very beginning of the file.
