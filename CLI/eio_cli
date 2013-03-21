@@ -36,7 +36,7 @@ EIO_IOC_CACHE_LIST = 0x4506
 EIO_IOC_SSD_ADD = 0x4507 
 EIO_IOC_SSD_REMOVE = 0x4508 
 EIO_IOC_SRC_ADD = 0x4509
-EIO_IOC_SRC_REMOVE = 0x4500a
+EIO_IOC_SRC_REMOVE = 0x450a
 IOC_BLKGETSIZE64 = 0x80081272
 IOC_SECTSIZE = 0x1268
 
@@ -322,16 +322,12 @@ class Dev_info:
 	def get_device_size_info(self,name):
 		fd = open(name,"r")
 		
-		buf = ' ' * 8
+		status = run_cmd("blockdev --getsize "+ name);
+                self.dev_size = int(status.output.split()[0]) * 512
 
-		buf = ioctl(fd, IOC_BLKGETSIZE64, buf)
-		bytes = struct.unpack('L', buf)
-		self.dev_size = int(bytes[0])
-
-		buf = ioctl(fd, IOC_SECTSIZE, buf)
-		bytes = struct.unpack('L', buf)
-		self.dev_sect_size = int(bytes[0])
-
+		status = run_cmd("blockdev --getss "+ name);
+                self.dev_sect_size = int(status.output.split()[0])
+		
 		pass
 		
 def main():
