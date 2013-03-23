@@ -36,4 +36,6 @@ EnhanceIO caches are persistent by default. A udev rule file named
 94-enhanceio-<cache_name>.rules is created, removed by create, delete
 sub-commands in eio_cli.
 
-
+Note: creating a writeback cache on root device is not supported. This is
+      because the root device is mounted as read only prior to the processing
+      of udev rules.
