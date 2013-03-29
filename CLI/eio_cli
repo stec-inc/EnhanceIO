@@ -401,12 +401,14 @@ class Cache_rec(Structure):
 				
 		rule_file_path = "/etc/udev/rules.d/94-enhanceio-" + self.name + ".rules" 
 		print "Removing file" + rule_file_path
-		if os.remove(rule_file_path) == '0':
+		try:	
+			os.remove(rule_file_path)
 			print "Done removing rule file"
 			return SUCCESS
-		else:
+		except Exception as e:
 			print "Unable to delete rule file" + \
 			"(please emove it manually)"
+			print e
 		return FAILURE
 	
 class Status:
