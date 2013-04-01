@@ -77,7 +77,7 @@
 #define EIO_HANDLE_REBOOT       1
 
 
-static __inline__ uint32_t
+static __inline__ uint64_t
 EIO_DIV(uint64_t dividend_64, uint32_t divisor_32)
 {
 	uint64_t result;
