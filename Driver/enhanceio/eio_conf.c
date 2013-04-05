@@ -283,8 +283,8 @@ int eio_sb_store(struct cache_c *dmc)
 	strncpy(sb->sbf.disk_devname, dmc->disk_devname, DEV_PATHLEN);
 	strncpy(sb->sbf.cache_devname, dmc->cache_devname, DEV_PATHLEN);
 	strncpy(sb->sbf.ssd_uuid, dmc->ssd_uuid, DEV_PATHLEN - 1);
-	sb->sbf.cache_devsize = cpu_to_le64(to_sector(eio_get_device_size(dmc->cache_dev)));
-	sb->sbf.disk_devsize = cpu_to_le64(to_sector(eio_get_device_size(dmc->disk_dev)));
+	sb->sbf.cache_devsize = cpu_to_le64(eio_to_sector(eio_get_device_size(dmc->cache_dev)));
+	sb->sbf.disk_devsize = cpu_to_le64(eio_to_sector(eio_get_device_size(dmc->disk_dev)));
 	sb->sbf.cache_version = cpu_to_le32(dmc->sb_version);
 	strncpy(sb->sbf.cache_name, dmc->cache_name, DEV_PATHLEN);
 	sb->sbf.cache_name[DEV_PATHLEN - 1] = '\0';
@@ -317,7 +317,7 @@ int eio_sb_store(struct cache_c *dmc)
 	/* write out to ssd */
 	where.bdev = dmc->cache_dev->bdev;
 	where.sector = EIO_SUPERBLOCK_START;
-	where.count = to_sector(EIO_SUPERBLOCK_SIZE);
+	where.count = eio_to_sector(EIO_SUPERBLOCK_SIZE);
 	error = eio_io_sync_vm(dmc, &where, WRITE, sb_pages, nr_pages);
 	if (error) {
 		pr_err
@@ -577,7 +577,7 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 	struct eio_io_region where;
 	sector_t i;
 	int j, error;
-	sector_t cache_size, dev_size;
+	uint64_t cache_size, dev_size;
 	sector_t order;
 	sector_t sectors_written = 0, sectors_expected = 0;     /* debug */
 	int slots_written = 0;                                  /* How many cache slots did we fill in this MD io block ? */
@@ -619,7 +619,7 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 
 	where.bdev = dmc->cache_dev->bdev;
 	where.sector = EIO_SUPERBLOCK_START;
-	where.count = to_sector(EIO_SUPERBLOCK_SIZE);
+	where.count = eio_to_sector(EIO_SUPERBLOCK_SIZE);
 	error = eio_io_sync_vm(dmc, &where, READ, header_page, 1);
 	if (error) {
 		pr_err
@@ -672,7 +672,7 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 		ret = -ENODEV;
 		goto free_header;
 	}
-	dev_size = to_sector(eio_get_device_size(dmc->cache_dev));
+	dev_size = eio_to_sector(eio_get_device_size(dmc->cache_dev));
 	cache_size = dmc->md_sectors + (dmc->size * dmc->block_size);
 	if (cache_size > dev_size) {
 		pr_err
@@ -992,7 +992,7 @@ static int eio_md_load(struct cache_c *dmc)
 
 	where.bdev = dmc->cache_dev->bdev;
 	where.sector = EIO_SUPERBLOCK_START;
-	where.count = to_sector(EIO_SUPERBLOCK_SIZE);
+	where.count = eio_to_sector(EIO_SUPERBLOCK_SIZE);
 	error = eio_io_sync_vm(dmc, &where, READ, header_page, 1);
 	if (error) {
 		pr_err
@@ -1491,7 +1491,7 @@ int eio_cache_create(struct cache_rec_short *cache)
 		goto bad1;
 	}
 	if ((dmc->disk_size =
-		     to_sector(eio_get_device_size(dmc->disk_dev))) >= EIO_MAX_SECTOR) {
+		     eio_to_sector(eio_get_device_size(dmc->disk_dev))) >= EIO_MAX_SECTOR) {
 		strerr = "Source device too big to support";
 		error = -EFBIG;
 		goto bad2;
@@ -1705,7 +1705,7 @@ int eio_cache_create(struct cache_rec_short *cache)
 	 * one we used for creating the cache, so we ideally should always use the kernel
 	 * got cache size.
 	 */
-	dmc->size = to_sector(eio_get_device_size(dmc->cache_dev));
+	dmc->size = eio_to_sector(eio_get_device_size(dmc->cache_dev));
 	if (dmc->size == 0) {
 		if (cache->cr_ssd_dev_size && cache->cr_ssd_sector_size)
 			dmc->size =
@@ -1745,8 +1745,8 @@ int eio_cache_create(struct cache_rec_short *cache)
 	 * device will have less than 4 billion sets.
 	 */
 
-	i = to_sector(eio_get_device_size(dmc->disk_dev)) /
-	    (dmc->assoc * dmc->block_size);
+	i = EIO_DIV(eio_to_sector(eio_get_device_size(dmc->disk_dev)),
+	    (dmc->assoc * dmc->block_size));
 	if (i >= (((u_int64_t)1) << 32)) {
 		strerr = "Too many cache sets to support";
 		goto bad5;
@@ -2133,10 +2133,10 @@ int eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 	eio_ttc_put_device(&prev_cache_dev);
 
 	/* sanity check */
-	if (dmc->cache_size != to_sector(eio_get_device_size(dmc->cache_dev))) {
+	if (dmc->cache_size != eio_to_sector(eio_get_device_size(dmc->cache_dev))) {
 		pr_err("ctr_ssd_add: Cache device size has changed, expected (%llu) found (%llu) \
 				continuing in degraded mode", (unsigned long long)dmc->cache_size,
-		       (unsigned long long)to_sector(eio_get_device_size(dmc->cache_dev)));
+		       (unsigned long long)eio_to_sector(eio_get_device_size(dmc->cache_dev)));
 		r = -EINVAL;
 		goto out;
 	}

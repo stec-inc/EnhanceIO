@@ -399,7 +399,7 @@ re_lookup:
 
 		/* I/O perfectly fit within cached partition */
 		if ((bio->bi_sector >= dmc1->dev_start_sect) &&
-		    ((bio->bi_sector + to_sector(bio->bi_size) - 1) <=
+		    ((bio->bi_sector + eio_to_sector(bio->bi_size) - 1) <=
 		     dmc1->dev_end_sect)) {
 			EIO_ASSERT(overlap == 0);
 			dmc = dmc1;     /* found cached partition */
@@ -409,9 +409,9 @@ re_lookup:
 		/* Check if I/O is overlapping with cached partitions */
 		if (((bio->bi_sector >= dmc1->dev_start_sect) &&
 		     (bio->bi_sector <= dmc1->dev_end_sect)) ||
-		    ((bio->bi_sector + to_sector(bio->bi_size) - 1 >=
+		    ((bio->bi_sector + eio_to_sector(bio->bi_size) - 1 >=
 		      dmc1->dev_start_sect) &&
-		     (bio->bi_sector + to_sector(bio->bi_size) - 1 <=
+		     (bio->bi_sector + eio_to_sector(bio->bi_size) - 1 <=
 		      dmc1->dev_end_sect))) {
 			overlap = 1;
 			pr_err
@@ -692,7 +692,7 @@ static int eio_dispatch_io_pages(struct cache_c *dmc,
 			if (!bio_add_page(bio, page, len, offset))
 				break;
 
-			remaining -= to_sector(len);
+			remaining -= eio_to_sector(len);
 			pindex++;
 			remaining_bvecs--;
 		}
@@ -757,7 +757,7 @@ static int eio_dispatch_io(struct cache_c *dmc, struct eio_io_region *where,
 				break;
 
 			offset = 0;
-			remaining -= to_sector(len);
+			remaining -= eio_to_sector(len);
 			bvec = bvec + 1;
 			remaining_bvecs--;
 		}

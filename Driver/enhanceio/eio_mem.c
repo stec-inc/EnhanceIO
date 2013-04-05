@@ -88,7 +88,7 @@ int eio_mem_init(struct cache_c *dmc)
 	msb_bits_24 = 24 - 1 - lsb_bits;        /* 1 for wrapped bit */
 	max_dbn =
 		((u_int64_t)1) << (msb_bits_24 + dmc->num_sets_bits + lsb_bits);
-	if (to_sector(eio_get_device_size(dmc->disk_dev)) > max_dbn) {
+	if (eio_to_sector(eio_get_device_size(dmc->disk_dev)) > max_dbn) {
 		dmc->cache_flags |= CACHE_FLAGS_MD8;
 		pr_info("Source volume too big to use small metadata");
 		return 1;

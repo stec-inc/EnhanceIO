@@ -95,6 +95,11 @@ EIO_REM(uint64_t dividend_64, uint32_t divisor_32)
 	return do_div(temp, divisor_32);
 }
 
+static inline sector_t
+eio_to_sector(uint64_t size_in_bytes)
+{
+	return (size_in_bytes >> 9);
+}	
 
 struct eio_control_s {
 	unsigned long synch_flags;
@@ -560,7 +565,7 @@ struct eio_errors {
  * code relies on it.
  */
 #define SECTOR_STATS(statval, io_size)	\
-	atomic64_add(to_sector(io_size), &statval);
+	atomic64_add(eio_to_sector(io_size), &statval);
 
 struct eio_stats {
 	atomic64_t reads;               /* Number of reads */

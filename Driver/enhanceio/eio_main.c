@@ -1287,7 +1287,7 @@ static void eio_do_mdupdate(struct work_struct *work)
 	   min_cboff = (min_index - start_index) / MD_BLOCKS_PER_CBLOCK(dmc);
 	   max_cboff = (max_index - start_index) / MD_BLOCKS_PER_CBLOCK(dmc);
 	   write_size = ((uint32_t)(max_cboff - min_cboff + 1)) << dmc->block_shift;
-	   EIO_ASSERT(write_size && (write_size <= to_sector(mdreq->md_size)));
+	   EIO_ASSERT(write_size && (write_size <= eio_to_sector(mdreq->md_size)));
 	 */
 
 	/* Move the pending mdlist to inprog list */
@@ -1718,7 +1718,7 @@ eio_inval_block_set_range(struct cache_c *dmc, int set, sector_t iosector,
 			  unsigned iosize, int multiblk)
 {
 	int start_index, end_index, i;
-	sector_t endsector = iosector + to_sector(iosize);
+	sector_t endsector = iosector + eio_to_sector(iosize);
 
 	start_index = dmc->assoc * set;
 	end_index = start_index + dmc->assoc;
@@ -1771,7 +1771,7 @@ eio_invalidate_sanity_check(struct cache_c *dmc, u_int64_t iosector,
 		return -EINVAL;
 	}
 
-	disk_size = to_sector(eio_get_device_size(dmc->disk_dev));
+	disk_size = eio_to_sector(eio_get_device_size(dmc->disk_dev));
 	if (iosector >= disk_size) {
 		pr_err
 			("eio_inval_range: nothing to do because starting sector is past last sector (%lu > %lu)",
@@ -2320,7 +2320,7 @@ static int eio_acquire_set_locks(struct cache_c *dmc, struct bio_container *bc)
 
 	round_sector = EIO_ROUND_SET_SECTOR(dmc, bio->bi_sector);
 	set_size = dmc->block_size * dmc->assoc;
-	end_sector = bio->bi_sector + to_sector(bio->bi_size);
+	end_sector = bio->bi_sector + eio_to_sector(bio->bi_size);
 	first_set = -1;
 	last_set = -1;
 	cur_set= -1;
@@ -2510,7 +2510,7 @@ eio_release_io_resources(struct cache_c *dmc, struct bio_container *bc)
  */
 int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 {
-	sector_t sectors = to_sector(bio->bi_size);
+	sector_t sectors = eio_to_sector(bio->bi_size);
 	struct eio_bio *ebio = NULL;
 	struct bio_container *bc;
 	sector_t snum;
@@ -2534,7 +2534,7 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 		pr_debug
 			("eio_map: Discard IO received. Invalidate incore start=%lu totalsectors=%d.\n",
 			(unsigned long)bio->bi_sector,
-			(int)to_sector(bio->bi_size));
+			(int)eio_to_sector(bio->bi_size));
 		bio_endio(bio, 0);
 		pr_err
 			("eio_map: I/O with Discard flag received. Discard flag is not supported.\n");
@@ -2655,7 +2655,7 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 			eend = ebio;
 
 			biosize -= iosize;
-			snum += to_sector(iosize);
+			snum += eio_to_sector(iosize);
 		}
 	}
 
@@ -2778,7 +2778,7 @@ static int eio_read_peek(struct cache_c *dmc, struct eio_bio *ebio)
 		 * Its guranteed that it will be a non-DIRTY block
 		 */
 		EIO_ASSERT(!(cstate & DIRTY));
-		if (to_sector(ebio->eb_size) == dmc->block_size) {
+		if (eio_to_sector(ebio->eb_size) == dmc->block_size) {
 			//We can recycle and then READFILL only if iosize is block size
 			atomic64_inc(&dmc->eio_stats.rd_replace);
 			EIO_CACHE_STATE_SET(dmc, index, VALID | DISKREADINPROG);
@@ -2797,7 +2797,7 @@ static int eio_read_peek(struct cache_c *dmc, struct eio_bio *ebio)
 	 * Found an invalid block to be used.
 	 * Can recycle only if iosize is block size
 	 */
-	if (to_sector(ebio->eb_size) == dmc->block_size) {
+	if (eio_to_sector(ebio->eb_size) == dmc->block_size) {
 		EIO_ASSERT(cstate & INVALID);
 		EIO_CACHE_STATE_SET(dmc, index, VALID | DISKREADINPROG);
 		atomic64_inc(&dmc->eio_stats.cached_blocks);
@@ -2882,7 +2882,7 @@ static int eio_write_peek(struct cache_c *dmc, struct eio_bio *ebio)
 		 * 2nd write.
 		 */
 		if ((cstate == ALREADY_DIRTY) ||
-		    (to_sector(ebio->eb_size) == dmc->block_size))
+		    (eio_to_sector(ebio->eb_size) == dmc->block_size))
 			retval = 1;
 		else
 			retval = 0;
@@ -2895,7 +2895,7 @@ static int eio_write_peek(struct cache_c *dmc, struct eio_bio *ebio)
 	 * Set INPROG flag, if the ebio size is equal to cache block size
 	 */
 	EIO_ASSERT(!(EIO_CACHE_STATE_GET(dmc, index) & DIRTY));
-	if (to_sector(ebio->eb_size) == dmc->block_size) {
+	if (eio_to_sector(ebio->eb_size) == dmc->block_size) {
 		if (res == VALID)
 			atomic64_inc(&dmc->eio_stats.wr_replace);
 		else
@@ -3460,7 +3460,7 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 
 	where.bdev = dmc->cache_dev->bdev;
 	where.sector = dmc->md_start_sect + INDEX_TO_MD_SECTOR(start_index);
-	where.count = to_sector(alloc_size);
+	where.count = eio_to_sector(alloc_size);
 	error =
 		eio_io_sync_pages(dmc, &where, WRITE, dmc->clean_mdpages,
 				  dmc->mdpage_count);

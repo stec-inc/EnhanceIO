@@ -168,9 +168,9 @@ struct kcached_job *eio_new_job(struct cache_c *dmc, struct eio_bio *bio,
 				(index << dmc->block_shift) + dmc->md_sectors +
 				(bio->eb_sector -
 				 EIO_ROUND_SECTOR(dmc, bio->eb_sector));
-			EIO_ASSERT(to_sector(bio->eb_size) <= dmc->block_size);
+			EIO_ASSERT(eio_to_sector(bio->eb_size) <= dmc->block_size);
 			job->job_io_regions.cache.count =
-				to_sector(bio->eb_size);
+				eio_to_sector(bio->eb_size);
 		} else {
 			job->job_io_regions.cache.sector =
 				(index << dmc->block_shift) + dmc->md_sectors;
@@ -181,7 +181,7 @@ struct kcached_job *eio_new_job(struct cache_c *dmc, struct eio_bio *bio,
 	job->job_io_regions.disk.bdev = dmc->disk_dev->bdev;
 	if (bio) {
 		job->job_io_regions.disk.sector = bio->eb_sector;
-		job->job_io_regions.disk.count = to_sector(bio->eb_size);
+		job->job_io_regions.disk.count = eio_to_sector(bio->eb_size);
 	} else {
 		job->job_io_regions.disk.sector = EIO_DBN_GET(dmc, index);
 		job->job_io_regions.disk.count = dmc->block_size;
