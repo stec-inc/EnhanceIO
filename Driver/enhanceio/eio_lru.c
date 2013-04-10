@@ -29,7 +29,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-#include "os.h"
+#include "eio.h"
 /* Generic policy functions prototyes */
 int eio_lru_init(struct cache_c *);
 void eio_lru_exit(void);
@@ -44,7 +44,6 @@ struct eio_policy *eio_lru_instance_init(void);
 void eio_lru_pushblks(struct eio_policy *);
 void eio_reclaim_lru_movetail(struct cache_c *, index_t, struct eio_policy *);
 
-
 /* Per cache set data structure */
 struct eio_lru_cache_set {
 	u_int16_t lru_head, lru_tail;
@@ -56,44 +55,40 @@ struct eio_lru_cache_block {
 };
 
 /* LRU specifc data structures */
-struct eio_lru eio_lru = {
-	.sl_lru_pushblks = eio_lru_pushblks,
-	.sl_reclaim_lru_movetail = eio_reclaim_lru_movetail,
+static struct eio_lru eio_lru = {
+	.sl_lru_pushblks		= eio_lru_pushblks,
+	.sl_reclaim_lru_movetail	= eio_reclaim_lru_movetail,
 };
 
 /*
  * Context that captures the LRU replacement policy
  */
-struct eio_policy_header eio_lru_ops = {
-	.sph_name = CACHE_REPL_LRU,
-	.sph_instance_init = eio_lru_instance_init,
+static struct eio_policy_header eio_lru_ops = {
+	.sph_name		= CACHE_REPL_LRU,
+	.sph_instance_init	= eio_lru_instance_init,
 };
-
 
 /*
  * Intialize LRU. Called from ctr.
  */
-int
-eio_lru_init(struct cache_c *dmc)
+int eio_lru_init(struct cache_c *dmc)
 {
-
 	return 0;
 }
-
 
 /*
  * Initialize per set LRU data structures.
  */
-int
-eio_lru_cache_sets_init(struct eio_policy *p_ops)
+int eio_lru_cache_sets_init(struct eio_policy *p_ops)
 {
 	sector_t order;
 	int i;
 	struct cache_c *dmc = p_ops->sp_dmc;
 	struct eio_lru_cache_set *cache_sets;
 
-
-	order = (dmc->size >> dmc->consecutive_shift) * sizeof (struct eio_lru_cache_set);
+	order =
+		(dmc->size >> dmc->consecutive_shift) *
+		sizeof(struct eio_lru_cache_set);
 
 	dmc->sp_cache_set = (struct eio_lru_cache_set *)vmalloc((size_t)order);
 	if (dmc->sp_cache_set == NULL)
@@ -101,7 +96,7 @@ eio_lru_cache_sets_init(struct eio_policy *p_ops)
 
 	cache_sets = (struct eio_lru_cache_set *)dmc->sp_cache_set;
 
-	for (i = 0 ; i < (int)(dmc->size >> dmc->consecutive_shift) ; i++) {
+	for (i = 0; i < (int)(dmc->size >> dmc->consecutive_shift); i++) {
 		cache_sets[i].lru_tail = EIO_LRU_NULL;
 		cache_sets[i].lru_head = EIO_LRU_NULL;
 	}
@@ -110,37 +105,32 @@ eio_lru_cache_sets_init(struct eio_policy *p_ops)
 	return 0;
 }
 
-
 /*
  * Initialize per block LRU data structures
  */
-int
-eio_lru_cache_blk_init(struct eio_policy *p_ops)
+int eio_lru_cache_blk_init(struct eio_policy *p_ops)
 {
 	sector_t order;
 	struct cache_c *dmc = p_ops->sp_dmc;
 
+	order = dmc->size * sizeof(struct eio_lru_cache_block);
 
-	order = dmc->size * sizeof (struct eio_lru_cache_block);
-
-	dmc->sp_cache_blk = (struct eio_lru_cache_block *)vmalloc((size_t)order);
+	dmc->sp_cache_blk =
+		(struct eio_lru_cache_block *)vmalloc((size_t)order);
 	if (dmc->sp_cache_blk == NULL)
 		return -ENOMEM;
 
 	return 0;
 }
 
-
 /*
  * Allocate a new instance of eio_policy per dmc
  */
-struct eio_policy *
-eio_lru_instance_init(void)
+struct eio_policy *eio_lru_instance_init(void)
 {
 	struct eio_policy *new_instance;
 
-
-	new_instance = (struct eio_policy *)vmalloc(sizeof (struct eio_policy));
+	new_instance = (struct eio_policy *)vmalloc(sizeof(struct eio_policy));
 	if (new_instance == NULL) {
 		pr_err("eio_lru_instance_init: vmalloc failed");
 		return NULL;
@@ -164,24 +154,20 @@ eio_lru_instance_init(void)
 	return new_instance;
 }
 
-
 /*
  * Cleanup an instance of eio_policy (called from dtr).
  */
-void
-eio_lru_exit(void)
+void eio_lru_exit(void)
 {
-
 	module_put(THIS_MODULE);
 }
-
 
 /*
  * Find a victim block to evict and return it in index.
  */
 void
 eio_lru_find_reclaim_dbn(struct eio_policy *p_ops,
-			index_t start_index, index_t *index)
+			 index_t start_index, index_t *index)
 {
 	index_t lru_rel_index;
 	struct eio_lru_cache_set *lru_sets;
@@ -189,16 +175,19 @@ eio_lru_find_reclaim_dbn(struct eio_policy *p_ops,
 	struct cache_c *dmc = p_ops->sp_dmc;
 	index_t set;
 
-
 	set = start_index / dmc->assoc;
 	lru_sets = (struct eio_lru_cache_set *)(dmc->sp_cache_set);
 
 	lru_rel_index = lru_sets[set].lru_head;
 	while (lru_rel_index != EIO_LRU_NULL) {
-		lru_blk = ((struct eio_lru_cache_block *)dmc->sp_cache_blk + lru_rel_index + start_index);
-		if (EIO_CACHE_STATE_GET(dmc, (lru_rel_index + start_index)) == VALID) {
-			VERIFY((lru_blk - (struct eio_lru_cache_block *)dmc->sp_cache_blk) ==
-					(lru_rel_index + start_index));
+		lru_blk =
+			((struct eio_lru_cache_block *)dmc->sp_cache_blk +
+			 lru_rel_index + start_index);
+		if (EIO_CACHE_STATE_GET(dmc, (lru_rel_index + start_index)) ==
+		    VALID) {
+			EIO_ASSERT((lru_blk - (struct eio_lru_cache_block *)
+				dmc->sp_cache_blk) ==
+			       (lru_rel_index + start_index));
 			*index = lru_rel_index + start_index;
 			eio_reclaim_lru_movetail(dmc, *index, p_ops);
 			break;
@@ -209,12 +198,10 @@ eio_lru_find_reclaim_dbn(struct eio_policy *p_ops,
 	return;
 }
 
-
 /*
  * Go through the entire set and clean.
  */
-int
-eio_lru_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
+int eio_lru_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
 {
 	struct cache_c *dmc = p_ops->sp_dmc;
 	index_t lru_rel_index;
@@ -224,16 +211,20 @@ eio_lru_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
 	index_t dmc_idx;
 	index_t start_index;
 
-
 	lru_cache_sets = (struct eio_lru_cache_set *)dmc->sp_cache_set;
 	start_index = set * dmc->assoc;
 	lru_rel_index = lru_cache_sets[set].lru_head;
 
 	while ((lru_rel_index != EIO_LRU_NULL) && (nr_writes < to_clean)) {
 		dmc_idx = lru_rel_index + start_index;
-		lru_cacheblk = ((struct eio_lru_cache_block *)dmc->sp_cache_blk + lru_rel_index + start_index);
-		VERIFY((lru_cacheblk - (struct eio_lru_cache_block *)dmc->sp_cache_blk) == (lru_rel_index + start_index));
-		if ((EIO_CACHE_STATE_GET(dmc, dmc_idx) & (DIRTY | BLOCK_IO_INPROG)) == DIRTY) {
+		lru_cacheblk =
+			((struct eio_lru_cache_block *)dmc->sp_cache_blk +
+			 lru_rel_index + start_index);
+		EIO_ASSERT((lru_cacheblk -
+			(struct eio_lru_cache_block *)dmc->sp_cache_blk) ==
+		       (lru_rel_index + start_index));
+		if ((EIO_CACHE_STATE_GET(dmc, dmc_idx) &
+		     (DIRTY | BLOCK_IO_INPROG)) == DIRTY) {
 			EIO_CACHE_STATE_ON(dmc, dmc_idx, DISKWRITEINPROG);
 			nr_writes++;
 		}
@@ -243,12 +234,12 @@ eio_lru_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
 	return nr_writes;
 }
 
-
 /*
  * LRU specific functions.
  */
 void
-eio_reclaim_lru_movetail(struct cache_c *dmc, index_t index, struct eio_policy *p_ops)
+eio_reclaim_lru_movetail(struct cache_c *dmc, index_t index,
+			 struct eio_policy *p_ops)
 {
 	index_t set = index / dmc->assoc;
 	index_t start_index = set * dmc->assoc;
@@ -257,8 +248,8 @@ eio_reclaim_lru_movetail(struct cache_c *dmc, index_t index, struct eio_policy *
 	struct eio_lru_cache_set *cache_sets;
 	struct eio_lru_cache_block *blkptr;
 
-
-	cacheblk = (((struct eio_lru_cache_block *)(dmc->sp_cache_blk))+index);
+	cacheblk =
+		(((struct eio_lru_cache_block *)(dmc->sp_cache_blk)) + index);
 	cache_sets = (struct eio_lru_cache_set *)dmc->sp_cache_set;
 	blkptr = (struct eio_lru_cache_block *)(dmc->sp_cache_blk);
 
@@ -287,17 +278,14 @@ eio_reclaim_lru_movetail(struct cache_c *dmc, index_t index, struct eio_policy *
 	cache_sets[set].lru_tail = (u_int16_t)my_index;
 }
 
-
-void
-eio_lru_pushblks(struct eio_policy *p_ops)
+void eio_lru_pushblks(struct eio_policy *p_ops)
 {
 	struct cache_c *dmc = p_ops->sp_dmc;
 	struct eio_lru_cache_block *cache_block;
 	int i;
 
-
 	cache_block = dmc->sp_cache_blk;
-	for (i = 0 ; i < (int)dmc->size ; i++) {
+	for (i = 0; i < (int)dmc->size; i++) {
 		cache_block[i].lru_prev = EIO_LRU_NULL;
 		cache_block[i].lru_next = EIO_LRU_NULL;
 		eio_reclaim_lru_movetail(dmc, i, p_ops);
@@ -305,13 +293,10 @@ eio_lru_pushblks(struct eio_policy *p_ops)
 	return;
 }
 
-
 static
-int __init
-lru_register(void)
+int __init lru_register(void)
 {
 	int ret;
-
 
 	ret = eio_register_policy(&eio_lru_ops);
 	if (ret != 0)
@@ -320,13 +305,10 @@ lru_register(void)
 	return ret;
 }
 
-
 static
-void __exit
-lru_unregister(void)
+void __exit lru_unregister(void)
 {
 	int ret;
-
 
 	ret = eio_unregister_policy(&eio_lru_ops);
 	if (ret != 0)
@@ -339,5 +321,3 @@ module_exit(lru_unregister);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LRU policy for EnhanceIO");
 MODULE_AUTHOR("STEC, Inc. based on code by Facebook");
-MODULE_VERSION(EIO_RELEASE);
-

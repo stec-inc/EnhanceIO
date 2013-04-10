@@ -4,6 +4,7 @@
 
 config ENHANCEIO
 	tristate "Enable EnhanceIO"
+	depends on PROC_FS
 	default m
 	---help---
 	Based on Facebook's open source Flashcache project developed by

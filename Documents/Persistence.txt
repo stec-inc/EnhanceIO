@@ -1,11 +1,41 @@
 How to create persistent cache
 ==============================
 
-Use the 94-Enhanceio-template file to create a per cache udev-rule file named /etc/udev/rules.d/94-enhancio-<cache_name>.rules
 
-1) Change <cache_match_expr> to ENV{ID_SERIAL}=="<ID SERIAL OF YOUR CACHE DEVICE>", ENV{DEVTYPE}==<DEVICE TYPE OF YOUR CACHE DEVICE>
+Clean operation of a writeback cache can be trigerred through eio_cli or 
+alternatively it can also be trigerred by "do_clean" sysctl. The value set 
+can be any of
+0 : stop the ongoing clean operation
+1 : starts the clean operation (eio_cli internally uses this for clean command) 
+2 : get the status of clean operation
+4 : start the clean and keep it clean. 
 
-2) Change <source_match_expr> to ENV{ID_SERIAL}=="<ID SERIAL OF YOUR HARD DISK>", ENV{DEVTYPE}==<DEVICE TYPE OF YOUR SOURCE DEVICE>
 
-3) Replace all instances of <cache_name> with the name of your cache
-    	
+
+Autoclean thresholds
+----------------
+a) Dirty high threshold (%) : The upper limit percentage of dirty blocks in
+   an entire cache that will trigger a clean-up.
+b) Dirty low threshold (%) : The lower limit percentage of dirty blocks in
+   an entire cache that will stop the clean-up process.
+c) Dirty set high threshold (%) : The upper limit percentage of dirty blocks
+   in a set that will trigger a clean-up.
+d) Dirty set low threshold (%) : The lower limit percentage of dirty blocks
+   in a set that will stop the clean-up process.
+e) Automatic clean-up threshold : An automatic clean-up of the cache will
+   occur only if the number of outstanding I/O requests from the HDD is
+   below the threshold.
+f) Time based clean-up interval (minutes) : This option allows you to specify
+   an interval between each clean-up process.
+
+
+
+Persistence
+-----------
+EnhanceIO caches are persistent by default. A udev rule file named
+94-enhanceio-<cache_name>.rules is created, removed by create, delete
+sub-commands in eio_cli.
+
+Note: creating a writeback cache on root device is not supported. This is
+      because the root device is mounted as read only prior to the processing
+      of udev rules.

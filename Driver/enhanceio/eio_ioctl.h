@@ -30,19 +30,18 @@
 #ifndef EIO_IOCTL_H
 #define EIO_IOCTL_H
 
-#define EIO_DEVPATH	"/dev/eiodev"
+#define EIO_DEVPATH     "/dev/eiodev"
 #define MISC_DEVICE     "eiodev"
 
-#define CACHE_NAME_LEN		31
-#define CACHE_NAME_SZ		CACHE_NAME_LEN + 1 
+#define CACHE_NAME_LEN          31
+#define CACHE_NAME_SZ           CACHE_NAME_LEN + 1
 
-#define NAME_LEN		127
-#define NAME_SZ			NAME_LEN + 1
+#define NAME_LEN                127
+#define NAME_SZ                 NAME_LEN + 1
 
+#define EIO_IOC         ('E' << 8)
 
-#define EIO_IOC		('E' << 8)
-
-typedef enum eio_ioc {
+enum eio_ioc {
 	EIO_IOC_CREATE = EIO_IOC,
 	EIO_IOC_DELETE,
 	EIO_IOC_ENABLE,
@@ -57,34 +56,34 @@ typedef enum eio_ioc {
 	EIO_IOC_NOTIFY_REBOOT,
 	EIO_IOC_SET_WARM_BOOT,
 	EIO_IOC_UNUSED
-} eio_ioc_t;
+};
 
-typedef struct cache_rec_short {
-	char		cr_name[CACHE_NAME_SZ];
-	char		cr_src_devname[NAME_SZ];
-	char		cr_ssd_devname[NAME_SZ];
-	char		cr_ssd_uuid[NAME_SZ];
-	uint64_t	cr_src_dev_size;
-	uint64_t	cr_ssd_dev_size;
-	uint32_t	cr_src_sector_size;
-	uint32_t	cr_ssd_sector_size;
-	uint32_t	cr_flags;	/* CACHE_FLAGS_INV* etc. */
-	char 		cr_policy;
-	char		cr_mode;
-	char 		cr_persistence;
-	char		cr_cold_boot;
-	uint64_t	cr_blksize;
-	uint64_t	cr_assoc;
-} cache_rec_short_t;
+struct cache_rec_short {
+	char cr_name[CACHE_NAME_SZ];
+	char cr_src_devname[NAME_SZ];
+	char cr_ssd_devname[NAME_SZ];
+	char cr_ssd_uuid[NAME_SZ];
+	uint64_t cr_src_dev_size;
+	uint64_t cr_ssd_dev_size;
+	uint32_t cr_src_sector_size;
+	uint32_t cr_ssd_sector_size;
+	uint32_t cr_flags;      /* CACHE_FLAGS_INV* etc. */
+	char cr_policy;
+	char cr_mode;
+	char cr_persistence;
+	char cr_cold_boot;
+	uint64_t cr_blksize;
+	uint64_t cr_assoc;
+};
 
-typedef struct cache_list {
-	uint64_t		ncaches;
-	cache_rec_short_t	*cachelist;
-} cache_list_t;
+struct cache_list {
+	uint64_t ncaches;
+	struct cache_rec_short *cachelist;
+};
 
 #ifdef __KERNEL__
 long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg);
 long eio_compact_ioctl(struct file *filp, unsigned cmd, unsigned long arg);
-#endif /* __KERNEL__ */
+#endif                          /* __KERNEL__ */
 
-#endif /* !EIO_IOCTL_H */
+#endif                          /* !EIO_IOCTL_H */

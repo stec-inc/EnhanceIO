@@ -40,8 +40,8 @@
  * XXX - The above comment is from the original code. Looks like an error,
  * maximum associativity should be 32K (2^15) and not 8K.
  */
-#define EIO_MAX_ASSOC	8192
-#define EIO_LRU_NULL	0xFFFF
+#define EIO_MAX_ASSOC   8192
+#define EIO_LRU_NULL    0xFFFF
 
 /* Declerations to keep the compiler happy */
 struct cache_c;
@@ -51,13 +51,14 @@ struct eio_lru;
 /* LRU specific data structures and functions */
 struct eio_lru {
 	void (*sl_lru_pushblks)(struct eio_policy *);
-	void (*sl_reclaim_lru_movetail)(struct cache_c *, index_t, struct eio_policy *);
+	void (*sl_reclaim_lru_movetail)(struct cache_c *, index_t,
+					struct eio_policy *);
 };
 
 /* Function prototypes for LRU wrappers in eio_policy.c */
 void eio_policy_lru_pushblks(struct eio_policy *);
-void eio_policy_reclaim_lru_movetail(struct cache_c *, index_t, struct eio_policy *);
-
+void eio_policy_reclaim_lru_movetail(struct cache_c *, index_t,
+				     struct eio_policy *);
 
 /*
  * Context that captures the cache block replacement policy.
@@ -73,7 +74,7 @@ struct eio_policy {
 	int (*sp_repl_sets_init)(struct eio_policy *);
 	int (*sp_repl_blk_init)(struct eio_policy *);
 	void (*sp_find_reclaim_dbn)(struct eio_policy *,
-				index_t start_index, index_t *index);
+				    index_t start_index, index_t *index);
 	int (*sp_clean_set)(struct eio_policy *, index_t set, int);
 	struct cache_c *sp_dmc;
 };
@@ -88,19 +89,17 @@ struct eio_policy_header {
 	struct list_head sph_list;
 };
 
-
 /* Prototypes of generic functions in eio_policy */
 int *eio_repl_init(struct cache_c *);
 int eio_repl_sets_init(struct eio_policy *);
 int eio_repl_blk_init(struct eio_policy *);
-void eio_find_reclaim_dbn(struct eio_policy *, index_t start_index, index_t *index);
+void eio_find_reclaim_dbn(struct eio_policy *, index_t start_index,
+			  index_t *index);
 int eio_policy_clean_set(struct eio_policy *, index_t, int);
-
 
 int eio_register_policy(struct eio_policy_header *);
 int eio_unregister_policy(struct eio_policy_header *);
 struct eio_policy *eio_get_policy(int);
 void eio_put_policy(struct eio_policy *);
 
-#endif /* EIO_POLICY_H */
-
+#endif                          /* EIO_POLICY_H */
