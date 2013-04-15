@@ -1112,6 +1112,7 @@ static index_t find_invalid_dbn(struct cache_c *dmc, index_t start_index)
 static void
 find_reclaim_dbn(struct cache_c *dmc, index_t start_index, index_t *index)
 {
+#if 0
 	int i;
 	index_t idx;
 
@@ -1130,6 +1131,7 @@ find_reclaim_dbn(struct cache_c *dmc, index_t start_index, index_t *index)
 			}
 		}
 	} else
+#endif
 		eio_find_reclaim_dbn(dmc->policy_ops, start_index, index);
 }
 

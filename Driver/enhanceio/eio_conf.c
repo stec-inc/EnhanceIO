@@ -143,16 +143,17 @@ inline int eio_policy_init(struct cache_c *dmc)
 
 	if (dmc->req_policy == 0)
 		dmc->req_policy = CACHE_REPL_DEFAULT;
-
+#if 0
 	if (dmc->req_policy == CACHE_REPL_RANDOM) {
 		dmc->policy_ops = NULL;
 		pr_info("Setting replacement policy to random");
 	} else {
+#endif    
 		dmc->policy_ops = eio_get_policy(dmc->req_policy);
 		if (dmc->policy_ops == NULL) {
-			dmc->req_policy = CACHE_REPL_RANDOM;
+			//dmc->req_policy = CACHE_REPL_RANDOM;
 			pr_err
-				("policy_init: Cannot find requested policy, defaulting to random");
+				("policy_init: Cannot find requested policy");
 			error = -ENOMEM;
 		} else {
 			/* Back pointer to reference dmc from policy_ops */
@@ -162,7 +163,7 @@ inline int eio_policy_init(struct cache_c *dmc)
 				 CACHE_REPL_FIFO) ? "fifo" : "lru",
 				dmc->policy_ops->sp_name);
 		}
-	}
+	//}
 	return error;
 }
 
