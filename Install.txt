@@ -18,21 +18,7 @@ Run following commands as root
 
 3) Driver installation
 
-   1. Let's say kernel sources are located at the path KERNEL_SRC and the driver has been downloaded
-      at the path DRIVER_REPO
-      Copy Driver/enhanceio dir under KERNEL_SRC/drivers/block
-      Apply config patch.
-      cd KERNEL_SRC; patch -p0 < DRIVER_REPO/Driver/config.patch
-
-   2. Regenerate config file
-      Run make menuconfig and save the configuration
-
-   3. To compile:
-      > cd KERNEL_SRC
-      > make modules
-
-   4. To install modules
-      > make modules_install
+   make && make install
 
 4) manually load modules by running
    modprobe enhanceio_fifo
