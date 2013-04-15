@@ -136,6 +136,16 @@ void eio_thread_exit(long exit_code)
 {
 	do_exit(exit_code);
 }
+ const char *eio_policy_to_name(u8 p)
+{
+    int i;
+    for (i = 0; i < ARRAY_SIZE(eio_policy_names); i++)
+        if (eio_policy_names[i].p == p)
+            return eio_policy_names[i].n;
+
+    return NULL;
+}
+
 
 inline int eio_policy_init(struct cache_c *dmc)
 {
@@ -143,27 +153,18 @@ inline int eio_policy_init(struct cache_c *dmc)
 
 	if (dmc->req_policy == 0)
 		dmc->req_policy = CACHE_REPL_DEFAULT;
-#if 0
-	if (dmc->req_policy == CACHE_REPL_RANDOM) {
-		dmc->policy_ops = NULL;
-		pr_info("Setting replacement policy to random");
+	dmc->policy_ops = eio_get_policy(dmc->req_policy);
+	if (dmc->policy_ops == NULL) {
+		pr_err
+			("policy_init: Cannot find requested policy");
+		error = -ENOMEM;
 	} else {
-#endif    
-		dmc->policy_ops = eio_get_policy(dmc->req_policy);
-		if (dmc->policy_ops == NULL) {
-			//dmc->req_policy = CACHE_REPL_RANDOM;
-			pr_err
-				("policy_init: Cannot find requested policy");
-			error = -ENOMEM;
-		} else {
-			/* Back pointer to reference dmc from policy_ops */
-			dmc->policy_ops->sp_dmc = dmc;
-			pr_info("Setting replacement policy to %s (%d)",
-				(dmc->policy_ops->sp_name ==
-				 CACHE_REPL_FIFO) ? "fifo" : "lru",
+		/* Back pointer to reference dmc from policy_ops */
+		dmc->policy_ops->sp_dmc = dmc;
+		pr_info("Setting replacement policy to %s (%d)",
+				eio_policy_to_name(dmc->policy_ops->sp_name),
 				dmc->policy_ops->sp_name);
-		}
-	//}
+	}
 	return error;
 }
 

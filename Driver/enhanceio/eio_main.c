@@ -385,7 +385,7 @@ static void eio_post_io_callback(struct work_struct *work)
 	eb_cacheset = ebio->eb_cacheset;
 	if (error)
 		pr_err("io_callback: io error %d block %llu action %d",
-		       error, 
+		       error,
 		       (unsigned long long)job->job_io_regions.disk.sector,
 		       job->action);
 
@@ -1112,27 +1112,7 @@ static index_t find_invalid_dbn(struct cache_c *dmc, index_t start_index)
 static void
 find_reclaim_dbn(struct cache_c *dmc, index_t start_index, index_t *index)
 {
-#if 0
-	int i;
-	index_t idx;
-
-	if (dmc->policy_ops == NULL) {
-		/*
-		 * "start_index" should already be the beginning index of the set.
-		 * We're just being cautious here.
-		 */
-		start_index = (start_index / dmc->assoc) * dmc->assoc;
-		for (i = 0; i < (int)dmc->assoc; i++) {
-			idx = dmc->random++ % dmc->assoc;
-			if (EIO_CACHE_STATE_GET(dmc, start_index + idx) ==
-			    VALID) {
-				*index = start_index + idx;
-				return;
-			}
-		}
-	} else
-#endif
-		eio_find_reclaim_dbn(dmc->policy_ops, start_index, index);
+	eio_find_reclaim_dbn(dmc->policy_ops, start_index, index);
 }
 
 void eio_set_warm_boot(void)
@@ -1600,7 +1580,7 @@ static void eio_check_dirty_cache_thresholds(struct cache_c *dmc)
 
 		/* Clean needs to be triggered on the cache */
 		required_cleans = atomic64_read(&dmc->nr_dirty) -
-				  (EIO_DIV((dmc->sysctl_active.dirty_low_threshold * dmc->size), 
+				  (EIO_DIV((dmc->sysctl_active.dirty_low_threshold * dmc->size),
 				   100));
 		enqueued_cleans = 0;
 
