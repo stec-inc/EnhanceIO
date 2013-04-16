@@ -99,7 +99,7 @@ static inline sector_t
 eio_to_sector(uint64_t size_in_bytes)
 {
 	return (size_in_bytes >> 9);
-}	
+}
 
 struct eio_control_s {
 	unsigned long synch_flags;
@@ -233,7 +233,7 @@ union eio_superblock {
 		__le32 mode;
 		__le32 repl_policy;
 		__le32 cache_flags;
-		__le32 magic;                
+		__le32 magic;
 		__le32 cold_boot;            /* cache to be started as cold after boot */
 		char ssd_uuid[DEV_PATHLEN];
 		__le64 cache_md_start_sect;   /* cache metadata start (8K aligned) */
@@ -349,6 +349,19 @@ struct flash_cacheblock {
 #define CACHE_REPL_FIRST        CACHE_REPL_FIFO
 #define CACHE_REPL_LAST         CACHE_REPL_RANDOM
 #define CACHE_REPL_DEFAULT      CACHE_REPL_FIFO
+
+struct eio_policy_and_name {
+    u8  p;
+    char *n;
+};
+
+
+static const struct eio_policy_and_name eio_policy_names[] = {
+     { CACHE_REPL_FIFO,  "fifo"    },
+     { CACHE_REPL_LRU,  "lru"      },
+     { CACHE_REPL_RANDOM,  "rand"  },
+};
+
 
 /*
  * Default cache parameters.
@@ -1072,7 +1085,7 @@ void eio_set_warm_boot(void);
 /* resolve conflict with scsi/scsi_device.h */
 #ifdef __KERNEL__
 
-#ifdef EIO_ASSERT 
+#ifdef EIO_ASSERT
 #undef EIO_ASSERT
 #endif
 /*Always compiled in*/

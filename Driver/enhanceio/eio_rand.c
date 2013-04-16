@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2013 ProfitBricks, GmbH.
  *   Jack Wang <jinpu.wang@profitbricks.com>
- *   Dongsu Park <dpark@profitbricks.com> 
+ *   Dongsu Park <dongsu.park@profitbricks.com>
  *
  *  Copyright (C) 2012 STEC, Inc. All rights not specifically granted
  *   under a license included herein are reserved
@@ -45,11 +45,6 @@ int eio_rand_clean_set(struct eio_policy *, index_t, int);
 /* Per policy instance initialization */
 struct eio_policy *eio_rand_instance_init(void);
 
-/* Per cache set data structure */
-struct eio_rand_cache_set {
-	index_t set_rand_next;
-	index_t set_clean_next;
-};
 
 /*
  * Context that captures the rand replacement policy
@@ -72,28 +67,6 @@ int eio_rand_init(struct cache_c *dmc)
  */
 int eio_rand_cache_sets_init(struct eio_policy *p_ops)
 {
-	#if 0
-	int i;
-	sector_t order;
-	struct cache_c *dmc = p_ops->sp_dmc;
-	struct eio_rand_cache_set *cache_sets;
-
-	pr_info("Initializing rand cache sets\n");
-	order = (dmc->size >> dmc->consecutive_shift) *
-		sizeof(struct eio_rand_cache_set);
-
-	dmc->sp_cache_set =
-		(struct eio_rand_cache_set *)vmalloc((size_t)order);
-	if (dmc->sp_cache_set == NULL)
-		return -ENOMEM;
-
-	cache_sets = (struct eio_rand_cache_set *)dmc->sp_cache_set;
-
-	for (i = 0; i < (int)(dmc->size >> dmc->consecutive_shift); i++) {
-		cache_sets[i].set_rand_next = i * dmc->assoc;
-		cache_sets[i].set_clean_next = i * dmc->assoc;
-	}
-#endif
 	return 0;
 }
 
@@ -109,19 +82,18 @@ eio_rand_find_reclaim_dbn(struct eio_policy *p_ops, index_t start_index,
 
 	struct cache_c *dmc = p_ops->sp_dmc;
 
-    /*
-     * "start_index" should already be the beginning index of the set.
-     * We're just being cautious here.
-     */
-    start_index = (start_index / dmc->assoc) * dmc->assoc;
-    for (i = 0; i < (int)dmc->assoc; i++) {
-    	idx = dmc->random++ % dmc->assoc;
-    	if (EIO_CACHE_STATE_GET(dmc, start_index + idx) ==
-    	    VALID) {
-    		*index = start_index + idx;
-    		return;
-    	}
-    }	
+	/*
+	 * "start_index" should already be the beginning index of the set.
+	 * We're just being cautious here.
+	 */
+	start_index = (start_index / dmc->assoc) * dmc->assoc;
+	for (i = 0; i < (int)dmc->assoc; i++) {
+		idx = dmc->random++ % dmc->assoc;
+		if (EIO_CACHE_STATE_GET(dmc, start_index + idx) == VALID) {
+			*index = start_index + idx;
+			return;
+		}
+	}
 }
 
 /*
@@ -138,17 +110,16 @@ int eio_rand_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
 
 	start_index = set * dmc->assoc;
 
-
-    /* Scan sequentially in the set and pick blocks to clean */
-    while ((i < (int)dmc->assoc) && (nr_writes < to_clean)) {
-    	if ((EIO_CACHE_STATE_GET(dmc, start_index + i) &
-    	     (DIRTY | BLOCK_IO_INPROG)) == DIRTY) {
-    		EIO_CACHE_STATE_ON(dmc, start_index + i,
-    						   DISKWRITEINPROG);
-    		nr_writes++;
-    	}
-    	i++;
-    }	
+	/* Scan sequentially in the set and pick blocks to clean */
+	while ((i < (int)dmc->assoc) && (nr_writes < to_clean)) {
+		if ((EIO_CACHE_STATE_GET(dmc, start_index + i) &
+		    (DIRTY | BLOCK_IO_INPROG)) == DIRTY) {
+			EIO_CACHE_STATE_ON(dmc, start_index + i,
+			DISKWRITEINPROG);
+			nr_writes++;
+		}
+		i++;
+	}
 
 	return nr_writes;
 }

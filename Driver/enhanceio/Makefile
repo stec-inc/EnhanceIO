@@ -24,7 +24,7 @@ ifneq "$(OPENVZ_VER)" ""
         RHEL5_TREE := /usr/src/redhat/BUILD/ovzkernel-2.6.18/linux-$(shell uname -r).$(shell uname -i)
         KERNEL_TREE := $(RHEL5_TREE)
 endif
-obj-m	+= enhanceio.o enhanceio_lru.o enhanceio_fifo.o
+obj-m	+= enhanceio.o enhanceio_lru.o enhanceio_fifo.o  enhanceio_rand.o
 enhanceio-y	+= \
 	eio_conf.o \
 	eio_ioctl.o \
@@ -36,6 +36,7 @@ enhanceio-y	+= \
 	eio_subr.o \
 	eio_ttc.o
 enhanceio_fifo-y	+= eio_fifo.o
+enhanceio_rand-y	+= eio_rand.o
 enhanceio_lru-y	+= eio_lru.o
 .PHONY: all
 all: modules 
