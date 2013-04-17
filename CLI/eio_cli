@@ -581,6 +581,7 @@ def main():
 	run_cmd("/sbin/modprobe enhanceio")
 	run_cmd("/sbin/modprobe enhanceio_fifo")
 	run_cmd("/sbin/modprobe enhanceio_lru")
+	run_cmd("/sbin/modprobe enhanceio_rand")
 
 	if sys.argv[1] == "create":
 

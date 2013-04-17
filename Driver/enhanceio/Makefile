@@ -47,6 +47,9 @@ modules: $(RHEL5_SETUP)
 modules_install: modules
 	install -o root -g root -m 0755 -d $(DESTDIR)/lib/modules/$(KERNEL_SOURCE_VERSION)/extra/enhanceio/
 	install -o root -g root -m 0755 enhanceio.ko $(DESTDIR)/lib/modules/$(KERNEL_SOURCE_VERSION)/extra/enhanceio/
+	install -o root -g root -m 0755 enhanceio_rand.ko $(DESTDIR)/lib/modules/$(KERNEL_SOURCE_VERSION)/extra/enhanceio/
+	install -o root -g root -m 0755 enhanceio_fifo.ko $(DESTDIR)/lib/modules/$(KERNEL_SOURCE_VERSION)/extra/enhanceio/
+	install -o root -g root -m 0755 enhanceio_lru.ko $(DESTDIR)/lib/modules/$(KERNEL_SOURCE_VERSION)/extra/enhanceio/
 	depmod -a
 .PHONY: install
 install: modules_install
