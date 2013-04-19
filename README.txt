@@ -184,6 +184,30 @@
 	In case an SSD does not come up during a bootup, access to HDD should
 	stopped. It should be enabled only after SSD comes-up and a cache is
 	enabled.
+	
+	Write-back cache needs to perform clean operation in order to flush the
+	dirty data to the source device(HDD). The clean can be either trigerred
+	by the user or automatically initiated, based on preconfigured
+	thresholds. These thresholds are described below. They can be set using 
+	sysctl calls.
+
+	a) Dirty high threshold (%) : The upper limit on percentage of dirty
+	   blocks in the entire cache.
+	b) Dirty low threshold (%) : The lower limit on percentage of dirty
+	   blocks in the entire cache.
+	c) Dirty set high threshold (%) : The upper limit on percentage of dirty
+	   blocks in a set.
+	d) Dirty set low threshold (%) : The lower limit on percentage of dirty
+	   blocks in a set.	
+	e) Automatic clean-up threshold : An automatic clean-up of the cache
+	   will occur only if the number of outstanding I/O requests from the
+	   HDD is below the threshold.
+	f) Time based clean-up interval (minutes) : This option allows you to
+	   specify an interval between each clean-up process.
+
+	Clean is trigerred when one of the upper thresholds or time based clean 
+	threshold is met and stops when all the lower thresholds are met.  
+
 
 4. ACKNOWLEDGEMENTS
 
