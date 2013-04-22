@@ -39,24 +39,21 @@
 #define NAME_LEN                127
 #define NAME_SZ                 NAME_LEN + 1
 
-#define EIO_IOC         ('E' << 8)
+#define EIO_IOC_CREATE _IOW('E', 0, struct cache_rec_short)
+#define EIO_IOC_DELETE _IOW('E', 1, struct cache_rec_short)
+#define EIO_IOC_ENABLE _IOW('E', 2, struct cache_rec_short)
+#define EIO_IOC_DISABLE _IOW('E', 3, struct cache_rec_short)
+#define EIO_IOC_EDIT _IOW('E', 4, struct cache_rec_short)
+#define EIO_IOC_NCACHES _IOR('E', 5, struct uint64_t)
+#define EIO_IOC_CACHE_LIST _IOWR('E', 6, struct cache_list)
+#define EIO_IOC_SSD_ADD _IOW('E', 7, struct cache_rec_short)
+#define EIO_IOC_SSD_REMOVE _IOW('E', 8, struct cache_rec_short)
+#define EIO_IOC_SRC_ADD _IOW('E', 9, struct cache_rec_short)
+#define EIO_IOC_SRC_REMOVE _IOW('E', 10, struct cache_rec_short)
+#define EIO_IOC_NOTIFY_REBOOT _IO('E', 11)
+#define EIO_IOC_SET_WARM_BOOT _IO('E', 12)
+#define EIO_IOC_UNUSED _IO('E', 13)
 
-enum eio_ioc {
-	EIO_IOC_CREATE = EIO_IOC,
-	EIO_IOC_DELETE,
-	EIO_IOC_ENABLE,
-	EIO_IOC_DISABLE,
-	EIO_IOC_EDIT,
-	EIO_IOC_NCACHES,
-	EIO_IOC_CACHE_LIST,
-	EIO_IOC_SSD_ADD,
-	EIO_IOC_SSD_REMOVE,
-	EIO_IOC_SRC_ADD,
-	EIO_IOC_SRC_REMOVE,
-	EIO_IOC_NOTIFY_REBOOT,
-	EIO_IOC_SET_WARM_BOOT,
-	EIO_IOC_UNUSED
-};
 
 struct cache_rec_short {
 	char cr_name[CACHE_NAME_SZ];
