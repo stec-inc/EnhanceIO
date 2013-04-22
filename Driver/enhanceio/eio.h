@@ -76,7 +76,28 @@
 #define EIO_UPDATE_LIST         0
 #define EIO_HANDLE_REBOOT       1
 
+/*
+ * It is to carry out 64bit division
+ * on 32bit architecture.
+ */
+static __inline__ uint64_t
+EIO_CALCULATE_PERCENTAGE(uint64_t x64, uint64_t y64)
+{
+	uint64_t result;
+	uint32_t h_y32 = y64 >> 32;
 
+	result = x64 * 100;
+	while (h_y32) {
+		h_y32 >>= 1;
+		y64 >>= 1;
+		result >>= 1;
+	}
+
+	do_div(result, y64);
+	return result;
+}
+
+		
 static __inline__ uint64_t
 EIO_DIV(uint64_t dividend_64, uint32_t divisor_32)
 {

@@ -1690,19 +1690,19 @@ static int eio_stats_show(struct seq_file *seq, void *v)
 
 	if (atomic64_read(&stats->reads) > 0)
 		read_hit_pct =
-			((atomic64_read(&stats->read_hits) * 100LL) /	\
-				atomic64_read(&stats->reads));
+		EIO_CALCULATE_PERCENTAGE(atomic64_read(&stats->read_hits),
+			atomic64_read(&stats->reads));
 	else
 		read_hit_pct = 0;
 
 	if (atomic64_read(&stats->writes) > 0) {
 		write_hit_pct =
-			((atomic64_read(&stats->write_hits) * 100LL) /	\
+		EIO_CALCULATE_PERCENTAGE(atomic64_read(&stats->write_hits),
 			atomic64_read(&stats->writes));
 
 		dirty_write_hit_pct =
-			((atomic64_read(&stats->dirty_write_hits) *	\
-				100LL) / atomic64_read(&stats->writes));
+		EIO_CALCULATE_PERCENTAGE(atomic64_read(&stats->dirty_write_hits),
+			atomic64_read(&stats->writes));
 	} else {
 		write_hit_pct = 0;
 		dirty_write_hit_pct = 0;
