@@ -44,7 +44,7 @@
 #define EIO_IOC_ENABLE _IOW('E', 2, struct cache_rec_short)
 #define EIO_IOC_DISABLE _IOW('E', 3, struct cache_rec_short)
 #define EIO_IOC_EDIT _IOW('E', 4, struct cache_rec_short)
-#define EIO_IOC_NCACHES _IOR('E', 5, struct uint64_t)
+#define EIO_IOC_NCACHES _IOR('E', 5, uint64_t)
 #define EIO_IOC_CACHE_LIST _IOWR('E', 6, struct cache_list)
 #define EIO_IOC_SSD_ADD _IOW('E', 7, struct cache_rec_short)
 #define EIO_IOC_SSD_REMOVE _IOW('E', 8, struct cache_rec_short)
