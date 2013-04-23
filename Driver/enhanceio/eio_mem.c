@@ -55,7 +55,7 @@ int eio_mem_init(struct cache_c *dmc)
 	 */
 	num_sets_64 = EIO_DIV(dmc->size, dmc->assoc);
 	if (num_sets_64 > UINT_MAX) {
-		pr_err("Number of cache sets (%lu) greater than maximum"
+		pr_err("Number of cache sets (%lu) greater than maximum"\
 		       "allowed (%u)",
 		       (long unsigned int)num_sets_64, UINT_MAX);
 		return -1;

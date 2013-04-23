@@ -87,7 +87,7 @@ void eio_put_policy(struct eio_policy *p_ops)
 {
 
 	if (p_ops == NULL) {
-		pr_err("put_policy: Cannot decrement reference"
+		pr_err("put_policy: Cannot decrement reference"\
 		       "count of NULL policy");
 		return;
 	}
