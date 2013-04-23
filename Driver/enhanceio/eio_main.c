@@ -777,7 +777,7 @@ int eio_clean_thread_proc(void *context)
 
 	eio_thread_exit(0);
 
-	//Should never reach here
+	/*Should never reach here*/
 	return 0;
 }
 
@@ -860,7 +860,7 @@ void eio_do_readfill(struct work_struct *work)
 					if (unlikely
 						    (EIO_CACHE_STATE_GET(dmc, index) &
 						    QUEUED)) {
-						//An invalidation request is queued. Can't do anything
+						/*An invalidation request is queued. Can't do anything*/
 						CTRACE("eio_do_readfill:2\n");
 						EIO_CACHE_STATE_SET(dmc, index,
 								    INVALID);
@@ -2761,7 +2761,7 @@ static int eio_read_peek(struct cache_c *dmc, struct eio_bio *ebio)
 		 */
 		EIO_ASSERT(!(cstate & DIRTY));
 		if (eio_to_sector(ebio->eb_size) == dmc->block_size) {
-			//We can recycle and then READFILL only if iosize is block size
+			/*We can recycle and then READFILL only if iosize is block size*/
 			atomic64_inc(&dmc->eio_stats.rd_replace);
 			EIO_CACHE_STATE_SET(dmc, index, VALID | DISKREADINPROG);
 			EIO_DBN_SET(dmc, index, (sector_t)ebio->eb_sector);

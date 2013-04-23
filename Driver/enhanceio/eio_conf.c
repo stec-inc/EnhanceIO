@@ -126,7 +126,7 @@ void eio_wait_thread_exit(void *thrdptr, int *running)
 	while (*running)
 		msleep(1);
 
-	//do_exit() would be called within the thread func itself
+	/*do_exit() would be called within the thread func itself*/
 
 	return;
 }
@@ -237,8 +237,8 @@ static int eio_kcached_init(struct cache_c *dmc)
 static void eio_kcached_client_destroy(struct cache_c *dmc)
 {
 
-	/* Wait for all IOs */
-	//wait_event(dmc->destroyq, !atomic_read(&dmc->nr_jobs));
+	/* Wait for all IOs 
+	/wait_event(dmc->destroyq, !atomic_read(&dmc->nr_jobs));*/
 }
 
 /* Store the cache superblock on ssd */
@@ -591,7 +591,7 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 	int ret = 0, k;
 	void **pg_virt_addr = NULL;
 
-	// Allocate single page for superblock header.
+	/* Allocate single page for superblock header.*/
 	page_count = 0;
 	header_page = eio_alloc_pages(1, &page_count);
 	if (header_page == NULL) {
@@ -1265,7 +1265,7 @@ static int eio_md_load(struct cache_c *dmc)
 					(struct flash_cacheblock *)
 					pg_virt_addr[page_index++];
 
-			// If unclean shutdown, only the DIRTY blocks are loaded.
+			/* If unclean shutdown, only the DIRTY blocks are loaded.*/
 			if (clean_shutdown || (next_ptr->cache_state & DIRTY)) {
 
 				if (next_ptr->cache_state & DIRTY)
