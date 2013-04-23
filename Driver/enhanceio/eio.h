@@ -80,13 +80,14 @@
  * It is to carry out 64bit division
  * on 32bit architecture.
  */
-static __inline__ uint64_t
+static inline uint64_t
 EIO_CALCULATE_PERCENTAGE(uint64_t x64, uint64_t y64)
 {
 	uint64_t result;
 	uint32_t h_y32 = y64 >> 32;
+
 	result = x64 * 100;
-	
+
 	while (h_y32) {
 		h_y32 >>= 1;
 		y64 >>= 1;
@@ -97,20 +98,22 @@ EIO_CALCULATE_PERCENTAGE(uint64_t x64, uint64_t y64)
 }
 
 
-static __inline__ uint64_t
+static inline uint64_t
 EIO_DIV(uint64_t dividend_64, uint32_t divisor_32)
 {
 	uint64_t result;
+
 	result = dividend_64;
 	do_div(result, divisor_32);
 	return result;
 }
 
 
-static __inline__ uint32_t
+static inline uint32_t
 EIO_REM(uint64_t dividend_64, uint32_t divisor_32)
 {
 	uint64_t temp;
+
 	temp = dividend_64;
 	return do_div(temp, divisor_32);
 }
@@ -240,10 +243,10 @@ extern mempool_t *_job_pool;
 
 union eio_superblock {
 	struct superblock_fields {
-		__le64 size;                  /* Cache size */
-		__le32 block_size;           /* Cache block size */
-		__le32 assoc;                /* Cache associativity */
-		__le32 cache_sb_state;       /* Clean shutdown ? */
+		__le64 size;                    /* Cache size */
+		__le32 block_size;              /* Cache block size */
+		__le32 assoc;                   /* Cache associativity */
+		__le32 cache_sb_state;          /* Clean shutdown ? */
 		char cache_devname[DEV_PATHLEN];
 		__le64 cache_devsize;
 		char disk_devname[DEV_PATHLEN];
@@ -254,10 +257,10 @@ union eio_superblock {
 		__le32 repl_policy;
 		__le32 cache_flags;
 		__le32 magic;
-		__le32 cold_boot;            /* cache to be started as cold after boot */
+		__le32 cold_boot;               /* cache to be started as cold after boot */
 		char ssd_uuid[DEV_PATHLEN];
-		__le64 cache_md_start_sect;   /* cache metadata start (8K aligned) */
-		__le64 cache_data_start_sect; /* cache data start (8K aligned) */
+		__le64 cache_md_start_sect;     /* cache metadata start (8K aligned) */
+		__le64 cache_data_start_sect;   /* cache data start (8K aligned) */
 		__le32 dirty_high_threshold;
 		__le32 dirty_low_threshold;
 		__le32 dirty_set_high_threshold;
@@ -371,15 +374,15 @@ struct flash_cacheblock {
 #define CACHE_REPL_DEFAULT      CACHE_REPL_FIFO
 
 struct eio_policy_and_name {
-    u8  p;
-    char *n;
+	u8 p;
+	char *n;
 };
 
 
 static const struct eio_policy_and_name eio_policy_names[] = {
-     { CACHE_REPL_FIFO,  "fifo"    },
-     { CACHE_REPL_LRU,  "lru"      },
-     { CACHE_REPL_RANDOM,  "rand"  },
+	{ CACHE_REPL_FIFO,   "fifo"	 },
+	{ CACHE_REPL_LRU,    "lru"	 },
+	{ CACHE_REPL_RANDOM, "rand"	 },
 };
 
 
@@ -812,7 +815,7 @@ struct cache_c {
 
 #define DIRTY_CACHE_THRESHOLD_CROSSED(dmc)	\
 	((atomic64_read(&(dmc)->nr_dirty) - atomic64_read(&(dmc)->clean_pendings)) >= \
-	  (int64_t)((dmc)->sysctl_active.dirty_high_threshold * EIO_DIV((dmc)->size, 100)) && \
+	 (int64_t)((dmc)->sysctl_active.dirty_high_threshold * EIO_DIV((dmc)->size, 100)) && \
 	 ((dmc)->sysctl_active.dirty_high_threshold > (dmc)->sysctl_active.dirty_low_threshold))
 
 #define DIRTY_SET_THRESHOLD_CROSSED(dmc, set)	\
@@ -1039,7 +1042,7 @@ extern void eio_put_cache_device(struct cache_c *dmc);
 extern void eio_suspend_caching(struct cache_c *dmc, enum dev_notifier note);
 extern void eio_resume_caching(struct cache_c *dmc, char *dev);
 
-static __inline__ void
+static inline void
 EIO_DBN_SET(struct cache_c *dmc, u_int64_t index, sector_t dbn)
 {
 	if (EIO_MD8(dmc))
@@ -1050,7 +1053,7 @@ EIO_DBN_SET(struct cache_c *dmc, u_int64_t index, sector_t dbn)
 		dmc->index_zero = index;
 }
 
-static __inline__ u_int64_t EIO_DBN_GET(struct cache_c *dmc, u_int64_t index)
+static inline u_int64_t EIO_DBN_GET(struct cache_c *dmc, u_int64_t index)
 {
 	if (EIO_MD8(dmc))
 		return dmc->cache_md8[index].md8_md & EIO_MD8_DBN_MASK;
@@ -1058,7 +1061,7 @@ static __inline__ u_int64_t EIO_DBN_GET(struct cache_c *dmc, u_int64_t index)
 	return eio_expand_dbn(dmc, index);
 }
 
-static __inline__ void
+static inline void
 EIO_CACHE_STATE_SET(struct cache_c *dmc, u_int64_t index, u_int8_t cache_state)
 {
 	if (EIO_MD8(dmc))
@@ -1067,7 +1070,7 @@ EIO_CACHE_STATE_SET(struct cache_c *dmc, u_int64_t index, u_int8_t cache_state)
 		EIO_MD4_CACHE_STATE(dmc, index) = cache_state;
 }
 
-static __inline__ u_int8_t
+static inline u_int8_t
 EIO_CACHE_STATE_GET(struct cache_c *dmc, u_int64_t index)
 {
 	u_int8_t cache_state;
@@ -1079,7 +1082,7 @@ EIO_CACHE_STATE_GET(struct cache_c *dmc, u_int64_t index)
 	return cache_state;
 }
 
-static __inline__ void
+static inline void
 EIO_CACHE_STATE_OFF(struct cache_c *dmc, index_t index, u_int8_t bitmask)
 {
 	u_int8_t cache_state = EIO_CACHE_STATE_GET(dmc, index);
@@ -1088,7 +1091,7 @@ EIO_CACHE_STATE_OFF(struct cache_c *dmc, index_t index, u_int8_t bitmask)
 	EIO_CACHE_STATE_SET(dmc, index, cache_state);
 }
 
-static __inline__ void
+static inline void
 EIO_CACHE_STATE_ON(struct cache_c *dmc, index_t index, u_int8_t bitmask)
 {
 	u_int8_t cache_state = EIO_CACHE_STATE_GET(dmc, index);

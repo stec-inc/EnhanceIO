@@ -80,7 +80,7 @@ static int eio_notify_ssd_rm(struct notifier_block *nb, unsigned long action,
 static struct notifier_block eio_reboot_notifier = {
 	.notifier_call	= eio_notify_reboot,
 	.next		= NULL,
-	.priority	= INT_MAX,         /* should be > ssd pri's and disk dev pri's */
+	.priority	= INT_MAX,          /* should be > ssd pri's and disk dev pri's */
 };
 
 static struct notifier_block eio_ssd_rm_notifier = {
@@ -136,14 +136,15 @@ void eio_thread_exit(long exit_code)
 {
 	do_exit(exit_code);
 }
- const char *eio_policy_to_name(u8 p)
+const char *eio_policy_to_name(u8 p)
 {
-    int i;
-    for (i = 0; i < ARRAY_SIZE(eio_policy_names); i++)
-        if (eio_policy_names[i].p == p)
-            return eio_policy_names[i].n;
+	int i;
 
-    return NULL;
+	for (i = 0; i < ARRAY_SIZE(eio_policy_names); i++)
+		if (eio_policy_names[i].p == p)
+			return eio_policy_names[i].n;
+
+	return NULL;
 }
 
 
@@ -162,8 +163,8 @@ inline int eio_policy_init(struct cache_c *dmc)
 		/* Back pointer to reference dmc from policy_ops */
 		dmc->policy_ops->sp_dmc = dmc;
 		pr_info("Setting replacement policy to %s (%d)",
-				eio_policy_to_name(dmc->policy_ops->sp_name),
-				dmc->policy_ops->sp_name);
+			eio_policy_to_name(dmc->policy_ops->sp_name),
+			dmc->policy_ops->sp_name);
 	}
 	return error;
 }
@@ -237,8 +238,8 @@ static int eio_kcached_init(struct cache_c *dmc)
 static void eio_kcached_client_destroy(struct cache_c *dmc)
 {
 
-	/* Wait for all IOs 
-	/wait_event(dmc->destroyq, !atomic_read(&dmc->nr_jobs));*/
+	/* Wait for all IOs
+	   /wait_event(dmc->destroyq, !atomic_read(&dmc->nr_jobs));*/
 }
 
 /* Store the cache superblock on ssd */
@@ -304,7 +305,7 @@ int eio_sb_store(struct cache_c *dmc)
 	sb->sbf.cold_boot = cpu_to_le32(dmc->cold_boot);
 	if (le32_to_cpu(sb->sbf.cold_boot) && eio_force_warm_boot)
 		sb->sbf.cold_boot = cpu_to_le32(le32_to_cpu(sb->sbf.cold_boot) |
-			       			BOOT_FLAG_FORCE_WARM);
+						BOOT_FLAG_FORCE_WARM);
 
 	sb->sbf.dirty_high_threshold = cpu_to_le32(dmc->sysctl_active.dirty_high_threshold);
 	sb->sbf.dirty_low_threshold = cpu_to_le32(dmc->sysctl_active.dirty_low_threshold);
@@ -690,10 +691,10 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 		 sizeof(struct cacheblock));
 	i = EIO_MD8(dmc) ? sizeof(struct cacheblock_md8) : sizeof(struct
 								  cacheblock);
-	pr_info("Allocate %lluKB (%lluB per) mem for %llu-entry cache "\
+	pr_info("Allocate %lluKB (%lluB per) mem for %llu-entry cache "	\
 		"(capacity:%lluMB, associativity:%u, block size:%u bytes)",
 		(unsigned long long)order >> 10, (unsigned long long)i,
-	       	(long long unsigned int)dmc->size,
+		(long long unsigned int)dmc->size,
 		(unsigned long long)(cache_size >> (20 - SECTOR_SHIFT)), dmc->assoc,
 		dmc->block_size << SECTOR_SHIFT);
 
@@ -1006,27 +1007,27 @@ static int eio_md_load(struct cache_c *dmc)
 
 	/* check ondisk superblock version */
 	if (le32_to_cpu(header->sbf.cache_version) != EIO_SB_VERSION) {
-		pr_info("md_load: Cache superblock mismatch detected."\
+		pr_info("md_load: Cache superblock mismatch detected." \
 			" (current: %u, ondisk: %u)", EIO_SB_VERSION,
 			header->sbf.cache_version);
 
 		if (le32_to_cpu(header->sbf.cache_version) == 0) {
-			pr_err("md_load: Can't enable cache %s. Either "\
-			       "superblock version is invalid or cache has"\
+			pr_err("md_load: Can't enable cache %s. Either " \
+			       "superblock version is invalid or cache has" \
 			       " been deleted", header->sbf.cache_name);
 			ret = 1;
 			goto free_header;
 		}
 
 		if (le32_to_cpu(header->sbf.cache_version) > EIO_SB_VERSION) {
-			pr_err("md_load: Can't enable cache %s with newer "\
+			pr_err("md_load: Can't enable cache %s with newer " \
 			       " superblock version.", header->sbf.cache_name);
 			ret = 1;
 			goto free_header;
 		}
 
 		if (le32_to_cpu(header->sbf.mode) == CACHE_MODE_WB) {
-			pr_err("md_load: Can't enable write-back cache %s"\
+			pr_err("md_load: Can't enable write-back cache %s" \
 			       " with newer superblock version.",
 			       header->sbf.cache_name);
 			ret = 1;
@@ -1034,7 +1035,7 @@ static int eio_md_load(struct cache_c *dmc)
 		} else if ((le32_to_cpu(header->sbf.mode) == CACHE_MODE_RO) ||
 			   (le32_to_cpu(header->sbf.mode) == CACHE_MODE_WT)) {
 			dmc->persistence = CACHE_FORCECREATE;
-			pr_info("md_load: Can't enable cache, recreating"\
+			pr_info("md_load: Can't enable cache, recreating" \
 				" cache %s with newer superblock version.",
 				header->sbf.cache_name);
 			ret = 0;
@@ -1046,9 +1047,9 @@ static int eio_md_load(struct cache_c *dmc)
 
 	if (le32_to_cpu(header->sbf.cache_version) >= EIO_SB_MAGIC_VERSION &&
 	    le32_to_cpu(header->sbf.magic) != EIO_MAGIC) {
-		pr_err("md_load: Magic number mismatch in superblock detected."\
+		pr_err("md_load: Magic number mismatch in superblock detected."	\
 		       " (current: %u, ondisk: %u)", EIO_MAGIC,
-		      le32_to_cpu(header->sbf.magic));
+		       le32_to_cpu(header->sbf.magic));
 		ret = 1;
 		goto free_header;
 	}
@@ -1073,7 +1074,7 @@ static int eio_md_load(struct cache_c *dmc)
 	if (le32_to_cpu(header->sbf.cold_boot) & BOOT_FLAG_FORCE_WARM) {
 		force_warm_boot = 1;
 		header->sbf.cold_boot = cpu_to_le32(le32_to_cpu(header->sbf.cold_boot) &
-							~BOOT_FLAG_FORCE_WARM);
+						    ~BOOT_FLAG_FORCE_WARM);
 	}
 
 	/*
@@ -1161,12 +1162,12 @@ static int eio_md_load(struct cache_c *dmc)
 	size =
 		EIO_MD8(dmc) ? sizeof(struct cacheblock_md8) : sizeof(struct
 								      cacheblock);
-	pr_info("Allocate %lluKB (%lluB per) mem for %llu-entry cache "\
+	pr_info("Allocate %lluKB (%lluB per) mem for %llu-entry cache "	\
 		"(capacity:%lluMB, associativity:%u, block size:%u bytes)",
 		(unsigned long long)order >> 10, (unsigned long long)size,
-	       	(long long unsigned int)dmc->size,
+		(long long unsigned int)dmc->size,
 		(long long unsigned int)(dmc->md_sectors + data_size) >> (20 -
-								     SECTOR_SHIFT),
+									  SECTOR_SHIFT),
 		dmc->assoc, dmc->block_size << SECTOR_SHIFT);
 
 	if (EIO_MD8(dmc))
@@ -1276,8 +1277,8 @@ static int eio_md_load(struct cache_c *dmc)
 						    cache_state & ~QUEUED);
 
 				EIO_ASSERT((EIO_CACHE_STATE_GET(dmc, i) &
-					(VALID | INVALID))
-				       != (VALID | INVALID));
+					    (VALID | INVALID))
+					   != (VALID | INVALID));
 
 				if (EIO_CACHE_STATE_GET(dmc, i) & VALID)
 					num_valid++;
@@ -1748,7 +1749,7 @@ int eio_cache_create(struct cache_rec_short *cache)
 	 */
 
 	i = EIO_DIV(eio_to_sector(eio_get_device_size(dmc->disk_dev)),
-	    (dmc->assoc * dmc->block_size));
+		    (dmc->assoc * dmc->block_size));
 	if (i >= (((u_int64_t)1) << 32)) {
 		strerr = "Too many cache sets to support";
 		goto bad5;
@@ -1956,7 +1957,7 @@ int eio_cache_delete(char *cache_name, int do_delete)
 
 	spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 	if (dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG) {
-		pr_err("cache_delete: system shutdown in progress, cannot "\
+		pr_err("cache_delete: system shutdown in progress, cannot " \
 		       "delete cache %s", cache_name);
 		spin_unlock_irqrestore(&dmc->cache_spin_lock,
 				       dmc->cache_spin_lock_flags);
@@ -1964,7 +1965,7 @@ int eio_cache_delete(char *cache_name, int do_delete)
 	}
 	if (dmc->cache_flags & CACHE_FLAGS_MOD_INPROG) {
 		pr_err
-			("cache_delete: simultaneous edit/delete operation "\
+			("cache_delete: simultaneous edit/delete operation " \
 			" on cache %s is not permitted", cache_name);
 		spin_unlock_irqrestore(&dmc->cache_spin_lock,
 				       dmc->cache_spin_lock_flags);
@@ -2031,7 +2032,7 @@ int eio_cache_delete(char *cache_name, int do_delete)
 
 	if (!CACHE_FAILED_IS_SET(dmc))
 		EIO_ASSERT(dmc->sysctl_active.fast_remove
-		       || (atomic64_read(&dmc->nr_dirty) == 0));
+			   || (atomic64_read(&dmc->nr_dirty) == 0));
 
 	/*
 	 * If ttc_deactivate succeeded... proceed with cache delete.
@@ -2136,12 +2137,12 @@ int eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 
 	/* sanity check */
 	if (dmc->cache_size != eio_to_sector(eio_get_device_size(dmc->cache_dev))) {
-		pr_err("ctr_ssd_add: Cache device size has changed,"\
-			"expected (%llu) found (%llu)"\
-			"continuing in degraded mode",
-			 (unsigned long long)dmc->cache_size,
+		pr_err("ctr_ssd_add: Cache device size has changed," \
+		       "expected (%llu) found (%llu)" \
+		       "continuing in degraded mode",
+		       (unsigned long long)dmc->cache_size,
 		       (unsigned long long)eio_to_sector(
-				eio_get_device_size(dmc->cache_dev)));
+			       eio_get_device_size(dmc->cache_dev)));
 		r = -EINVAL;
 		goto out;
 	}
@@ -2149,10 +2150,10 @@ int eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 	/* sanity check for cache device start sector */
 	if (dmc->cache_dev_start_sect !=
 	    eio_get_device_start_sect(dmc->cache_dev)) {
-		pr_err("ctr_ssd_add: Cache device starting sector changed,"\
-				"expected (%llu) found (%llu) continuing in"\
-				"degraded mode", (unsigned long long)dmc->cache_dev_start_sect,
-			       	(unsigned long long)eio_get_device_start_sect(dmc->cache_dev));
+		pr_err("ctr_ssd_add: Cache device starting sector changed," \
+		       "expected (%llu) found (%llu) continuing in" \
+		       "degraded mode", (unsigned long long)dmc->cache_dev_start_sect,
+		       (unsigned long long)eio_get_device_start_sect(dmc->cache_dev));
 		r = -EINVAL;
 		goto out;
 	}
@@ -2321,7 +2322,7 @@ int eio_allocate_wb_resources(struct cache_c *dmc)
 		ret = -ENOMEM;
 
 	if (ret < 0) {
-		pr_err("cache_create: Failed to initialize dirty lru set or"\
+		pr_err("cache_create: Failed to initialize dirty lru set or" \
 		       "clean/mdupdate thread for wb cache.\n");
 		if (dmc->dirty_set_lru) {
 			lru_uninit(dmc->dirty_set_lru);

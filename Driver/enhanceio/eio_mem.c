@@ -55,7 +55,7 @@ int eio_mem_init(struct cache_c *dmc)
 	 */
 	num_sets_64 = EIO_DIV(dmc->size, dmc->assoc);
 	if (num_sets_64 > UINT_MAX) {
-		pr_err("Number of cache sets (%lu) greater than maximum"\
+		pr_err("Number of cache sets (%lu) greater than maximum" \
 		       "allowed (%u)",
 		       (long unsigned int)num_sets_64, UINT_MAX);
 		return -1;
@@ -66,9 +66,9 @@ int eio_mem_init(struct cache_c *dmc)
 	 * its corresponding mask value.
 	 */
 	dmc->num_sets = (u_int32_t)num_sets_64;
-	for (dmc->num_sets_bits = 0; 
-			(dmc->num_sets >> dmc->num_sets_bits) != 0;
-			dmc->num_sets_bits++);
+	for (dmc->num_sets_bits = 0;
+	     (dmc->num_sets >> dmc->num_sets_bits) != 0;
+	     dmc->num_sets_bits++) ;
 
 	dmc->num_sets_mask = ULLONG_MAX >> (64 - dmc->num_sets_bits);
 

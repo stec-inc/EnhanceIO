@@ -187,7 +187,7 @@ int eio_ttc_activate(struct cache_c *dmc)
 	dmc->dev_end_sect =
 		bdev->bd_part->start_sect + bdev->bd_part->nr_sects - 1;
 
-	pr_debug("eio_ttc_activate: Device/Partition"\
+	pr_debug("eio_ttc_activate: Device/Partition" \
 		 " sector_start: %llu, end: %llu\n",
 		 (uint64_t)dmc->dev_start_sect, (uint64_t)dmc->dev_end_sect);
 
@@ -423,7 +423,7 @@ re_lookup:
 
 		if (bio_rw_flagged(bio, REQ_DISCARD)) {
 			pr_err
-				("eio_mfn: Overlap I/O with Discard flag."\
+				("eio_mfn: Overlap I/O with Discard flag." \
 				" Discard flag is not supported.\n");
 			bio_endio(bio, -EOPNOTSUPP);
 		} else
@@ -1016,7 +1016,7 @@ int eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 
 	if (unlikely(CACHE_FAILED_IS_SET(dmc)) ||
 	    unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
-		pr_err("cache_edit: Cannot proceed with edit on cache \"%s\""\
+		pr_err("cache_edit: Cannot proceed with edit on cache \"%s\"" \
 		       ". Cache is in failed or degraded state.",
 		       dmc->cache_name);
 		return -EINVAL;
@@ -1024,15 +1024,15 @@ int eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 
 	spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 	if (dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG) {
-		pr_err("cache_edit: system shutdown in progress, cannot edit"\
+		pr_err("cache_edit: system shutdown in progress, cannot edit" \
 		       " cache %s", cache_name);
 		spin_unlock_irqrestore(&dmc->cache_spin_lock,
 				       dmc->cache_spin_lock_flags);
 		return -EINVAL;
 	}
 	if (dmc->cache_flags & CACHE_FLAGS_MOD_INPROG) {
-		pr_err("cache_edit: simultaneous edit/delete operation on "\
-	 		"cache %s is not permitted", cache_name);
+		pr_err("cache_edit: simultaneous edit/delete operation on " \
+		       "cache %s is not permitted", cache_name);
 		spin_unlock_irqrestore(&dmc->cache_spin_lock,
 				       dmc->cache_spin_lock_flags);
 		return -EINVAL;
@@ -1073,9 +1073,9 @@ int eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 			goto out;
 		}
 		EIO_ASSERT((dmc->sysctl_active.do_clean & EIO_CLEAN_KEEP) &&
-		       !(dmc->sysctl_active.do_clean & EIO_CLEAN_START));
+			   !(dmc->sysctl_active.do_clean & EIO_CLEAN_START));
 		EIO_ASSERT(dmc->sysctl_active.fast_remove ||
-		       (atomic64_read(&dmc->nr_dirty) == 0));
+			   (atomic64_read(&dmc->nr_dirty) == 0));
 	}
 
 	index = EIO_HASH_BDEV(dmc->disk_dev->bdev->bd_contains->bd_dev);
@@ -1186,8 +1186,8 @@ static int eio_mode_switch(struct cache_c *dmc, u_int32_t mode)
 		dmc->mode = mode;
 	} else {                /* (RO -> WT) or (WT -> RO) */
 		EIO_ASSERT(((dmc->mode == CACHE_MODE_RO) && (mode == CACHE_MODE_WT))
-		       || ((dmc->mode == CACHE_MODE_WT) &&
-			   (mode == CACHE_MODE_RO)));
+			   || ((dmc->mode == CACHE_MODE_WT) &&
+			       (mode == CACHE_MODE_RO)));
 		dmc->mode = mode;
 	}
 
@@ -1345,7 +1345,7 @@ int eio_alloc_wb_bvecs(struct bio_vec *bvec, int max, int blksize)
 		case BLKSIZE_8K:
 			page = alloc_page(GFP_KERNEL | __GFP_ZERO);
 			if (unlikely(!page)) {
-				pr_err("eio_alloc_wb_bvecs:"\
+				pr_err("eio_alloc_wb_bvecs:" \
 				       " System memory too low.\n");
 				goto err;
 			}
@@ -1496,7 +1496,7 @@ int eio_reboot_handling(void)
 			if (unlikely(CACHE_FAILED_IS_SET(dmc)) ||
 			    unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
 				pr_err
-					("Cache \"%s\" is in failed/degraded "\
+					("Cache \"%s\" is in failed/degraded " \
 					"mode. Cannot mark cache read only.\n",
 					dmc->cache_name);
 				continue;
@@ -1518,8 +1518,8 @@ int eio_reboot_handling(void)
 			spin_lock_irqsave(&dmc->cache_spin_lock,
 					  dmc->cache_spin_lock_flags);
 			EIO_ASSERT(!
-			       (dmc->
-				cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG));
+				   (dmc->
+				    cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG));
 			dmc->cache_flags |= CACHE_FLAGS_SHUTDOWN_INPROG;
 			spin_unlock_irqrestore(&dmc->cache_spin_lock,
 					       dmc->cache_spin_lock_flags);

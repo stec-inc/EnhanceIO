@@ -1016,21 +1016,21 @@ static struct sysctl_table_dir {
 	ctl_table dir[1 + 1];
 	ctl_table root[1 + 1];
 } sysctl_template_dir = {
-	.vars = {
-	}, .dev	= {
-	}, .dir	= {
+	.vars				={
+	}, .dev				={
+	}, .dir				={
 		{
-			.procname = PROC_SYS_DIR_NAME,
-			.maxlen = 0,
-			.mode =	S_IRUGO | S_IXUGO,
-			.child = sysctl_template_dir.dev,
+			.procname	= PROC_SYS_DIR_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_dir.dev,
 		},
-	}, .root = {
+	}, .root			={
 		{
-			.procname = PROC_SYS_ROOT_NAME,
-			.maxlen = 0,
-			.mode =	0555,
-			.child = sysctl_template_dir.dir,
+			.procname	= PROC_SYS_ROOT_NAME,
+			.maxlen		= 0,
+			.mode		= 0555,
+			.child		= sysctl_template_dir.dir,
 		},
 	},
 };
@@ -1044,42 +1044,42 @@ static struct sysctl_table_common {
 	ctl_table dir[1 + 1];
 	ctl_table root[1 + 1];
 } sysctl_template_common = {
-	.vars = {
+	.vars				={
 		{               /* 1 */
-			.procname = "zero_stats",
-			.maxlen = sizeof(int),
-			.mode = 0644,
-			.proc_handler = &eio_zerostats_sysctl,
+			.procname	= "zero_stats",
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= &eio_zerostats_sysctl,
 		}, {            /* 2 */
-			.procname = "mem_limit_pct",
-			.maxlen = sizeof(int), .mode = 0644,
-			.proc_handler = &eio_mem_limit_pct_sysctl,
+			.procname	= "mem_limit_pct",
+			.maxlen		= sizeof(int),		    .mode= 0644,
+			.proc_handler	= &eio_mem_limit_pct_sysctl,
 		}, {            /* 3 */
-			.procname = "control",
-			.maxlen = sizeof(int),
-			.mode = 0644,
-			.proc_handler = &eio_control_sysctl,
+			.procname	= "control",
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= &eio_control_sysctl,
 		},
-	}, .dev = {
+	}, .dev				={
 		{
-			.procname = PROC_SYS_CACHE_NAME,
-			.maxlen = 0,
-			.mode =	S_IRUGO | S_IXUGO,
-			.child = sysctl_template_common.vars,
+			.procname	= PROC_SYS_CACHE_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_common.vars,
 		},
-	}, .dir = {
+	}, .dir				={
 		{
-			.procname = PROC_SYS_DIR_NAME,
-			.maxlen = 0,
-			.mode = S_IRUGO | S_IXUGO,
-			.child = sysctl_template_common.dev,
+			.procname	= PROC_SYS_DIR_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_common.dev,
 		},
-	}, .root = {
+	}, .root			={
 		{
-			.procname = PROC_SYS_ROOT_NAME,
-			.maxlen = 0,
-			.mode = 0555,
-			.child = sysctl_template_common.dir,
+			.procname	= PROC_SYS_ROOT_NAME,
+			.maxlen		= 0,
+			.mode		= 0555,
+			.child		= sysctl_template_common.dir,
 		},
 	},
 };
@@ -1093,68 +1093,68 @@ static struct sysctl_table_writeback {
 	ctl_table dir[1 + 1];
 	ctl_table root[1 + 1];
 } sysctl_template_writeback = {
-	.vars = {
+	.vars				={
 		{               /* 1 */
-			.procname = "do_clean",
-			.maxlen = sizeof(int),
-			.mode = 0644,
-			.proc_handler = &eio_clean_sysctl,
+			.procname	= "do_clean",
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= &eio_clean_sysctl,
 		}, {            /* 2 */
-			.procname = "time_based_clean_interval",
-			.maxlen = sizeof(unsigned int),
-			.mode = 0644,
-			.proc_handler = &eio_time_based_clean_interval_sysctl,
+			.procname	= "time_based_clean_interval",
+			.maxlen		= sizeof(unsigned int),
+			.mode		= 0644,
+			.proc_handler	= &eio_time_based_clean_interval_sysctl,
 		}, {            /* 3 */
-			.procname = "autoclean_threshold",
-			.maxlen = sizeof(int),
-			.mode = 0644,
-			.proc_handler = &eio_autoclean_threshold_sysctl,
+			.procname	= "autoclean_threshold",
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= &eio_autoclean_threshold_sysctl,
 		}, {            /* 4 */
-			.procname = "dirty_high_threshold",
-			.maxlen = sizeof(uint32_t),
-			.mode = 0644,
-			.proc_handler = &eio_dirty_high_threshold_sysctl,
+			.procname	= "dirty_high_threshold",
+			.maxlen		= sizeof(uint32_t),
+			.mode		= 0644,
+			.proc_handler	= &eio_dirty_high_threshold_sysctl,
 		}
 		, {             /* 5 */
-			.procname = "dirty_low_threshold",
-			.maxlen = sizeof(uint32_t),
-			.mode = 0644,
-			.proc_handler = &eio_dirty_low_threshold_sysctl,
+			.procname	= "dirty_low_threshold",
+			.maxlen		= sizeof(uint32_t),
+			.mode		= 0644,
+			.proc_handler	= &eio_dirty_low_threshold_sysctl,
 		}
 		, {             /* 6 */
-			.procname = "dirty_set_high_threshold",
-			.maxlen = sizeof(uint32_t),
-			.mode = 0644,
-			.proc_handler = &eio_dirty_set_high_threshold_sysctl,
+			.procname	= "dirty_set_high_threshold",
+			.maxlen		= sizeof(uint32_t),
+			.mode		= 0644,
+			.proc_handler	= &eio_dirty_set_high_threshold_sysctl,
 		}
 		, {             /* 7 */
-			.procname = "dirty_set_low_threshold",
-			.maxlen = sizeof(uint32_t),
-			.mode = 0644,
-			.proc_handler = &eio_dirty_set_low_threshold_sysctl,
+			.procname	= "dirty_set_low_threshold",
+			.maxlen		= sizeof(uint32_t),
+			.mode		= 0644,
+			.proc_handler	= &eio_dirty_set_low_threshold_sysctl,
 		}
 		,
 	}
-	, .dev = {
+	, .dev				={
 		{
-			.procname = PROC_SYS_CACHE_NAME, .maxlen = 0, .mode =
-				S_IRUGO | S_IXUGO, .child =
+			.procname	= PROC_SYS_CACHE_NAME, .maxlen = 0, .mode =
+				S_IRUGO | S_IXUGO, .child=
 				sysctl_template_writeback.vars,
 		}
 		,
 	}
-	, .dir = {
+	, .dir				={
 		{
-			.procname = PROC_SYS_DIR_NAME, .maxlen = 0, .mode =
-				S_IRUGO | S_IXUGO, .child =
+			.procname	= PROC_SYS_DIR_NAME, .maxlen = 0, .mode =
+				S_IRUGO | S_IXUGO, .child=
 				sysctl_template_writeback.dev,
 		}
 		,
 	}
-	, .root = {
+	, .root				={
 		{
-			.procname = PROC_SYS_ROOT_NAME, .maxlen = 0, .mode =
-				0555, .child = sysctl_template_writeback.dir,
+			.procname	= PROC_SYS_ROOT_NAME, .maxlen = 0, .mode =
+				0555, .child= sysctl_template_writeback.dir,
 		}
 		,
 	}
@@ -1169,37 +1169,37 @@ static struct sysctl_table_invalidate {
 	ctl_table dir[1 + 1];
 	ctl_table root[1 + 1];
 } sysctl_template_invalidate = {
-	.vars = {
+	.vars				={
 		{        /* 1 */
-			.procname = "invalidate",
-			.maxlen = sizeof(u_int64_t), 
-			.mode = 0644,
-			.proc_handler = &eio_invalidate_sysctl,
+			.procname	= "invalidate",
+			.maxlen		= sizeof(u_int64_t),
+			.mode		= 0644,
+			.proc_handler	= &eio_invalidate_sysctl,
 		}
 		,
 	}
-	, .dev = {
+	, .dev				={
 		{
-			.procname = PROC_SYS_CACHE_NAME, .maxlen = 0, .mode =
-				S_IRUGO | S_IXUGO, .child =
+			.procname	= PROC_SYS_CACHE_NAME, .maxlen = 0, .mode =
+				S_IRUGO | S_IXUGO, .child=
 				sysctl_template_invalidate.vars,
 		}
 		,
 	}
-	, .dir = {
+	, .dir				={
 		{
-			.procname = PROC_SYS_DIR_NAME, .maxlen = 0, .mode =
-				S_IRUGO | S_IXUGO, .child =
+			.procname	= PROC_SYS_DIR_NAME, .maxlen = 0, .mode =
+				S_IRUGO | S_IXUGO, .child=
 				sysctl_template_invalidate.dev,
 		}
 		,
 	}
-	, .root = {
+	, .root				={
 		{
-			.procname = PROC_SYS_ROOT_NAME,
-			.maxlen = 0,
-			.mode = 0555,
-			.child = sysctl_template_invalidate.dir,
+			.procname	= PROC_SYS_ROOT_NAME,
+			.maxlen		= 0,
+			.mode		= 0555,
+			.child		= sysctl_template_invalidate.dir,
 		}
 		,
 	}
@@ -1691,20 +1691,20 @@ static int eio_stats_show(struct seq_file *seq, void *v)
 	if (atomic64_read(&stats->reads) > 0)
 		read_hit_pct =
 			EIO_CALCULATE_PERCENTAGE(
-					atomic64_read(&stats->read_hits),
-					atomic64_read(&stats->reads));
+				atomic64_read(&stats->read_hits),
+				atomic64_read(&stats->reads));
 	else
 		read_hit_pct = 0;
 
 	if (atomic64_read(&stats->writes) > 0) {
 		write_hit_pct =
 			EIO_CALCULATE_PERCENTAGE(
-					atomic64_read(&stats->write_hits),
-					atomic64_read(&stats->writes));
+				atomic64_read(&stats->write_hits),
+				atomic64_read(&stats->writes));
 		dirty_write_hit_pct =
 			EIO_CALCULATE_PERCENTAGE(
-					atomic64_read(&stats->dirty_write_hits),
-					atomic64_read(&stats->writes));
+				atomic64_read(&stats->dirty_write_hits),
+				atomic64_read(&stats->writes));
 	} else {
 		write_hit_pct = 0;
 		dirty_write_hit_pct = 0;

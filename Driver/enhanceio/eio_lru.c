@@ -186,8 +186,8 @@ eio_lru_find_reclaim_dbn(struct eio_policy *p_ops,
 		if (EIO_CACHE_STATE_GET(dmc, (lru_rel_index + start_index)) ==
 		    VALID) {
 			EIO_ASSERT((lru_blk - (struct eio_lru_cache_block *)
-				dmc->sp_cache_blk) ==
-			       (lru_rel_index + start_index));
+				    dmc->sp_cache_blk) ==
+				   (lru_rel_index + start_index));
 			*index = lru_rel_index + start_index;
 			eio_reclaim_lru_movetail(dmc, *index, p_ops);
 			break;
@@ -221,8 +221,8 @@ int eio_lru_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
 			((struct eio_lru_cache_block *)dmc->sp_cache_blk +
 			 lru_rel_index + start_index);
 		EIO_ASSERT((lru_cacheblk -
-			(struct eio_lru_cache_block *)dmc->sp_cache_blk) ==
-		       (lru_rel_index + start_index));
+			    (struct eio_lru_cache_block *)dmc->sp_cache_blk) ==
+			   (lru_rel_index + start_index));
 		if ((EIO_CACHE_STATE_GET(dmc, dmc_idx) &
 		     (DIRTY | BLOCK_IO_INPROG)) == DIRTY) {
 			EIO_CACHE_STATE_ON(dmc, dmc_idx, DISKWRITEINPROG);
