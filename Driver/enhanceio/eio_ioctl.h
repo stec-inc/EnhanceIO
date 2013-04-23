@@ -34,10 +34,10 @@
 #define MISC_DEVICE     "eiodev"
 
 #define CACHE_NAME_LEN          31
-#define CACHE_NAME_SZ           CACHE_NAME_LEN + 1
+#define CACHE_NAME_SZ           (CACHE_NAME_LEN + 1)
 
 #define NAME_LEN                127
-#define NAME_SZ                 NAME_LEN + 1
+#define NAME_SZ                 (NAME_LEN + 1)
 
 #define EIO_IOC_CREATE _IOW('E', 0, struct cache_rec_short)
 #define EIO_IOC_DELETE _IOW('E', 1, struct cache_rec_short)

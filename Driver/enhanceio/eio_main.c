@@ -2623,8 +2623,10 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 
 			if (IS_ERR
 				    (ebio =
-					    eio_new_ebio(dmc, bio, &residual_biovec, snum,
-							 iosize, bc, EB_SUBORDINATE_IO))) {
+					    eio_new_ebio(dmc, bio,
+						&residual_biovec, snum,
+						iosize, bc,
+					       	EB_SUBORDINATE_IO))) {
 				bc->bc_error = -ENOMEM;
 				break;
 			}
@@ -3300,7 +3302,8 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 		if (EIO_CACHE_STATE_GET(dmc, i) == CLEAN_INPROG) {
 
 			for (j = i; (j < end_index) &&
-			     (EIO_CACHE_STATE_GET(dmc, j) == CLEAN_INPROG); j++);
+			     (EIO_CACHE_STATE_GET(dmc, j) == CLEAN_INPROG);
+			     j++);
 
 			blkindex = (i - start_index);
 			total = (j - i);

@@ -144,7 +144,9 @@ extern struct bio_vec *eio_alloc_pages(u_int32_t max_pages, int *page_count);
 extern int eio_md_store(struct cache_c *);
 extern int eio_reboot_handling(void);
 extern void eio_process_zero_size_bio(struct cache_c *dmc, struct bio *origbio);
-
+extern long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg);
+extern long eio_compact_ioctl(struct file *filp, unsigned cmd,
+			      unsigned long arg);
 #endif                          /* __KERNEL__ */
 
 #endif                          /* EIO_TTC_H */

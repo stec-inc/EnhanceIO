@@ -168,7 +168,8 @@ struct kcached_job *eio_new_job(struct cache_c *dmc, struct eio_bio *bio,
 				(index << dmc->block_shift) + dmc->md_sectors +
 				(bio->eb_sector -
 				 EIO_ROUND_SECTOR(dmc, bio->eb_sector));
-			EIO_ASSERT(eio_to_sector(bio->eb_size) <= dmc->block_size);
+			EIO_ASSERT(eio_to_sector(bio->eb_size) <=
+					dmc->block_size);
 			job->job_io_regions.cache.count =
 				eio_to_sector(bio->eb_size);
 		} else {

@@ -66,8 +66,10 @@ int eio_mem_init(struct cache_c *dmc)
 	 * its corresponding mask value.
 	 */
 	dmc->num_sets = (u_int32_t)num_sets_64;
-	for (dmc->num_sets_bits = 0; (dmc->num_sets >> dmc->num_sets_bits) != 0;
-	     dmc->num_sets_bits++) ;
+	for (dmc->num_sets_bits = 0; 
+			(dmc->num_sets >> dmc->num_sets_bits) != 0;
+			dmc->num_sets_bits++);
+
 	dmc->num_sets_mask = ULLONG_MAX >> (64 - dmc->num_sets_bits);
 
 	/*

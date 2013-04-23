@@ -36,10 +36,6 @@ static struct list_head eio_ttc_list[EIO_HASHTBL_SIZE];
 
 int eio_reboot_notified;
 
-extern long eio_ioctl(struct file *filp, unsigned cmd, unsigned long arg);
-extern long eio_compact_ioctl(struct file *filp, unsigned cmd,
-			      unsigned long arg);
-
 static void eio_make_request_fn(struct request_queue *, struct bio *);
 static void eio_cache_rec_fill(struct cache_c *, struct cache_rec_short *);
 static void eio_bio_end_empty_barrier(struct bio *, int);

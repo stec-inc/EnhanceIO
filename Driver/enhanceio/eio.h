@@ -118,7 +118,7 @@ EIO_REM(uint64_t dividend_64, uint32_t divisor_32)
 static inline sector_t
 eio_to_sector(uint64_t size_in_bytes)
 {
-	return (size_in_bytes >> 9);
+	return size_in_bytes >> 9;
 }
 
 struct eio_control_s {
@@ -518,8 +518,8 @@ struct cacheblock {
 #endif                          /* DO_CHECKSUM */
 };
 
-#define md4_md                          md4_u.u_i_md4
-#define md4_cache_state                 md4_u.u_s_md4.cache_state
+#define md4_md                          ((md4_u).u_i_md4)
+#define md4_cache_state                 (((md4_u).u_s_md4).cache_state)
 #define EIO_MD4_DBN_BITS                (32 - 8)        /* 8 bits for state */
 #define EIO_MD4_DBN_MASK                ((1 << EIO_MD4_DBN_BITS) - 1)
 #define EIO_MD4_INVALID                 (INVALID << EIO_MD4_DBN_BITS)
@@ -546,8 +546,8 @@ struct cacheblock_md8 {
 #endif                          /* DO_CHECKSUM */
 };
 
-#define md8_md                          md8_u.u_i_md8
-#define md8_cache_state                 md8_u.u_s_md8.cache_state
+#define md8_md                          ((md8_u).u_i_md8)
+#define md8_cache_state                 (((md8_u).u_s_md8).cache_state)
 #define EIO_MD8_DBN_BITS                (64 - 8)        /* 8 bits for state */
 #define EIO_MD8_DBN_MASK                ((((u_int64_t)1) << EIO_MD8_DBN_BITS) - 1)
 #define EIO_MD8_INVALID                 (((u_int64_t)INVALID) << EIO_MD8_DBN_BITS)
