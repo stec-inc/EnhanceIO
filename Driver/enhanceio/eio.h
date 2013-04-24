@@ -521,12 +521,9 @@ struct cacheblock {
 #endif                          /* DO_CHECKSUM */
 };
 
-#define md4_md                          ((md4_u).u_i_md4)
-#define md4_cache_state                 (((md4_u).u_s_md4).cache_state)
 #define EIO_MD4_DBN_BITS                (32 - 8)        /* 8 bits for state */
 #define EIO_MD4_DBN_MASK                ((1 << EIO_MD4_DBN_BITS) - 1)
 #define EIO_MD4_INVALID                 (INVALID << EIO_MD4_DBN_BITS)
-#define EIO_MD4_CACHE_STATE(dmc, index) (dmc->cache[index].md4_cache_state)
 
 /*
  * 8-byte metadata support.
@@ -549,12 +546,9 @@ struct cacheblock_md8 {
 #endif                          /* DO_CHECKSUM */
 };
 
-#define md8_md                          ((md8_u).u_i_md8)
-#define md8_cache_state                 (((md8_u).u_s_md8).cache_state)
 #define EIO_MD8_DBN_BITS                (64 - 8)        /* 8 bits for state */
 #define EIO_MD8_DBN_MASK                ((((u_int64_t)1) << EIO_MD8_DBN_BITS) - 1)
 #define EIO_MD8_INVALID                 (((u_int64_t)INVALID) << EIO_MD8_DBN_BITS)
-#define EIO_MD8_CACHE_STATE(dmc, index) ((dmc)->cache_md8[index].md8_cache_state)
 #define EIO_MD8(dmc)                    CACHE_MD8_IS_SET(dmc)
 
 /* Structure used for metadata update on-disk and in-core for writeback cache */
@@ -1056,7 +1050,7 @@ EIO_DBN_SET(struct cache_c *dmc, u_int64_t index, sector_t dbn)
 static inline u_int64_t EIO_DBN_GET(struct cache_c *dmc, u_int64_t index)
 {
 	if (EIO_MD8(dmc))
-		return dmc->cache_md8[index].md8_md & EIO_MD8_DBN_MASK;
+		return dmc->cache_md8[index].md8_u.u_i_md8 & EIO_MD8_DBN_MASK;
 
 	return eio_expand_dbn(dmc, index);
 }
@@ -1065,9 +1059,9 @@ static inline void
 EIO_CACHE_STATE_SET(struct cache_c *dmc, u_int64_t index, u_int8_t cache_state)
 {
 	if (EIO_MD8(dmc))
-		EIO_MD8_CACHE_STATE(dmc, index) = cache_state;
+		dmc->cache_md8[index].md8_u.u_s_md8.cache_state = cache_state;
 	else
-		EIO_MD4_CACHE_STATE(dmc, index) = cache_state;
+		dmc->cache[index].md4_u.u_s_md4.cache_state = cache_state;
 }
 
 static inline u_int8_t
@@ -1076,9 +1070,9 @@ EIO_CACHE_STATE_GET(struct cache_c *dmc, u_int64_t index)
 	u_int8_t cache_state;
 
 	if (EIO_MD8(dmc))
-		cache_state = EIO_MD8_CACHE_STATE(dmc, index);
+		cache_state = dmc->cache_md8[index].md8_u.u_s_md8.cache_state;
 	else
-		cache_state = EIO_MD4_CACHE_STATE(dmc, index);
+		cache_state = dmc->cache[index].md4_u.u_s_md4.cache_state;
 	return cache_state;
 }
 

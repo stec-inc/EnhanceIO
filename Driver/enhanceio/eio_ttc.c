@@ -1444,9 +1444,7 @@ struct bio_vec *eio_alloc_pages(u_int32_t max_pages, int *page_count)
 
 	if (pcount == 0) {
 		pr_err("Single page allocation failed. System memory too low.");
-		if (pages)
-			kfree(pages);
-
+		kfree(pages);
 		return NULL;
 	}
 
@@ -1490,8 +1488,8 @@ int eio_reboot_handling(void)
 	for (i = 0; i < EIO_HASHTBL_SIZE; i++) {
 		down_write(&eio_ttc_lock[i]);
 		list_for_each_entry(dmc, &eio_ttc_list[i], cachelist) {
-			if (tempdmc)
-				kfree(tempdmc);
+			
+			kfree(tempdmc);
 			tempdmc = NULL;
 			if (unlikely(CACHE_FAILED_IS_SET(dmc)) ||
 			    unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
@@ -1574,8 +1572,7 @@ int eio_reboot_handling(void)
 
 			down_write(&eio_ttc_lock[i]);
 		}
-		if (tempdmc)
-			kfree(tempdmc);
+		kfree(tempdmc);
 		tempdmc = NULL;
 		up_write(&eio_ttc_lock[i]);
 	}

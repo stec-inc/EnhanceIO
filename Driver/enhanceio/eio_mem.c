@@ -163,7 +163,7 @@ sector_t eio_expand_dbn(struct cache_c *dmc, u_int64_t index)
 	    dmc->index_zero < (u_int64_t)dmc->assoc)
 		return 0;
 
-	dbn_24 = dmc->cache[index].md4_md & EIO_MD4_DBN_MASK;
+	dbn_24 = dmc->cache[index].md4_u.u_i_md4 & EIO_MD4_DBN_MASK;
 	if (dbn_24 == 0 && EIO_CACHE_STATE_GET(dmc, index) == INVALID)
 		return (sector_t)0;
 
@@ -193,9 +193,9 @@ void eio_invalidate_md(struct cache_c *dmc, u_int64_t index)
 {
 
 	if (EIO_MD8(dmc))
-		dmc->cache_md8[index].md8_md = EIO_MD8_INVALID;
+		dmc->cache_md8[index].md8_u.u_i_md8 = EIO_MD8_INVALID;
 	else
-		dmc->cache[index].md4_md = EIO_MD4_INVALID;
+		dmc->cache[index].md4_u.u_i_md4 = EIO_MD4_INVALID;
 }
 
 /*
@@ -207,8 +207,8 @@ void eio_md4_dbn_set(struct cache_c *dmc, u_int64_t index, u_int32_t dbn_24)
 	EIO_ASSERT((dbn_24 & ~EIO_MD4_DBN_MASK) == 0);
 
 	/* retain "cache_state" */
-	dmc->cache[index].md4_md &= ~EIO_MD4_DBN_MASK;
-	dmc->cache[index].md4_md |= dbn_24;
+	dmc->cache[index].md4_u.u_i_md4 &= ~EIO_MD4_DBN_MASK;
+	dmc->cache[index].md4_u.u_i_md4 |= dbn_24;
 
 	/* XXX excessive debugging */
 	if (dmc->index_zero < (u_int64_t)dmc->assoc &&  /* sector 0 cached */
@@ -226,8 +226,8 @@ void eio_md8_dbn_set(struct cache_c *dmc, u_int64_t index, sector_t dbn)
 	EIO_ASSERT((dbn & ~EIO_MD8_DBN_MASK) == 0);
 
 	/* retain "cache_state" */
-	dmc->cache_md8[index].md8_md &= ~EIO_MD8_DBN_MASK;
-	dmc->cache_md8[index].md8_md |= dbn;
+	dmc->cache_md8[index].md8_u.u_i_md8 &= ~EIO_MD8_DBN_MASK;
+	dmc->cache_md8[index].md8_u.u_i_md8 |= dbn;
 
 	/* XXX excessive debugging */
 	if (dmc->index_zero < (u_int64_t)dmc->assoc &&  /* sector 0 cached */
