@@ -62,7 +62,7 @@ static int eio_release(struct inode *ip, struct file *filp)
 	return 0;
 }
 
-static struct file_operations eio_fops = {
+static const struct file_operations eio_fops = {
 	.open		= eio_open,
 	.release	= eio_release,
 	.unlocked_ioctl = eio_ioctl,
@@ -120,7 +120,7 @@ int eio_ttc_get_device(const char *path, fmode_t mode, struct eio_bdev **result)
 	 * bd_claim_by_disk(bdev, charptr, gendisk)
 	 */
 
-	eio_bdev = (struct eio_bdev *)kzalloc(sizeof(*eio_bdev), GFP_KERNEL);
+	eio_bdev = kzalloc(sizeof(*eio_bdev), GFP_KERNEL);
 	if (eio_bdev == NULL) {
 		blkdev_put(bdev, mode);
 		return -ENOMEM;
@@ -317,8 +317,6 @@ deactivate:
 
 		if ((dmc->dev_info == EIO_DEV_WHOLE_DISK) || (found_partitions == 0))
 			rq->make_request_fn = dmc->origmfn;
-		else {
-		}
 
 	list_del_init(&dmc->cachelist);
 	up_write(&eio_ttc_lock[index]);
@@ -759,11 +757,9 @@ static int eio_dispatch_io(struct cache_c *dmc, struct eio_io_region *where,
 		}
 
 		atomic_inc(&io->count);
-		if (hddio) {
+		if (hddio)
 			dmc->origmfn(bdev_get_queue(bio->bi_bdev), bio);
-			if (ret) {
-			}
-		} else
+		else
 			submit_bio(rw, bio);
 
 	} while (remaining);
@@ -1488,7 +1484,7 @@ int eio_reboot_handling(void)
 	for (i = 0; i < EIO_HASHTBL_SIZE; i++) {
 		down_write(&eio_ttc_lock[i]);
 		list_for_each_entry(dmc, &eio_ttc_list[i], cachelist) {
-			
+
 			kfree(tempdmc);
 			tempdmc = NULL;
 			if (unlikely(CACHE_FAILED_IS_SET(dmc)) ||
@@ -1616,7 +1612,8 @@ static int eio_overlap_split_bio(struct request_queue *q, struct bio *bio)
 	bvec_consumed = 0;
 	for (i = 0; i < nbios; i++) {
 		bioptr[i] =
-			eio_split_new_bio(bio, bc, &bvec_idx, &bvec_consumed, snum);
+			eio_split_new_bio(bio, bc, &bvec_idx,
+					&bvec_consumed, snum);
 		if (!bioptr[i])
 			break;
 		snum++;

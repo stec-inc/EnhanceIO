@@ -135,7 +135,7 @@ eio_io_async_bvec(struct cache_c *dmc, struct eio_io_region *where, int rw,
 	struct eio_io_request req;
 	int error = 0;
 
-	memset((char *)&req, 0, sizeof req);
+	memset((char *)&req, 0, sizeof(req));
 
 	if (unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
 		if (where->bdev != dmc->disk_dev->bdev) {
@@ -462,9 +462,9 @@ static void eio_post_io_callback(struct work_struct *work)
 		if (unlikely(error))
 			dmc->eio_errors.ssd_write_errors++;
 		if (!(EIO_CACHE_STATE_GET(dmc, index) & CACHEWRITEINPROG)) {
-			printk(KERN_DEBUG
-			       "DISKWRITEINPROG absent in READFILL sector %llu io size %u\n",
-			       (unsigned long long)ebio->eb_sector,
+			pr_debug("DISKWRITEINPROG absent in READFILL \
+				sector %llu io size %u\n",
+				(unsigned long long)ebio->eb_sector,
 			       ebio->eb_size);
 		}
 		callendio = 1;
@@ -1772,42 +1772,6 @@ eio_invalidate_sanity_check(struct cache_c *dmc, u_int64_t iosector,
 	return 0;
 }
 
-#if defined (VMCACHE)
-int
-eio_invalidate_sector_range(char *cache_name, u_int64_t iosector,
-			    u_int64_t num_sectors)
-{
-	struct cache_c *dmc;
-	int ret;
-
-	dmc = eio_find_cache(cache_name);
-
-	if (dmc == NULL) {
-		pr_err
-			("invalidate_sector_range: cache object with name=%s does not exist.",
-			cache_name);
-		return -EINVAL;
-	}
-
-	ret = eio_invalidate_sanity_check(dmc, iosector, &num_sectors);
-
-	if (ret == 0)
-		eio_inval_range(dmc, iosector, (unsigned)to_bytes(num_sectors));
-	else
-		return ret;
-
-	if (CACHE_VERBOSE_IS_SET(dmc)) {
-		pr_info
-			("eio_inval_range: Invalidated sector range from sector=%lu to sector=%lu",
-			(long unsigned int)iosector,
-			(long unsigned int)num_sectors);
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL(eio_invalidate_sector_range);
-#endif                          /* VMCACHE */
-
 void eio_inval_range(struct cache_c *dmc, sector_t iosector, unsigned iosize)
 {
 	u_int32_t bset;
@@ -2510,7 +2474,7 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 
 	EIO_ASSERT(bio->bi_idx == 0);
 
-	pr_debug("this needs to be removed immediately \n");
+	pr_debug("this needs to be removed immediately\n");
 
 	if (bio_rw_flagged(bio, REQ_DISCARD)) {
 		pr_debug
@@ -2599,7 +2563,8 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 		 * lock on the cache set for app I/Os and exclusive
 		 * lock on the cache set for clean I/Os.
 		 */
-		if ((ret = eio_acquire_set_locks(dmc, bc)) != 0) {
+		ret = eio_acquire_set_locks(dmc, bc);
+		if (ret) {
 			bio_endio(bio, ret);
 			kfree(bc);
 			return DM_MAPIO_SUBMITTED;
@@ -2620,13 +2585,9 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 	else {
 		while (biosize) {
 			iosize = eio_get_iosize(dmc, snum, biosize);
-
-			if (IS_ERR
-				    (ebio =
-					    eio_new_ebio(dmc, bio,
-							 &residual_biovec, snum,
-							 iosize, bc,
-							 EB_SUBORDINATE_IO))) {
+			ebio = eio_new_ebio(dmc, bio, &residual_biovec, snum,
+					iosize, bc, EB_SUBORDINATE_IO);
+			if (IS_ERR(ebio)) {
 				bc->bc_error = -ENOMEM;
 				break;
 			}
@@ -3098,7 +3059,7 @@ void eio_clean_all(struct cache_c *dmc)
 		}
 
 		eio_clean_set(dmc, (index_t)(atomic_read(&dmc->clean_index)),
-		              /* whole */ 1, /* force */ 1);
+				/* whole */ 1, /* force */ 1);
 	}
 
 	spin_lock_irqsave(&dmc->cache_spin_lock, flags);
@@ -3301,9 +3262,9 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 	for (i = start_index; i < end_index; i++) {
 		if (EIO_CACHE_STATE_GET(dmc, i) == CLEAN_INPROG) {
 
-			for (j = i; (j < end_index) &&
-			     (EIO_CACHE_STATE_GET(dmc, j) == CLEAN_INPROG);
-			     j++) ;
+			for (j = i; ((j < end_index) &&
+				(EIO_CACHE_STATE_GET(dmc, j) == CLEAN_INPROG));
+				j++);
 
 			blkindex = (i - start_index);
 			total = (j - i);

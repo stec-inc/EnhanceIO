@@ -139,7 +139,7 @@ struct eio_policy *eio_rand_instance_init(void)
 {
 	struct eio_policy *new_instance;
 
-	new_instance = (struct eio_policy *)vmalloc(sizeof(struct eio_policy));
+	new_instance = vmalloc(sizeof(struct eio_policy));
 	if (new_instance == NULL) {
 		pr_err("ssdscache_rand_instance_init: vmalloc failed");
 		return NULL;

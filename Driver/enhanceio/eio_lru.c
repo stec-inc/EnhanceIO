@@ -90,7 +90,7 @@ int eio_lru_cache_sets_init(struct eio_policy *p_ops)
 		(dmc->size >> dmc->consecutive_shift) *
 		sizeof(struct eio_lru_cache_set);
 
-	dmc->sp_cache_set = (struct eio_lru_cache_set *)vmalloc((size_t)order);
+	dmc->sp_cache_set = vmalloc((size_t)order);
 	if (dmc->sp_cache_set == NULL)
 		return -ENOMEM;
 
@@ -115,8 +115,7 @@ int eio_lru_cache_blk_init(struct eio_policy *p_ops)
 
 	order = dmc->size * sizeof(struct eio_lru_cache_block);
 
-	dmc->sp_cache_blk =
-		(struct eio_lru_cache_block *)vmalloc((size_t)order);
+	dmc->sp_cache_blk = vmalloc((size_t)order);
 	if (dmc->sp_cache_blk == NULL)
 		return -ENOMEM;
 
@@ -130,7 +129,7 @@ struct eio_policy *eio_lru_instance_init(void)
 {
 	struct eio_policy *new_instance;
 
-	new_instance = (struct eio_policy *)vmalloc(sizeof(struct eio_policy));
+	new_instance = vmalloc(sizeof(struct eio_policy));
 	if (new_instance == NULL) {
 		pr_err("eio_lru_instance_init: vmalloc failed");
 		return NULL;

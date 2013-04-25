@@ -380,9 +380,9 @@ struct eio_policy_and_name {
 
 
 static const struct eio_policy_and_name eio_policy_names[] = {
-	{ CACHE_REPL_FIFO,   "fifo"	 },
-	{ CACHE_REPL_LRU,    "lru"	 },
-	{ CACHE_REPL_RANDOM, "rand"	 },
+	{ CACHE_REPL_FIFO,   "fifo" },
+	{ CACHE_REPL_LRU,    "lru"  },
+	{ CACHE_REPL_RANDOM, "rand" },
 };
 
 
@@ -1112,10 +1112,7 @@ extern sector_t eio_get_device_size(struct eio_bdev *);
 extern sector_t eio_get_device_start_sect(struct eio_bdev *);
 #endif                          /* __KERNEL__ */
 
-#define EIO_INIT_EVENT(ev)						\
-	do {						\
-		(ev)->process = NULL;			\
-	} while (0)
+#define EIO_INIT_EVENT(ev)	((ev)->process = NULL)
 
 /*Assumes that the macro gets called under the same spinlock as in wait event*/
 #define EIO_SET_EVENT_AND_UNLOCK(ev, sl, flags)					\
@@ -1142,10 +1139,7 @@ extern sector_t eio_get_device_start_sect(struct eio_bdev *);
 		(ev)->process = NULL;				\
 	} while (0)
 
-#define EIO_CLEAR_EVENT(ev)							\
-	do {							\
-		(ev)->process = NULL;				\
-	} while (0)
+#define EIO_CLEAR_EVENT(ev)	((ev)->process = NULL)
 
 #include "eio_setlru.h"
 #include "eio_policy.h"

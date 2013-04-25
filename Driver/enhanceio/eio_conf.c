@@ -44,7 +44,7 @@
 #define KMEM_DMC_BIO_PAIR       "eio-dmc-bio-pair"
 /* #define KMEM_CACHE_PENDING_JOB	"eio-pending-jobs" */
 
-static struct cache_c *cache_list_head = NULL;
+static struct cache_c *cache_list_head;
 struct work_struct _kcached_wq;
 
 static struct kmem_cache *_job_cache;
@@ -80,7 +80,7 @@ static int eio_notify_ssd_rm(struct notifier_block *nb, unsigned long action,
 static struct notifier_block eio_reboot_notifier = {
 	.notifier_call	= eio_notify_reboot,
 	.next		= NULL,
-	.priority	= INT_MAX,          /* should be > ssd pri's and disk dev pri's */
+	.priority	= INT_MAX,         /* should be > ssd pri's and disk dev pri's */
 };
 
 static struct notifier_block eio_ssd_rm_notifier = {
@@ -662,7 +662,8 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 	dmc->md_sectors +=
 		EIO_EXTRA_SECTORS(dmc->cache_dev_start_sect, dmc->md_sectors);
 
-	if ((error = eio_mem_init(dmc)) == -1) {
+	error = eio_mem_init(dmc);
+	if (error == -1) {
 		ret = -EINVAL;
 		goto free_header;
 	}
@@ -711,11 +712,9 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 	 */
 	if (!CACHE_SSD_ADD_INPROG_IS_SET(dmc)) {
 		if (EIO_MD8(dmc))
-			dmc->cache_md8 =
-				(struct cacheblock_md8 *)vmalloc((size_t)order);
+			dmc->cache_md8 = vmalloc((size_t)order);
 		else
-			dmc->cache =
-				(struct cacheblock *)vmalloc((size_t)order);
+			dmc->cache = vmalloc((size_t)order);
 		if ((EIO_MD8(dmc) && !dmc->cache_md8)
 		    || (!EIO_MD8(dmc) && !dmc->cache)) {
 			pr_err
@@ -1148,7 +1147,8 @@ static int eio_md_load(struct cache_c *dmc)
 	dmc->sysctl_active.autoclean_threshold =
 		le32_to_cpu(header->sbf.autoclean_threshold);
 
-	if ((i = eio_mem_init(dmc)) == -1) {
+	i = eio_mem_init(dmc);
+	if (i == -1) {
 		pr_err("eio_md_load: Failed to initialize memory.");
 		ret = -EINVAL;
 		goto free_header;
@@ -1171,10 +1171,9 @@ static int eio_md_load(struct cache_c *dmc)
 		dmc->assoc, dmc->block_size << SECTOR_SHIFT);
 
 	if (EIO_MD8(dmc))
-		dmc->cache_md8 =
-			(struct cacheblock_md8 *)vmalloc((size_t)order);
+		dmc->cache_md8 = vmalloc((size_t)order);
 	else
-		dmc->cache = (struct cacheblock *)vmalloc((size_t)order);
+		dmc->cache = vmalloc((size_t)order);
 
 	if ((EIO_MD8(dmc) && !dmc->cache_md8) || (!EIO_MD8(dmc) && !dmc->cache)) {
 		pr_err("md_load: Unable to allocate memory");
@@ -1472,7 +1471,7 @@ int eio_cache_create(struct cache_rec_short *cache)
 	fmode_t mode = (FMODE_READ | FMODE_WRITE);
 	char *strerr = NULL;
 
-	dmc = (struct cache_c *)kzalloc(sizeof(*dmc), GFP_KERNEL);
+	dmc = kzalloc(sizeof(*dmc), GFP_KERNEL);
 	if (dmc == NULL) {
 		strerr = "Failed to allocate memory for cache context";
 		error = -ENOMEM;
@@ -1493,8 +1492,8 @@ int eio_cache_create(struct cache_rec_short *cache)
 		strerr = "Failed to lookup source device";
 		goto bad1;
 	}
-	if ((dmc->disk_size =
-		     eio_to_sector(eio_get_device_size(dmc->disk_dev))) >= EIO_MAX_SECTOR) {
+	dmc->disk_size = eio_to_sector(eio_get_device_size(dmc->disk_dev));
+	if (dmc->disk_size >= EIO_MAX_SECTOR) {
 		strerr = "Source device too big to support";
 		error = -EFBIG;
 		goto bad2;
@@ -1794,7 +1793,7 @@ init:
 		goto bad5;
 	}
 
-	dmc->cache_sets = (struct cache_set *)vmalloc((size_t)order);
+	dmc->cache_sets = vmalloc((size_t)order);
 	if (!dmc->cache_sets) {
 		strerr = "Failed to allocate memory";
 		error = -ENOMEM;
@@ -2255,9 +2254,8 @@ int eio_allocate_wb_resources(struct cache_c *dmc)
 	/* Data page allocations are done in terms of "bio_vec" structures */
 	iosize = (dmc->block_size * dmc->assoc) << SECTOR_SHIFT;
 	nr_bvecs = IO_BVEC_COUNT(iosize, dmc->block_size);
-	dmc->clean_dbvecs =
-		(struct bio_vec *)kmalloc(sizeof(struct bio_vec) * nr_bvecs,
-					  GFP_KERNEL);
+	dmc->clean_dbvecs = kmalloc(sizeof(struct bio_vec) * nr_bvecs,
+				GFP_KERNEL);
 	if (dmc->clean_dbvecs == NULL) {
 		pr_err("cache_create: Failed to allocated memory.\n");
 		ret = -ENOMEM;
@@ -2273,9 +2271,8 @@ int eio_allocate_wb_resources(struct cache_c *dmc)
 	/* Metadata page allocations are done in terms of pages only */
 	iosize = dmc->assoc * sizeof(struct flash_cacheblock);
 	nr_pages = IO_PAGE_COUNT(iosize);
-	dmc->clean_mdpages =
-		(struct page **)kmalloc(sizeof(struct page *) * nr_pages,
-					GFP_KERNEL);
+	dmc->clean_mdpages = kmalloc(sizeof(struct page *) * nr_pages,
+				GFP_KERNEL);
 	if (dmc->clean_mdpages == NULL) {
 		pr_err("cache_create: Failed to allocated memory.\n");
 		ret = -ENOMEM;
@@ -2481,8 +2478,8 @@ eio_notify_ssd_rm(struct notifier_block *nb, unsigned long action, void *data)
 
 	if (!scsi_is_sdev_device(dev))
 		return 0;
-
-	if ((device_name = dev_name(dev)) == NULL)
+	device_name = dev_name(dev);
+	if (device_name == NULL)
 		return 0;
 	len = strlen(device_name);
 
@@ -2562,7 +2559,7 @@ static int __init eio_init(void)
 	INIT_WORK(&_kcached_wq, eio_do_work);
 
 	eio_module_procfs_init();
-	eio_control = kmalloc(sizeof *eio_control, GFP_KERNEL);
+	eio_control = kmalloc(sizeof(*eio_control), GFP_KERNEL);
 	if (eio_control == NULL) {
 		pr_err("init: Cannot allocate memory for eio_control");
 		(void)eio_delete_misc_device();

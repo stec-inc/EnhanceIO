@@ -951,35 +951,35 @@ static int eio_version_open(struct inode *inode, struct file *file);
 static int eio_config_show(struct seq_file *seq, void *v);
 static int eio_config_open(struct inode *inode, struct file *file);
 
-static struct file_operations eio_version_operations = {
+static const struct file_operations eio_version_operations = {
 	.open		= eio_version_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
 
-static struct file_operations eio_stats_operations = {
+static const struct file_operations eio_stats_operations = {
 	.open		= eio_stats_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
 
-static struct file_operations eio_errors_operations = {
+static const struct file_operations eio_errors_operations = {
 	.open		= eio_errors_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
 
-static struct file_operations eio_iosize_hist_operations = {
+static const struct file_operations eio_iosize_hist_operations = {
 	.open		= eio_iosize_hist_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
 
-static struct file_operations eio_config_operations = {
+static const struct file_operations eio_config_operations = {
 	.open		= eio_config_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
@@ -1016,16 +1016,16 @@ static struct sysctl_table_dir {
 	ctl_table dir[1 + 1];
 	ctl_table root[1 + 1];
 } sysctl_template_dir = {
-	.vars				={
-	}, .dev				={
-	}, .dir				={
+	.vars = {
+	}, .dev	= {
+	}, .dir	= {
 		{
 			.procname	= PROC_SYS_DIR_NAME,
 			.maxlen		= 0,
 			.mode		= S_IRUGO | S_IXUGO,
 			.child		= sysctl_template_dir.dev,
 		},
-	}, .root			={
+	}, .root = {
 		{
 			.procname	= PROC_SYS_ROOT_NAME,
 			.maxlen		= 0,
@@ -1044,7 +1044,7 @@ static struct sysctl_table_common {
 	ctl_table dir[1 + 1];
 	ctl_table root[1 + 1];
 } sysctl_template_common = {
-	.vars				={
+	.vars = {
 		{               /* 1 */
 			.procname	= "zero_stats",
 			.maxlen		= sizeof(int),
@@ -1052,7 +1052,8 @@ static struct sysctl_table_common {
 			.proc_handler	= &eio_zerostats_sysctl,
 		}, {            /* 2 */
 			.procname	= "mem_limit_pct",
-			.maxlen		= sizeof(int),		    .mode= 0644,
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
 			.proc_handler	= &eio_mem_limit_pct_sysctl,
 		}, {            /* 3 */
 			.procname	= "control",
@@ -1060,21 +1061,21 @@ static struct sysctl_table_common {
 			.mode		= 0644,
 			.proc_handler	= &eio_control_sysctl,
 		},
-	}, .dev				={
+	}, .dev	= {
 		{
 			.procname	= PROC_SYS_CACHE_NAME,
 			.maxlen		= 0,
 			.mode		= S_IRUGO | S_IXUGO,
 			.child		= sysctl_template_common.vars,
 		},
-	}, .dir				={
+	}, .dir	= {
 		{
 			.procname	= PROC_SYS_DIR_NAME,
 			.maxlen		= 0,
 			.mode		= S_IRUGO | S_IXUGO,
 			.child		= sysctl_template_common.dev,
 		},
-	}, .root			={
+	}, .root = {
 		{
 			.procname	= PROC_SYS_ROOT_NAME,
 			.maxlen		= 0,
@@ -1093,7 +1094,7 @@ static struct sysctl_table_writeback {
 	ctl_table dir[1 + 1];
 	ctl_table root[1 + 1];
 } sysctl_template_writeback = {
-	.vars				={
+	.vars = {
 		{               /* 1 */
 			.procname	= "do_clean",
 			.maxlen		= sizeof(int),
@@ -1135,26 +1136,30 @@ static struct sysctl_table_writeback {
 		}
 		,
 	}
-	, .dev				={
+	, .dev = {
 		{
-			.procname	= PROC_SYS_CACHE_NAME, .maxlen = 0, .mode =
-				S_IRUGO | S_IXUGO, .child=
-				sysctl_template_writeback.vars,
+			.procname	= PROC_SYS_CACHE_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_writeback.vars,
 		}
 		,
 	}
-	, .dir				={
+	, .dir = {
 		{
-			.procname	= PROC_SYS_DIR_NAME, .maxlen = 0, .mode =
-				S_IRUGO | S_IXUGO, .child=
-				sysctl_template_writeback.dev,
+			.procname	= PROC_SYS_DIR_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_writeback.dev,
 		}
 		,
 	}
-	, .root				={
+	, .root	= {
 		{
-			.procname	= PROC_SYS_ROOT_NAME, .maxlen = 0, .mode =
-				0555, .child= sysctl_template_writeback.dir,
+			.procname	= PROC_SYS_ROOT_NAME,
+			.maxlen		= 0,
+			.mode		= 0555,
+			.child		= sysctl_template_writeback.dir,
 		}
 		,
 	}
@@ -1169,8 +1174,8 @@ static struct sysctl_table_invalidate {
 	ctl_table dir[1 + 1];
 	ctl_table root[1 + 1];
 } sysctl_template_invalidate = {
-	.vars				={
-		{        /* 1 */
+	.vars = {
+		{	/* 1 */
 			.procname	= "invalidate",
 			.maxlen		= sizeof(u_int64_t),
 			.mode		= 0644,
@@ -1178,23 +1183,25 @@ static struct sysctl_table_invalidate {
 		}
 		,
 	}
-	, .dev				={
+	, .dev = {
 		{
-			.procname	= PROC_SYS_CACHE_NAME, .maxlen = 0, .mode =
-				S_IRUGO | S_IXUGO, .child=
-				sysctl_template_invalidate.vars,
+			.procname	= PROC_SYS_CACHE_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_invalidate.vars,
 		}
 		,
 	}
-	, .dir				={
+	, .dir = {
 		{
-			.procname	= PROC_SYS_DIR_NAME, .maxlen = 0, .mode =
-				S_IRUGO | S_IXUGO, .child=
-				sysctl_template_invalidate.dev,
+			.procname	= PROC_SYS_DIR_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_invalidate.dev,
 		}
 		,
 	}
-	, .root				={
+	, .root	= {
 		{
 			.procname	= PROC_SYS_ROOT_NAME,
 			.maxlen		= 0,
@@ -1486,7 +1493,7 @@ static void eio_sysctl_register_dir(void)
 	struct sysctl_table_dir *dir;
 
 	dir =
-		kmemdup(&sysctl_template_dir, sizeof sysctl_template_dir,
+		kmemdup(&sysctl_template_dir, sizeof(sysctl_template_dir),
 			GFP_KERNEL);
 	if (unlikely(dir == NULL)) {
 		pr_err("Failed to allocate memory for dir sysctl");
@@ -1525,7 +1532,7 @@ static void eio_sysctl_register_common(struct cache_c *dmc)
 	struct sysctl_table_common *common;
 
 	common =
-		kmemdup(&sysctl_template_common, sizeof sysctl_template_common,
+		kmemdup(&sysctl_template_common, sizeof(sysctl_template_common),
 			GFP_KERNEL);
 	if (common == NULL) {
 		pr_err("Failed to allocate memory for common sysctl");
@@ -1580,7 +1587,7 @@ static void eio_sysctl_register_writeback(struct cache_c *dmc)
 
 	writeback =
 		kmemdup(&sysctl_template_writeback,
-			sizeof sysctl_template_writeback, GFP_KERNEL);
+			sizeof(sysctl_template_writeback), GFP_KERNEL);
 	if (writeback == NULL) {
 		pr_err("Failed to allocate memory for writeback sysctl");
 		return;
@@ -1634,7 +1641,7 @@ static void eio_sysctl_register_invalidate(struct cache_c *dmc)
 
 	invalidate =
 		kmemdup(&sysctl_template_invalidate,
-			sizeof sysctl_template_invalidate, GFP_KERNEL);
+			sizeof(sysctl_template_invalidate), GFP_KERNEL);
 	if (invalidate == NULL) {
 		pr_err("Failed to allocate memory for invalidate sysctl");
 		return;
@@ -1889,8 +1896,8 @@ static int eio_version_show(struct seq_file *seq, void *v)
 {
 	char buf[128];
 
-	memset(buf, 0, sizeof buf);
-	eio_version_query(sizeof buf, buf);
+	memset(buf, 0, sizeof(buf));
+	eio_version_query(sizeof(buf), buf);
 	seq_printf(seq, "%s\n", buf);
 
 	return 0;
