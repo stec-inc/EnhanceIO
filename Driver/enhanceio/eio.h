@@ -309,8 +309,8 @@ union eio_superblock {
  * load every block back into cache on a restart.
  */
 struct flash_cacheblock {
-	sector_t dbn;           /* Sector number of the cached block */
-	u_int64_t cache_state;
+	__le64 dbn;           /* Sector number of the cached block */
+	__le64 cache_state;
 };
 
 /* blksize in terms of no. of sectors */
@@ -504,21 +504,23 @@ typedef void (*eio_notify_fn)(int error, void *context);
  */
 
 #define EIO_MAX_SECTOR                  (((u_int64_t)1) << 40)
-
+#ifdef __BIG_ENDIAN
 struct md4 {
-	u_int16_t bytes1_2;
-	u_int8_t byte3;
+	u_int8_t cache_state;
+	char dbn_bytes[3];
+};
+#else /* Little Endian */
+struct md4 {
+	char dbn_bytes[3];
 	u_int8_t cache_state;
 };
+#endif
 
 struct cacheblock {
 	union {
 		u_int32_t u_i_md4;
 		struct md4 u_s_md4;
 	} md4_u;
-#ifdef DO_CHECKSUM
-	u_int64_t checksum;
-#endif                          /* DO_CHECKSUM */
 };
 
 #define EIO_MD4_DBN_BITS                (32 - 8)        /* 8 bits for state */
@@ -528,22 +530,22 @@ struct cacheblock {
 /*
  * 8-byte metadata support.
  */
-
+#ifdef __BIG_ENDIAN
 struct md8 {
-	u_int32_t bytes1_4;
-	u_int16_t bytes5_6;
-	u_int8_t byte7;
+	u_int8_t cache_state;
+	char dbn_bytes[7];
+};
+#else /* little endian*/
+struct md8 {
+	char dbn_bytes[7];
 	u_int8_t cache_state;
 };
-
+#endif
 struct cacheblock_md8 {
 	union {
 		u_int64_t u_i_md8;
 		struct md8 u_s_md8;
 	} md8_u;
-#ifdef DO_CHECKSUM
-	u_int64_t checksum;
-#endif                          /* DO_CHECKSUM */
 };
 
 #define EIO_MD8_DBN_BITS                (64 - 8)        /* 8 bits for state */

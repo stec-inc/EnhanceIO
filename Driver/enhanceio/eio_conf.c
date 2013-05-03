@@ -426,9 +426,9 @@ int eio_md_store(struct cache_c *dmc)
 			num_valid++;
 		if (EIO_CACHE_STATE_GET(dmc, (index_t)i) & DIRTY)
 			num_dirty++;
-		next_ptr->dbn = EIO_DBN_GET(dmc, i);
-		next_ptr->cache_state = EIO_CACHE_STATE_GET(dmc, (index_t)i) &
-					(INVALID | VALID | DIRTY);
+		next_ptr->dbn = cpu_to_le64(EIO_DBN_GET(dmc, i));
+		next_ptr->cache_state = cpu_to_le64(EIO_CACHE_STATE_GET(dmc, (index_t)i) &
+					(INVALID | VALID | DIRTY));
 
 		next_ptr++;
 		slots_written++;
@@ -795,11 +795,10 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 		j = MD_BLOCKS_PER_PAGE;
 
 		for (i = 0; i < dmc->size; i++) {
-			next_ptr->dbn = EIO_DBN_GET(dmc, i);
-			next_ptr->cache_state =
-				EIO_CACHE_STATE_GET(dmc,
-						    (index_t)i) & (INVALID | VALID
-								   | DIRTY);
+			next_ptr->dbn = cpu_to_le64(EIO_DBN_GET(dmc, i));
+			next_ptr->cache_state = 
+				cpu_to_le64(EIO_CACHE_STATE_GET(dmc,
+				(index_t)i) & (INVALID | VALID | DIRTY));
 			next_ptr++;
 			slots_written++;
 			j--;
@@ -1272,8 +1271,8 @@ static int eio_md_load(struct cache_c *dmc)
 					dirty_loaded++;
 
 				EIO_CACHE_STATE_SET(dmc, i,
-						    (u_int8_t)next_ptr->
-						    cache_state & ~QUEUED);
+					(u_int8_t)le64_to_cpu(next_ptr->
+					cache_state) & ~QUEUED);
 
 				EIO_ASSERT((EIO_CACHE_STATE_GET(dmc, i) &
 					    (VALID | INVALID))
@@ -1281,7 +1280,7 @@ static int eio_md_load(struct cache_c *dmc)
 
 				if (EIO_CACHE_STATE_GET(dmc, i) & VALID)
 					num_valid++;
-				EIO_DBN_SET(dmc, i, next_ptr->dbn);
+				EIO_DBN_SET(dmc, i, le64_to_cpu(next_ptr->dbn));
 			} else
 				eio_invalidate_md(dmc, i);
 			next_ptr++;

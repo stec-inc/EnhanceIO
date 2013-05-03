@@ -1214,11 +1214,11 @@ static void eio_do_mdupdate(struct work_struct *work)
 	/* initialize the md blocks to write */
 	for (i = start_index; i < end_index; i++) {
 		cstate = EIO_CACHE_STATE_GET(dmc, i);
-		md_blocks->dbn = EIO_DBN_GET(dmc, i);
+		md_blocks->dbn = cpu_to_le64(EIO_DBN_GET(dmc, i));
 		if (cstate == ALREADY_DIRTY)
-			md_blocks->cache_state = (VALID | DIRTY);
+			md_blocks->cache_state = cpu_to_le64((VALID | DIRTY));
 		else
-			md_blocks->cache_state = INVALID;
+			md_blocks->cache_state = cpu_to_le64(INVALID);
 		md_blocks++;
 		j--;
 
@@ -3381,14 +3381,14 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 
 	for (i = start_index; i < end_index; i++) {
 
-		md_blocks->dbn = EIO_DBN_GET(dmc, i);
+		md_blocks->dbn = cpu_to_le64(EIO_DBN_GET(dmc, i));
 
 		if (EIO_CACHE_STATE_GET(dmc, i) == CLEAN_INPROG)
-			md_blocks->cache_state = INVALID;
+			md_blocks->cache_state = cpu_to_le64(INVALID);
 		else if (EIO_CACHE_STATE_GET(dmc, i) == ALREADY_DIRTY)
-			md_blocks->cache_state = (VALID | DIRTY);
+			md_blocks->cache_state = cpu_to_le64((VALID | DIRTY));
 		else
-			md_blocks->cache_state = INVALID;
+			md_blocks->cache_state = cpu_to_le64(INVALID);
 
 		/* This was missing earlier. */
 		md_blocks++;
