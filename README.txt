@@ -41,7 +41,7 @@
 	HDD asynchronously. Reads are handled similar to Read-only and
 	Write-through modes.
 
-2. WHAT HAS ENHANCEIO ADDED TO FLASHCACHE?
+2. WHAT HAS ENHANCEIO CHANGED TO FLASHCACHE?
 
 2.1. A new write-back engine
 
@@ -94,7 +94,7 @@
 	RAM for each SSD cache block. In this case, RAM usage is 0.2% (2/1000)
 	of SSD capacity for a cache block size of 4K.
 
-2.4. Loadable Replacement Policies
+2.5. Loadable Replacement Policies
 
 	Since the SSD cache size is typically 10%-20% of the source volume
 	size, the set-associative nature of EnhanceIO necessitates cache
@@ -124,13 +124,13 @@
 		FIFO	4 bytes per cache set
 		LRU	4 bytes per cache set + 4 bytes per cache block
 
-2.5. Optimal Alignment of Data Blocks on SSD
+2.6. Optimal Alignment of Data Blocks on SSD
 
 	EnhanceIO writes all meta data and data blocks on 4K-aligned blocks
 	on the SSD. This minimizes write amplification and flash wear.
 	It also improves performance.
 
-2.6. Improved device failure handling
+2.7. Improved device failure handling
 
 	Failure of an SSD device in read-only and write-through modes is
 	handled gracefully by allowing I/O to continue to/from the
@@ -152,6 +152,13 @@
 	read-only cache modes, splitting of a single large spinlock, and more.
 	Most of the code paths in flashcache have been substantially
 	restructured.
+
+2.9 Sequential I/O bypass
+
+	EnhanceIO has removed the bypass of sequential IO available in flashcache.
+	The sequential detection logic has a limited use case, espescially in a
+	reasonably multithreaded scenario.
+
 
 3. EnhanceIO usage
 
