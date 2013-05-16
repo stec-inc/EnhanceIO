@@ -1504,7 +1504,7 @@ int eio_cache_create(struct cache_rec_short *cache)
 	 */
 
 	error =
-		eio_ttc_get_device(cache->cr_ssd_devname, mode, &dmc->cache_dev);
+		eio_ttc_get_device(cache->cr_ssd_devname, mode | FMODE_EXCL, &dmc->cache_dev);
 	if (error) {
 		strerr = "get_device for cache device failed";
 		goto bad2;

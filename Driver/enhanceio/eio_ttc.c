@@ -90,35 +90,12 @@ int eio_ttc_get_device(const char *path, fmode_t mode, struct eio_bdev **result)
 {
 	struct block_device *bdev;
 	struct eio_bdev *eio_bdev;
-	unsigned int major, minor;
 
-	dev_t uninitialized_var(dev);
-	static char *eio_holder = "ENHANCE IO";
+	static char *eio_holder = "EnhanceIO";
 
-	if (sscanf(path, "%u:%u", &major, &minor) == 2) {
-		/* Extract the major/minor numbers */
-		dev = MKDEV(major, minor);
-		if (MAJOR(dev) != major || MINOR(dev) != minor)
-			return -EOVERFLOW;
-	} else {
-		/* convert the path to a device */
-		struct block_device *bdev = lookup_bdev(path);
-
-		if (IS_ERR(bdev))
-			return PTR_ERR(bdev);
-
-		dev = bdev->bd_dev;
-		bdput(bdev);
-	}
-
-	bdev = blkdev_get_by_dev(dev, mode, eio_holder);
+	bdev = blkdev_get_by_path(path, mode, eio_holder);
 	if (IS_ERR(bdev))
 		return PTR_ERR(bdev);
-
-	/*
-	 * Do we need to claim the devices ??
-	 * bd_claim_by_disk(bdev, charptr, gendisk)
-	 */
 
 	eio_bdev = kzalloc(sizeof(*eio_bdev), GFP_KERNEL);
 	if (eio_bdev == NULL) {
