@@ -150,23 +150,22 @@ const char *eio_policy_to_name(u8 p)
 
 inline int eio_policy_init(struct cache_c *dmc)
 {
-	int error = 0;
 
 	if (dmc->req_policy == 0)
 		dmc->req_policy = CACHE_REPL_DEFAULT;
 	dmc->policy_ops = eio_get_policy(dmc->req_policy);
 	if (dmc->policy_ops == NULL) {
-		pr_err
-			("policy_init: Cannot find requested policy");
-		error = -ENOMEM;
+		pr_err("eio_policy_init: Failed to initialize %s(%d) policy",
+			eio_policy_to_name(dmc->req_policy), dmc->req_policy);
+		return -EINVAL;
 	} else {
 		/* Back pointer to reference dmc from policy_ops */
 		dmc->policy_ops->sp_dmc = dmc;
 		pr_info("Setting replacement policy to %s (%d)",
 			eio_policy_to_name(dmc->policy_ops->sp_name),
 			dmc->policy_ops->sp_name);
+		return 0;
 	}
-	return error;
 }
 
 static int eio_jobs_init(void)
@@ -1121,8 +1120,10 @@ static int eio_md_load(struct cache_c *dmc)
 
 	if (!dmc->cache_flags)
 		dmc->cache_flags = le32_to_cpu(header->sbf.cache_flags);
-
-	(void)eio_policy_init(dmc);
+	
+	error = eio_policy_init(dmc);
+	if (error)
+		goto free_header;
 
 	dmc->block_size = le64_to_cpu(header->sbf.block_size);
 	dmc->block_shift = ffs(dmc->block_size) - 1;
@@ -1486,11 +1487,7 @@ int eio_cache_create(struct cache_rec_short *cache)
 		strerr = "get_device for source device failed";
 		goto bad1;
 	}
-	if (NULL == dmc->disk_dev) {
-		error = -EINVAL;
-		strerr = "Failed to lookup source device";
-		goto bad1;
-	}
+
 	dmc->disk_size = eio_to_sector(eio_get_device_size(dmc->disk_dev));
 	if (dmc->disk_size >= EIO_MAX_SECTOR) {
 		strerr = "Source device too big to support";
@@ -1509,11 +1506,7 @@ int eio_cache_create(struct cache_rec_short *cache)
 		strerr = "get_device for cache device failed";
 		goto bad2;
 	}
-	if (NULL == dmc->cache_dev) {
-		error = -EINVAL;
-		strerr = "Failed to lookup source device";
-		goto bad2;
-	}
+
 	if (dmc->disk_dev == dmc->cache_dev) {
 		error = -EINVAL;
 		strerr = "Same devices specified";
@@ -1663,8 +1656,13 @@ int eio_cache_create(struct cache_rec_short *cache)
 	}
 
 	/* eio_policy_init() is already called from within eio_md_load() */
-	if (persistence != CACHE_RELOAD)
-		(void)eio_policy_init(dmc);
+	if (persistence != CACHE_RELOAD) {
+		error = eio_policy_init(dmc);
+		if (error) {
+			strerr = "Failed to initialize policy";
+			goto bad5;
+		}
+	}	
 
 	if (cache->cr_flags) {
 		int flags;
@@ -2166,7 +2164,11 @@ int eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 	dmc->persistence = CACHE_FORCECREATE;
 
 	eio_policy_free(dmc);
-	(void)eio_policy_init(dmc);
+	r = eio_policy_init(dmc); 
+	if (r) {
+		pr_err("ctr_ssd_add: Failed to initialize policy");
+		goto out;
+	}
 
 	r = eio_md_create(dmc, /* force */ 1, /* cold */
 			  (dmc->mode != CACHE_MODE_WB));
