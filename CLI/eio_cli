@@ -96,7 +96,7 @@ PROGRAM="/bin/sh -c 'echo $links > \
 TEST=="/proc/enhanceio/<cache_name>",\
 PROGRAM="/bin/grep 'state\s*failed' /proc/enhanceio/<cache_name>/config", \
 PROGRAM="/bin/grep 'no_source_dev\s*1' /proc/enhanceio/<cache_name>/errors", \
-RUN+="/sbin/eio_admin notify -a add -d /dev/$kernel -c <cache_name>", NAME="", \
+RUN+="/sbin/eio_cli notify -a add -d /dev/$kernel -c <cache_name>", NAME="", \
 GOTO="EIO_EOF"
 
 TEST!="/proc/enhanceio/<cache_name>", \
