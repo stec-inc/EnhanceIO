@@ -1221,8 +1221,9 @@ void eio_module_procfs_init(void)
 	struct proc_dir_entry *entry;
 
 	if (proc_mkdir(PROC_STR, NULL)) {
-		entry = proc_create_data(PROC_VER_STR, 0, NULL,
-				&eio_version_operations, NULL);
+		entry = create_proc_entry(PROC_VER_STR, 0, NULL);
+		if (entry)
+			entry->proc_fops = &eio_version_operations;
 	}
 	eio_sysctl_register_dir();
 }
@@ -1255,19 +1256,35 @@ void eio_procfs_ctr(struct cache_c *dmc)
 	}
 
 	s = eio_cons_procfs_cachename(dmc, PROC_STATS);
-	entry = proc_create_data(s, 0, NULL, &eio_stats_operations, dmc);
+	entry = create_proc_entry(s, 0, NULL);
+	if (entry) {
+		entry->proc_fops = &eio_stats_operations;
+		entry->data = dmc;
+	}
 	kfree(s);
 
 	s = eio_cons_procfs_cachename(dmc, PROC_ERRORS);
-	entry = proc_create_data(s, 0, NULL, &eio_errors_operations, dmc);
+	entry = create_proc_entry(s, 0, NULL);
+	if (entry) {
+		entry->proc_fops = &eio_errors_operations;
+		entry->data = dmc;
+	}
 	kfree(s);
 
 	s = eio_cons_procfs_cachename(dmc, PROC_IOSZ_HIST);
-	entry = proc_create_data(s, 0, NULL, &eio_iosize_hist_operations, dmc);
+	entry = create_proc_entry(s, 0, NULL);
+	if (entry) {
+		entry->proc_fops = &eio_iosize_hist_operations;
+		entry->data = dmc;
+	}
 	kfree(s);
 
 	s = eio_cons_procfs_cachename(dmc, PROC_CONFIG);
-	entry = proc_create_data(s, 0, NULL, &eio_config_operations, dmc);
+	entry = create_proc_entry(s, 0, NULL);
+	if (entry) {
+		entry->proc_fops = &eio_config_operations;
+		entry->data = dmc;
+	}
 	kfree(s);
 
 	eio_sysctl_register_common(dmc);
@@ -1801,7 +1818,7 @@ static int eio_stats_show(struct seq_file *seq, void *v)
  */
 static int eio_stats_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, &eio_stats_show, PDE_DATA(inode));
+	return single_open(file, &eio_stats_show, PDE(inode)->data);
 }
 
 /*
@@ -1834,7 +1851,7 @@ static int eio_errors_show(struct seq_file *seq, void *v)
  */
 static int eio_errors_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, &eio_errors_show, PDE_DATA(inode));
+	return single_open(file, &eio_errors_show, PDE(inode)->data);
 }
 
 /*
@@ -1869,7 +1886,7 @@ static int eio_iosize_hist_show(struct seq_file *seq, void *v)
 static int eio_iosize_hist_open(struct inode *inode, struct file *file)
 {
 
-	return single_open(file, &eio_iosize_hist_show, PDE_DATA(inode));
+	return single_open(file, &eio_iosize_hist_show, PDE(inode)->data);
 }
 
 /*
@@ -1891,7 +1908,7 @@ static int eio_version_show(struct seq_file *seq, void *v)
  */
 static int eio_version_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, &eio_version_show, PDE_DATA(inode));
+	return single_open(file, &eio_version_show, PDE(inode)->data);
 }
 
 /*
@@ -1928,5 +1945,5 @@ static int eio_config_show(struct seq_file *seq, void *v)
 static int eio_config_open(struct inode *inode, struct file *file)
 {
 
-	return single_open(file, &eio_config_show, PDE_DATA(inode));
+	return single_open(file, &eio_config_show, PDE(inode)->data);
 }
