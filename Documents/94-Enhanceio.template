@@ -29,5 +29,6 @@ LABEL="EIO_SETUP"
 	PROGRAM="/bin/sh -c 'cat /dev/enhanceio/<cache_name>/.disk_name'", ENV{disk_name}="%c"
 
 	TEST!="/proc/enhanceio/<cache_name>", RUN+="/sbin/eio_cli enable -d /dev/$env{disk_name} -s /dev/$env{ssd_name} -m <mode> -b <block_size> -c <cache_name>"
+	<source_match_expr>, SYMLINK+="eio-<cache_name>"
 LABEL="EIO_EOF"
 

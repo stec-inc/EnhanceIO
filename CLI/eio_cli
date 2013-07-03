@@ -137,6 +137,7 @@ do rm -f /dev/$$i; ln -f -s /dev/$env{disk_name} /dev/$$i; done'"
 TEST!="/proc/enhanceio/<cache_name>", RUN+="/sbin/eio_cli \
 enable -d /dev/$env{disk_name} -s /dev/$env{ssd_name} -m <mode> \
 -b <block_size> -p <policy> -c <cache_name>"
+<source_match_expr>, SYMLINK+="eio-<cache_name>"
 
 LABEL="EIO_EOF"
 """
