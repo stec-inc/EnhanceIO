@@ -90,7 +90,7 @@ int eio_lru_cache_sets_init(struct eio_policy *p_ops)
 		(dmc->size >> dmc->consecutive_shift) *
 		sizeof(struct eio_lru_cache_set);
 
-	dmc->sp_cache_set = (struct eio_lru_cache_set *)vmalloc((size_t)order);
+	dmc->sp_cache_set = vmalloc((size_t)order);
 	if (dmc->sp_cache_set == NULL)
 		return -ENOMEM;
 
@@ -115,8 +115,7 @@ int eio_lru_cache_blk_init(struct eio_policy *p_ops)
 
 	order = dmc->size * sizeof(struct eio_lru_cache_block);
 
-	dmc->sp_cache_blk =
-		(struct eio_lru_cache_block *)vmalloc((size_t)order);
+	dmc->sp_cache_blk = vmalloc((size_t)order);
 	if (dmc->sp_cache_blk == NULL)
 		return -ENOMEM;
 
@@ -130,7 +129,7 @@ struct eio_policy *eio_lru_instance_init(void)
 {
 	struct eio_policy *new_instance;
 
-	new_instance = (struct eio_policy *)vmalloc(sizeof(struct eio_policy));
+	new_instance = vmalloc(sizeof(struct eio_policy));
 	if (new_instance == NULL) {
 		pr_err("eio_lru_instance_init: vmalloc failed");
 		return NULL;
@@ -186,8 +185,8 @@ eio_lru_find_reclaim_dbn(struct eio_policy *p_ops,
 		if (EIO_CACHE_STATE_GET(dmc, (lru_rel_index + start_index)) ==
 		    VALID) {
 			EIO_ASSERT((lru_blk - (struct eio_lru_cache_block *)
-				dmc->sp_cache_blk) ==
-			       (lru_rel_index + start_index));
+				    dmc->sp_cache_blk) ==
+				   (lru_rel_index + start_index));
 			*index = lru_rel_index + start_index;
 			eio_reclaim_lru_movetail(dmc, *index, p_ops);
 			break;
@@ -221,8 +220,8 @@ int eio_lru_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
 			((struct eio_lru_cache_block *)dmc->sp_cache_blk +
 			 lru_rel_index + start_index);
 		EIO_ASSERT((lru_cacheblk -
-			(struct eio_lru_cache_block *)dmc->sp_cache_blk) ==
-		       (lru_rel_index + start_index));
+			    (struct eio_lru_cache_block *)dmc->sp_cache_blk) ==
+			   (lru_rel_index + start_index));
 		if ((EIO_CACHE_STATE_GET(dmc, dmc_idx) &
 		     (DIRTY | BLOCK_IO_INPROG)) == DIRTY) {
 			EIO_CACHE_STATE_ON(dmc, dmc_idx, DISKWRITEINPROG);

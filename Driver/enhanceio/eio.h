@@ -80,38 +80,40 @@
  * It is to carry out 64bit division
  * on 32bit architecture.
  */
-static __inline__ uint64_t
+static inline uint64_t
 EIO_CALCULATE_PERCENTAGE(uint64_t x64, uint64_t y64)
 {
 	uint64_t result;
 	uint32_t h_y32 = y64 >> 32;
 
 	result = x64 * 100;
+
 	while (h_y32) {
 		h_y32 >>= 1;
 		y64 >>= 1;
 		result >>= 1;
 	}
-
 	do_div(result, y64);
 	return result;
 }
 
-		
-static __inline__ uint64_t
+
+static inline uint64_t
 EIO_DIV(uint64_t dividend_64, uint32_t divisor_32)
 {
 	uint64_t result;
+
 	result = dividend_64;
 	do_div(result, divisor_32);
 	return result;
 }
 
 
-static __inline__ uint32_t
+static inline uint32_t
 EIO_REM(uint64_t dividend_64, uint32_t divisor_32)
 {
 	uint64_t temp;
+
 	temp = dividend_64;
 	return do_div(temp, divisor_32);
 }
@@ -119,7 +121,7 @@ EIO_REM(uint64_t dividend_64, uint32_t divisor_32)
 static inline sector_t
 eio_to_sector(uint64_t size_in_bytes)
 {
-	return (size_in_bytes >> 9);
+	return size_in_bytes >> 9;
 }
 
 struct eio_control_s {
@@ -241,10 +243,10 @@ extern mempool_t *_job_pool;
 
 union eio_superblock {
 	struct superblock_fields {
-		__le64 size;                  /* Cache size */
-		__le32 block_size;           /* Cache block size */
-		__le32 assoc;                /* Cache associativity */
-		__le32 cache_sb_state;       /* Clean shutdown ? */
+		__le64 size;                    /* Cache size */
+		__le32 block_size;              /* Cache block size */
+		__le32 assoc;                   /* Cache associativity */
+		__le32 cache_sb_state;          /* Clean shutdown ? */
 		char cache_devname[DEV_PATHLEN];
 		__le64 cache_devsize;
 		char disk_devname[DEV_PATHLEN];
@@ -255,10 +257,10 @@ union eio_superblock {
 		__le32 repl_policy;
 		__le32 cache_flags;
 		__le32 magic;
-		__le32 cold_boot;            /* cache to be started as cold after boot */
+		__le32 cold_boot;               /* cache to be started as cold after boot */
 		char ssd_uuid[DEV_PATHLEN];
-		__le64 cache_md_start_sect;   /* cache metadata start (8K aligned) */
-		__le64 cache_data_start_sect; /* cache data start (8K aligned) */
+		__le64 cache_md_start_sect;     /* cache metadata start (8K aligned) */
+		__le64 cache_data_start_sect;   /* cache data start (8K aligned) */
 		__le32 dirty_high_threshold;
 		__le32 dirty_low_threshold;
 		__le32 dirty_set_high_threshold;
@@ -307,8 +309,8 @@ union eio_superblock {
  * load every block back into cache on a restart.
  */
 struct flash_cacheblock {
-	sector_t dbn;           /* Sector number of the cached block */
-	u_int64_t cache_state;
+	__le64 dbn;           /* Sector number of the cached block */
+	__le64 cache_state;
 };
 
 /* blksize in terms of no. of sectors */
@@ -372,15 +374,15 @@ struct flash_cacheblock {
 #define CACHE_REPL_DEFAULT      CACHE_REPL_FIFO
 
 struct eio_policy_and_name {
-    u8  p;
-    char *n;
+	u8 p;
+	char *n;
 };
 
 
 static const struct eio_policy_and_name eio_policy_names[] = {
-     { CACHE_REPL_FIFO,  "fifo"    },
-     { CACHE_REPL_LRU,  "lru"      },
-     { CACHE_REPL_RANDOM,  "rand"  },
+	{ CACHE_REPL_FIFO,   "fifo" },
+	{ CACHE_REPL_LRU,    "lru"  },
+	{ CACHE_REPL_RANDOM, "rand" },
 };
 
 
@@ -502,57 +504,53 @@ typedef void (*eio_notify_fn)(int error, void *context);
  */
 
 #define EIO_MAX_SECTOR                  (((u_int64_t)1) << 40)
-
+#ifdef __BIG_ENDIAN
 struct md4 {
-	u_int16_t bytes1_2;
-	u_int8_t byte3;
+	u_int8_t cache_state;
+	char dbn_bytes[3];
+};
+#else /* Little Endian */
+struct md4 {
+	char dbn_bytes[3];
 	u_int8_t cache_state;
 };
+#endif
 
 struct cacheblock {
 	union {
 		u_int32_t u_i_md4;
 		struct md4 u_s_md4;
 	} md4_u;
-#ifdef DO_CHECKSUM
-	u_int64_t checksum;
-#endif                          /* DO_CHECKSUM */
 };
 
-#define md4_md                          md4_u.u_i_md4
-#define md4_cache_state                 md4_u.u_s_md4.cache_state
 #define EIO_MD4_DBN_BITS                (32 - 8)        /* 8 bits for state */
 #define EIO_MD4_DBN_MASK                ((1 << EIO_MD4_DBN_BITS) - 1)
 #define EIO_MD4_INVALID                 (INVALID << EIO_MD4_DBN_BITS)
-#define EIO_MD4_CACHE_STATE(dmc, index) (dmc->cache[index].md4_cache_state)
 
 /*
  * 8-byte metadata support.
  */
-
+#ifdef __BIG_ENDIAN
 struct md8 {
-	u_int32_t bytes1_4;
-	u_int16_t bytes5_6;
-	u_int8_t byte7;
+	u_int8_t cache_state;
+	char dbn_bytes[7];
+};
+#else /* little endian*/
+struct md8 {
+	char dbn_bytes[7];
 	u_int8_t cache_state;
 };
-
+#endif
 struct cacheblock_md8 {
 	union {
 		u_int64_t u_i_md8;
 		struct md8 u_s_md8;
 	} md8_u;
-#ifdef DO_CHECKSUM
-	u_int64_t checksum;
-#endif                          /* DO_CHECKSUM */
 };
 
-#define md8_md                          md8_u.u_i_md8
-#define md8_cache_state                 md8_u.u_s_md8.cache_state
 #define EIO_MD8_DBN_BITS                (64 - 8)        /* 8 bits for state */
 #define EIO_MD8_DBN_MASK                ((((u_int64_t)1) << EIO_MD8_DBN_BITS) - 1)
 #define EIO_MD8_INVALID                 (((u_int64_t)INVALID) << EIO_MD8_DBN_BITS)
-#define EIO_MD8_CACHE_STATE(dmc, index) ((dmc)->cache_md8[index].md8_cache_state)
 #define EIO_MD8(dmc)                    CACHE_MD8_IS_SET(dmc)
 
 /* Structure used for metadata update on-disk and in-core for writeback cache */
@@ -813,7 +811,7 @@ struct cache_c {
 
 #define DIRTY_CACHE_THRESHOLD_CROSSED(dmc)	\
 	((atomic64_read(&(dmc)->nr_dirty) - atomic64_read(&(dmc)->clean_pendings)) >= \
-	  (int64_t)((dmc)->sysctl_active.dirty_high_threshold * EIO_DIV((dmc)->size, 100)) && \
+	 (int64_t)((dmc)->sysctl_active.dirty_high_threshold * EIO_DIV((dmc)->size, 100)) && \
 	 ((dmc)->sysctl_active.dirty_high_threshold > (dmc)->sysctl_active.dirty_low_threshold))
 
 #define DIRTY_SET_THRESHOLD_CROSSED(dmc, set)	\
@@ -1040,7 +1038,7 @@ extern void eio_put_cache_device(struct cache_c *dmc);
 extern void eio_suspend_caching(struct cache_c *dmc, enum dev_notifier note);
 extern void eio_resume_caching(struct cache_c *dmc, char *dev);
 
-static __inline__ void
+static inline void
 EIO_DBN_SET(struct cache_c *dmc, u_int64_t index, sector_t dbn)
 {
 	if (EIO_MD8(dmc))
@@ -1051,36 +1049,36 @@ EIO_DBN_SET(struct cache_c *dmc, u_int64_t index, sector_t dbn)
 		dmc->index_zero = index;
 }
 
-static __inline__ u_int64_t EIO_DBN_GET(struct cache_c *dmc, u_int64_t index)
+static inline u_int64_t EIO_DBN_GET(struct cache_c *dmc, u_int64_t index)
 {
 	if (EIO_MD8(dmc))
-		return dmc->cache_md8[index].md8_md & EIO_MD8_DBN_MASK;
+		return dmc->cache_md8[index].md8_u.u_i_md8 & EIO_MD8_DBN_MASK;
 
 	return eio_expand_dbn(dmc, index);
 }
 
-static __inline__ void
+static inline void
 EIO_CACHE_STATE_SET(struct cache_c *dmc, u_int64_t index, u_int8_t cache_state)
 {
 	if (EIO_MD8(dmc))
-		EIO_MD8_CACHE_STATE(dmc, index) = cache_state;
+		dmc->cache_md8[index].md8_u.u_s_md8.cache_state = cache_state;
 	else
-		EIO_MD4_CACHE_STATE(dmc, index) = cache_state;
+		dmc->cache[index].md4_u.u_s_md4.cache_state = cache_state;
 }
 
-static __inline__ u_int8_t
+static inline u_int8_t
 EIO_CACHE_STATE_GET(struct cache_c *dmc, u_int64_t index)
 {
 	u_int8_t cache_state;
 
 	if (EIO_MD8(dmc))
-		cache_state = EIO_MD8_CACHE_STATE(dmc, index);
+		cache_state = dmc->cache_md8[index].md8_u.u_s_md8.cache_state;
 	else
-		cache_state = EIO_MD4_CACHE_STATE(dmc, index);
+		cache_state = dmc->cache[index].md4_u.u_s_md4.cache_state;
 	return cache_state;
 }
 
-static __inline__ void
+static inline void
 EIO_CACHE_STATE_OFF(struct cache_c *dmc, index_t index, u_int8_t bitmask)
 {
 	u_int8_t cache_state = EIO_CACHE_STATE_GET(dmc, index);
@@ -1089,7 +1087,7 @@ EIO_CACHE_STATE_OFF(struct cache_c *dmc, index_t index, u_int8_t bitmask)
 	EIO_CACHE_STATE_SET(dmc, index, cache_state);
 }
 
-static __inline__ void
+static inline void
 EIO_CACHE_STATE_ON(struct cache_c *dmc, index_t index, u_int8_t bitmask)
 {
 	u_int8_t cache_state = EIO_CACHE_STATE_GET(dmc, index);
@@ -1116,10 +1114,7 @@ extern sector_t eio_get_device_size(struct eio_bdev *);
 extern sector_t eio_get_device_start_sect(struct eio_bdev *);
 #endif                          /* __KERNEL__ */
 
-#define EIO_INIT_EVENT(ev)						\
-	do {						\
-		(ev)->process = NULL;			\
-	} while (0)
+#define EIO_INIT_EVENT(ev)	((ev)->process = NULL)
 
 /*Assumes that the macro gets called under the same spinlock as in wait event*/
 #define EIO_SET_EVENT_AND_UNLOCK(ev, sl, flags)					\
@@ -1146,10 +1141,7 @@ extern sector_t eio_get_device_start_sect(struct eio_bdev *);
 		(ev)->process = NULL;				\
 	} while (0)
 
-#define EIO_CLEAR_EVENT(ev)							\
-	do {							\
-		(ev)->process = NULL;				\
-	} while (0)
+#define EIO_CLEAR_EVENT(ev)	((ev)->process = NULL)
 
 #include "eio_setlru.h"
 #include "eio_policy.h"

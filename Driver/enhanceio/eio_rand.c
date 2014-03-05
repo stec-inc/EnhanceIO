@@ -113,9 +113,9 @@ int eio_rand_clean_set(struct eio_policy *p_ops, index_t set, int to_clean)
 	/* Scan sequentially in the set and pick blocks to clean */
 	while ((i < (int)dmc->assoc) && (nr_writes < to_clean)) {
 		if ((EIO_CACHE_STATE_GET(dmc, start_index + i) &
-		    (DIRTY | BLOCK_IO_INPROG)) == DIRTY) {
+		     (DIRTY | BLOCK_IO_INPROG)) == DIRTY) {
 			EIO_CACHE_STATE_ON(dmc, start_index + i,
-			DISKWRITEINPROG);
+					   DISKWRITEINPROG);
 			nr_writes++;
 		}
 		i++;
@@ -139,7 +139,7 @@ struct eio_policy *eio_rand_instance_init(void)
 {
 	struct eio_policy *new_instance;
 
-	new_instance = (struct eio_policy *)vmalloc(sizeof(struct eio_policy));
+	new_instance = vmalloc(sizeof(struct eio_policy));
 	if (new_instance == NULL) {
 		pr_err("ssdscache_rand_instance_init: vmalloc failed");
 		return NULL;

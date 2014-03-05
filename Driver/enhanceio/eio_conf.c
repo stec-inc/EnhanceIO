@@ -44,7 +44,7 @@
 #define KMEM_DMC_BIO_PAIR       "eio-dmc-bio-pair"
 /* #define KMEM_CACHE_PENDING_JOB	"eio-pending-jobs" */
 
-static struct cache_c *cache_list_head = NULL;
+static struct cache_c *cache_list_head;
 struct work_struct _kcached_wq;
 
 static struct kmem_cache *_job_cache;
@@ -126,7 +126,7 @@ void eio_wait_thread_exit(void *thrdptr, int *running)
 	while (*running)
 		msleep(1);
 
-	//do_exit() would be called within the thread func itself
+	/*do_exit() would be called within the thread func itself*/
 
 	return;
 }
@@ -136,36 +136,36 @@ void eio_thread_exit(long exit_code)
 {
 	do_exit(exit_code);
 }
- const char *eio_policy_to_name(u8 p)
+const char *eio_policy_to_name(u8 p)
 {
-    int i;
-    for (i = 0; i < ARRAY_SIZE(eio_policy_names); i++)
-        if (eio_policy_names[i].p == p)
-            return eio_policy_names[i].n;
+	int i;
 
-    return NULL;
+	for (i = 0; i < ARRAY_SIZE(eio_policy_names); i++)
+		if (eio_policy_names[i].p == p)
+			return eio_policy_names[i].n;
+
+	return NULL;
 }
 
 
 inline int eio_policy_init(struct cache_c *dmc)
 {
-	int error = 0;
 
 	if (dmc->req_policy == 0)
 		dmc->req_policy = CACHE_REPL_DEFAULT;
 	dmc->policy_ops = eio_get_policy(dmc->req_policy);
 	if (dmc->policy_ops == NULL) {
-		pr_err
-			("policy_init: Cannot find requested policy");
-		error = -ENOMEM;
+		pr_err("eio_policy_init: Failed to initialize %s(%d) policy",
+			eio_policy_to_name(dmc->req_policy), dmc->req_policy);
+		return -EINVAL;
 	} else {
 		/* Back pointer to reference dmc from policy_ops */
 		dmc->policy_ops->sp_dmc = dmc;
 		pr_info("Setting replacement policy to %s (%d)",
-				eio_policy_to_name(dmc->policy_ops->sp_name),
-				dmc->policy_ops->sp_name);
+			eio_policy_to_name(dmc->policy_ops->sp_name),
+			dmc->policy_ops->sp_name);
+		return 0;
 	}
-	return error;
 }
 
 static int eio_jobs_init(void)
@@ -237,8 +237,8 @@ static int eio_kcached_init(struct cache_c *dmc)
 static void eio_kcached_client_destroy(struct cache_c *dmc)
 {
 
-	/* Wait for all IOs */
-	//wait_event(dmc->destroyq, !atomic_read(&dmc->nr_jobs));
+	/* Wait for all IOs
+	   /wait_event(dmc->destroyq, !atomic_read(&dmc->nr_jobs));*/
 }
 
 /* Store the cache superblock on ssd */
@@ -304,7 +304,7 @@ int eio_sb_store(struct cache_c *dmc)
 	sb->sbf.cold_boot = cpu_to_le32(dmc->cold_boot);
 	if (le32_to_cpu(sb->sbf.cold_boot) && eio_force_warm_boot)
 		sb->sbf.cold_boot = cpu_to_le32(le32_to_cpu(sb->sbf.cold_boot) |
-			       			BOOT_FLAG_FORCE_WARM);
+						BOOT_FLAG_FORCE_WARM);
 
 	sb->sbf.dirty_high_threshold = cpu_to_le32(dmc->sysctl_active.dirty_high_threshold);
 	sb->sbf.dirty_low_threshold = cpu_to_le32(dmc->sysctl_active.dirty_low_threshold);
@@ -425,9 +425,9 @@ int eio_md_store(struct cache_c *dmc)
 			num_valid++;
 		if (EIO_CACHE_STATE_GET(dmc, (index_t)i) & DIRTY)
 			num_dirty++;
-		next_ptr->dbn = EIO_DBN_GET(dmc, i);
-		next_ptr->cache_state = EIO_CACHE_STATE_GET(dmc, (index_t)i) &
-					(INVALID | VALID | DIRTY);
+		next_ptr->dbn = cpu_to_le64(EIO_DBN_GET(dmc, i));
+		next_ptr->cache_state = cpu_to_le64(EIO_CACHE_STATE_GET(dmc, (index_t)i) &
+					(INVALID | VALID | DIRTY));
 
 		next_ptr++;
 		slots_written++;
@@ -591,7 +591,7 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 	int ret = 0, k;
 	void **pg_virt_addr = NULL;
 
-	// Allocate single page for superblock header.
+	/* Allocate single page for superblock header.*/
 	page_count = 0;
 	header_page = eio_alloc_pages(1, &page_count);
 	if (header_page == NULL) {
@@ -661,7 +661,8 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 	dmc->md_sectors +=
 		EIO_EXTRA_SECTORS(dmc->cache_dev_start_sect, dmc->md_sectors);
 
-	if ((error = eio_mem_init(dmc)) == -1) {
+	error = eio_mem_init(dmc);
+	if (error == -1) {
 		ret = -EINVAL;
 		goto free_header;
 	}
@@ -690,10 +691,10 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 		 sizeof(struct cacheblock));
 	i = EIO_MD8(dmc) ? sizeof(struct cacheblock_md8) : sizeof(struct
 								  cacheblock);
-	pr_info("Allocate %lluKB (%lluB per) mem for %llu-entry cache "
+	pr_info("Allocate %lluKB (%lluB per) mem for %llu-entry cache "	\
 		"(capacity:%lluMB, associativity:%u, block size:%u bytes)",
 		(unsigned long long)order >> 10, (unsigned long long)i,
-	       	(long long unsigned int)dmc->size,
+		(long long unsigned int)dmc->size,
 		(unsigned long long)(cache_size >> (20 - SECTOR_SHIFT)), dmc->assoc,
 		dmc->block_size << SECTOR_SHIFT);
 
@@ -710,11 +711,9 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 	 */
 	if (!CACHE_SSD_ADD_INPROG_IS_SET(dmc)) {
 		if (EIO_MD8(dmc))
-			dmc->cache_md8 =
-				(struct cacheblock_md8 *)vmalloc((size_t)order);
+			dmc->cache_md8 = vmalloc((size_t)order);
 		else
-			dmc->cache =
-				(struct cacheblock *)vmalloc((size_t)order);
+			dmc->cache = vmalloc((size_t)order);
 		if ((EIO_MD8(dmc) && !dmc->cache_md8)
 		    || (!EIO_MD8(dmc) && !dmc->cache)) {
 			pr_err
@@ -795,11 +794,10 @@ static int eio_md_create(struct cache_c *dmc, int force, int cold)
 		j = MD_BLOCKS_PER_PAGE;
 
 		for (i = 0; i < dmc->size; i++) {
-			next_ptr->dbn = EIO_DBN_GET(dmc, i);
-			next_ptr->cache_state =
-				EIO_CACHE_STATE_GET(dmc,
-						    (index_t)i) & (INVALID | VALID
-								   | DIRTY);
+			next_ptr->dbn = cpu_to_le64(EIO_DBN_GET(dmc, i));
+			next_ptr->cache_state = 
+				cpu_to_le64(EIO_CACHE_STATE_GET(dmc,
+				(index_t)i) & (INVALID | VALID | DIRTY));
 			next_ptr++;
 			slots_written++;
 			j--;
@@ -1006,27 +1004,27 @@ static int eio_md_load(struct cache_c *dmc)
 
 	/* check ondisk superblock version */
 	if (le32_to_cpu(header->sbf.cache_version) != EIO_SB_VERSION) {
-		pr_info("md_load: Cache superblock mismatch detected."
+		pr_info("md_load: Cache superblock mismatch detected." \
 			" (current: %u, ondisk: %u)", EIO_SB_VERSION,
 			header->sbf.cache_version);
 
 		if (le32_to_cpu(header->sbf.cache_version) == 0) {
-			pr_err("md_load: Can't enable cache %s. Either "
-			       "superblock version is invalid or cache has"
+			pr_err("md_load: Can't enable cache %s. Either " \
+			       "superblock version is invalid or cache has" \
 			       " been deleted", header->sbf.cache_name);
 			ret = 1;
 			goto free_header;
 		}
 
 		if (le32_to_cpu(header->sbf.cache_version) > EIO_SB_VERSION) {
-			pr_err("md_load: Can't enable cache %s with newer "
+			pr_err("md_load: Can't enable cache %s with newer " \
 			       " superblock version.", header->sbf.cache_name);
 			ret = 1;
 			goto free_header;
 		}
 
 		if (le32_to_cpu(header->sbf.mode) == CACHE_MODE_WB) {
-			pr_err("md_load: Can't enable write-back cache %s"
+			pr_err("md_load: Can't enable write-back cache %s" \
 			       " with newer superblock version.",
 			       header->sbf.cache_name);
 			ret = 1;
@@ -1034,7 +1032,7 @@ static int eio_md_load(struct cache_c *dmc)
 		} else if ((le32_to_cpu(header->sbf.mode) == CACHE_MODE_RO) ||
 			   (le32_to_cpu(header->sbf.mode) == CACHE_MODE_WT)) {
 			dmc->persistence = CACHE_FORCECREATE;
-			pr_info("md_load: Can't enable cache, recreating"
+			pr_info("md_load: Can't enable cache, recreating" \
 				" cache %s with newer superblock version.",
 				header->sbf.cache_name);
 			ret = 0;
@@ -1046,9 +1044,9 @@ static int eio_md_load(struct cache_c *dmc)
 
 	if (le32_to_cpu(header->sbf.cache_version) >= EIO_SB_MAGIC_VERSION &&
 	    le32_to_cpu(header->sbf.magic) != EIO_MAGIC) {
-		pr_err("md_load: Magic number mismatch in superblock detected."
+		pr_err("md_load: Magic number mismatch in superblock detected."	\
 		       " (current: %u, ondisk: %u)", EIO_MAGIC,
-		      le32_to_cpu(header->sbf.magic));
+		       le32_to_cpu(header->sbf.magic));
 		ret = 1;
 		goto free_header;
 	}
@@ -1073,7 +1071,7 @@ static int eio_md_load(struct cache_c *dmc)
 	if (le32_to_cpu(header->sbf.cold_boot) & BOOT_FLAG_FORCE_WARM) {
 		force_warm_boot = 1;
 		header->sbf.cold_boot = cpu_to_le32(le32_to_cpu(header->sbf.cold_boot) &
-							~BOOT_FLAG_FORCE_WARM);
+						    ~BOOT_FLAG_FORCE_WARM);
 	}
 
 	/*
@@ -1122,8 +1120,10 @@ static int eio_md_load(struct cache_c *dmc)
 
 	if (!dmc->cache_flags)
 		dmc->cache_flags = le32_to_cpu(header->sbf.cache_flags);
-
-	(void)eio_policy_init(dmc);
+	
+	error = eio_policy_init(dmc);
+	if (error)
+		goto free_header;
 
 	dmc->block_size = le64_to_cpu(header->sbf.block_size);
 	dmc->block_shift = ffs(dmc->block_size) - 1;
@@ -1147,7 +1147,8 @@ static int eio_md_load(struct cache_c *dmc)
 	dmc->sysctl_active.autoclean_threshold =
 		le32_to_cpu(header->sbf.autoclean_threshold);
 
-	if ((i = eio_mem_init(dmc)) == -1) {
+	i = eio_mem_init(dmc);
+	if (i == -1) {
 		pr_err("eio_md_load: Failed to initialize memory.");
 		ret = -EINVAL;
 		goto free_header;
@@ -1161,19 +1162,18 @@ static int eio_md_load(struct cache_c *dmc)
 	size =
 		EIO_MD8(dmc) ? sizeof(struct cacheblock_md8) : sizeof(struct
 								      cacheblock);
-	pr_info("Allocate %lluKB (%lluB per) mem for %llu-entry cache "
+	pr_info("Allocate %lluKB (%lluB per) mem for %llu-entry cache "	\
 		"(capacity:%lluMB, associativity:%u, block size:%u bytes)",
 		(unsigned long long)order >> 10, (unsigned long long)size,
-	       	(long long unsigned int)dmc->size,
+		(long long unsigned int)dmc->size,
 		(long long unsigned int)(dmc->md_sectors + data_size) >> (20 -
-								     SECTOR_SHIFT),
+									  SECTOR_SHIFT),
 		dmc->assoc, dmc->block_size << SECTOR_SHIFT);
 
 	if (EIO_MD8(dmc))
-		dmc->cache_md8 =
-			(struct cacheblock_md8 *)vmalloc((size_t)order);
+		dmc->cache_md8 = vmalloc((size_t)order);
 	else
-		dmc->cache = (struct cacheblock *)vmalloc((size_t)order);
+		dmc->cache = vmalloc((size_t)order);
 
 	if ((EIO_MD8(dmc) && !dmc->cache_md8) || (!EIO_MD8(dmc) && !dmc->cache)) {
 		pr_err("md_load: Unable to allocate memory");
@@ -1265,23 +1265,23 @@ static int eio_md_load(struct cache_c *dmc)
 					(struct flash_cacheblock *)
 					pg_virt_addr[page_index++];
 
-			// If unclean shutdown, only the DIRTY blocks are loaded.
+			/* If unclean shutdown, only the DIRTY blocks are loaded.*/
 			if (clean_shutdown || (next_ptr->cache_state & DIRTY)) {
 
 				if (next_ptr->cache_state & DIRTY)
 					dirty_loaded++;
 
 				EIO_CACHE_STATE_SET(dmc, i,
-						    (u_int8_t)next_ptr->
-						    cache_state & ~QUEUED);
+					(u_int8_t)le64_to_cpu(next_ptr->
+					cache_state) & ~QUEUED);
 
 				EIO_ASSERT((EIO_CACHE_STATE_GET(dmc, i) &
-					(VALID | INVALID))
-				       != (VALID | INVALID));
+					    (VALID | INVALID))
+					   != (VALID | INVALID));
 
 				if (EIO_CACHE_STATE_GET(dmc, i) & VALID)
 					num_valid++;
-				EIO_DBN_SET(dmc, i, next_ptr->dbn);
+				EIO_DBN_SET(dmc, i, le64_to_cpu(next_ptr->dbn));
 			} else
 				eio_invalidate_md(dmc, i);
 			next_ptr++;
@@ -1471,7 +1471,7 @@ int eio_cache_create(struct cache_rec_short *cache)
 	fmode_t mode = (FMODE_READ | FMODE_WRITE);
 	char *strerr = NULL;
 
-	dmc = (struct cache_c *)kzalloc(sizeof(*dmc), GFP_KERNEL);
+	dmc = kzalloc(sizeof(*dmc), GFP_KERNEL);
 	if (dmc == NULL) {
 		strerr = "Failed to allocate memory for cache context";
 		error = -ENOMEM;
@@ -1487,13 +1487,9 @@ int eio_cache_create(struct cache_rec_short *cache)
 		strerr = "get_device for source device failed";
 		goto bad1;
 	}
-	if (NULL == dmc->disk_dev) {
-		error = -EINVAL;
-		strerr = "Failed to lookup source device";
-		goto bad1;
-	}
-	if ((dmc->disk_size =
-		     eio_to_sector(eio_get_device_size(dmc->disk_dev))) >= EIO_MAX_SECTOR) {
+
+	dmc->disk_size = eio_to_sector(eio_get_device_size(dmc->disk_dev));
+	if (dmc->disk_size >= EIO_MAX_SECTOR) {
 		strerr = "Source device too big to support";
 		error = -EFBIG;
 		goto bad2;
@@ -1505,16 +1501,12 @@ int eio_cache_create(struct cache_rec_short *cache)
 	 */
 
 	error =
-		eio_ttc_get_device(cache->cr_ssd_devname, mode, &dmc->cache_dev);
+		eio_ttc_get_device(cache->cr_ssd_devname, mode | FMODE_EXCL, &dmc->cache_dev);
 	if (error) {
 		strerr = "get_device for cache device failed";
 		goto bad2;
 	}
-	if (NULL == dmc->cache_dev) {
-		error = -EINVAL;
-		strerr = "Failed to lookup source device";
-		goto bad2;
-	}
+
 	if (dmc->disk_dev == dmc->cache_dev) {
 		error = -EINVAL;
 		strerr = "Same devices specified";
@@ -1664,8 +1656,13 @@ int eio_cache_create(struct cache_rec_short *cache)
 	}
 
 	/* eio_policy_init() is already called from within eio_md_load() */
-	if (persistence != CACHE_RELOAD)
-		(void)eio_policy_init(dmc);
+	if (persistence != CACHE_RELOAD) {
+		error = eio_policy_init(dmc);
+		if (error) {
+			strerr = "Failed to initialize policy";
+			goto bad5;
+		}
+	}	
 
 	if (cache->cr_flags) {
 		int flags;
@@ -1748,7 +1745,7 @@ int eio_cache_create(struct cache_rec_short *cache)
 	 */
 
 	i = EIO_DIV(eio_to_sector(eio_get_device_size(dmc->disk_dev)),
-	    (dmc->assoc * dmc->block_size));
+		    (dmc->assoc * dmc->block_size));
 	if (i >= (((u_int64_t)1) << 32)) {
 		strerr = "Too many cache sets to support";
 		goto bad5;
@@ -1793,7 +1790,7 @@ init:
 		goto bad5;
 	}
 
-	dmc->cache_sets = (struct cache_set *)vmalloc((size_t)order);
+	dmc->cache_sets = vmalloc((size_t)order);
 	if (!dmc->cache_sets) {
 		strerr = "Failed to allocate memory";
 		error = -ENOMEM;
@@ -1956,7 +1953,7 @@ int eio_cache_delete(char *cache_name, int do_delete)
 
 	spin_lock_irqsave(&dmc->cache_spin_lock, dmc->cache_spin_lock_flags);
 	if (dmc->cache_flags & CACHE_FLAGS_SHUTDOWN_INPROG) {
-		pr_err("cache_delete: system shutdown in progress, cannot "
+		pr_err("cache_delete: system shutdown in progress, cannot " \
 		       "delete cache %s", cache_name);
 		spin_unlock_irqrestore(&dmc->cache_spin_lock,
 				       dmc->cache_spin_lock_flags);
@@ -1964,8 +1961,8 @@ int eio_cache_delete(char *cache_name, int do_delete)
 	}
 	if (dmc->cache_flags & CACHE_FLAGS_MOD_INPROG) {
 		pr_err
-			("cache_delete: simultaneous edit/delete operation on cache"
-			" %s is not permitted", cache_name);
+			("cache_delete: simultaneous edit/delete operation " \
+			" on cache %s is not permitted", cache_name);
 		spin_unlock_irqrestore(&dmc->cache_spin_lock,
 				       dmc->cache_spin_lock_flags);
 		return -EINVAL;
@@ -2031,7 +2028,7 @@ int eio_cache_delete(char *cache_name, int do_delete)
 
 	if (!CACHE_FAILED_IS_SET(dmc))
 		EIO_ASSERT(dmc->sysctl_active.fast_remove
-		       || (atomic64_read(&dmc->nr_dirty) == 0));
+			   || (atomic64_read(&dmc->nr_dirty) == 0));
 
 	/*
 	 * If ttc_deactivate succeeded... proceed with cache delete.
@@ -2136,9 +2133,12 @@ int eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 
 	/* sanity check */
 	if (dmc->cache_size != eio_to_sector(eio_get_device_size(dmc->cache_dev))) {
-		pr_err("ctr_ssd_add: Cache device size has changed, expected (%llu) found (%llu) \
-				continuing in degraded mode", (unsigned long long)dmc->cache_size,
-		       (unsigned long long)eio_to_sector(eio_get_device_size(dmc->cache_dev)));
+		pr_err("ctr_ssd_add: Cache device size has changed," \
+		       "expected (%llu) found (%llu)" \
+		       "continuing in degraded mode",
+		       (unsigned long long)dmc->cache_size,
+		       (unsigned long long)eio_to_sector(
+			       eio_get_device_size(dmc->cache_dev)));
 		r = -EINVAL;
 		goto out;
 	}
@@ -2146,10 +2146,10 @@ int eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 	/* sanity check for cache device start sector */
 	if (dmc->cache_dev_start_sect !=
 	    eio_get_device_start_sect(dmc->cache_dev)) {
-		pr_err("ctr_ssd_add: Cache device starting sector changed, \
-				expected (%llu) found (%llu) continuing in \
-				degraded mode", (unsigned long long)dmc->cache_dev_start_sect,
-			       	(unsigned long long)eio_get_device_start_sect(dmc->cache_dev));
+		pr_err("ctr_ssd_add: Cache device starting sector changed," \
+		       "expected (%llu) found (%llu) continuing in" \
+		       "degraded mode", (unsigned long long)dmc->cache_dev_start_sect,
+		       (unsigned long long)eio_get_device_start_sect(dmc->cache_dev));
 		r = -EINVAL;
 		goto out;
 	}
@@ -2164,7 +2164,11 @@ int eio_ctr_ssd_add(struct cache_c *dmc, char *dev)
 	dmc->persistence = CACHE_FORCECREATE;
 
 	eio_policy_free(dmc);
-	(void)eio_policy_init(dmc);
+	r = eio_policy_init(dmc); 
+	if (r) {
+		pr_err("ctr_ssd_add: Failed to initialize policy");
+		goto out;
+	}
 
 	r = eio_md_create(dmc, /* force */ 1, /* cold */
 			  (dmc->mode != CACHE_MODE_WB));
@@ -2251,9 +2255,8 @@ int eio_allocate_wb_resources(struct cache_c *dmc)
 	/* Data page allocations are done in terms of "bio_vec" structures */
 	iosize = (dmc->block_size * dmc->assoc) << SECTOR_SHIFT;
 	nr_bvecs = IO_BVEC_COUNT(iosize, dmc->block_size);
-	dmc->clean_dbvecs =
-		(struct bio_vec *)kmalloc(sizeof(struct bio_vec) * nr_bvecs,
-					  GFP_KERNEL);
+	dmc->clean_dbvecs = kmalloc(sizeof(struct bio_vec) * nr_bvecs,
+				GFP_KERNEL);
 	if (dmc->clean_dbvecs == NULL) {
 		pr_err("cache_create: Failed to allocated memory.\n");
 		ret = -ENOMEM;
@@ -2269,9 +2272,8 @@ int eio_allocate_wb_resources(struct cache_c *dmc)
 	/* Metadata page allocations are done in terms of pages only */
 	iosize = dmc->assoc * sizeof(struct flash_cacheblock);
 	nr_pages = IO_PAGE_COUNT(iosize);
-	dmc->clean_mdpages =
-		(struct page **)kmalloc(sizeof(struct page *) * nr_pages,
-					GFP_KERNEL);
+	dmc->clean_mdpages = kmalloc(sizeof(struct page *) * nr_pages,
+				GFP_KERNEL);
 	if (dmc->clean_mdpages == NULL) {
 		pr_err("cache_create: Failed to allocated memory.\n");
 		ret = -ENOMEM;
@@ -2318,7 +2320,7 @@ int eio_allocate_wb_resources(struct cache_c *dmc)
 		ret = -ENOMEM;
 
 	if (ret < 0) {
-		pr_err("cache_create: Failed to initialize dirty lru set or"
+		pr_err("cache_create: Failed to initialize dirty lru set or" \
 		       "clean/mdupdate thread for wb cache.\n");
 		if (dmc->dirty_set_lru) {
 			lru_uninit(dmc->dirty_set_lru);
@@ -2477,8 +2479,8 @@ eio_notify_ssd_rm(struct notifier_block *nb, unsigned long action, void *data)
 
 	if (!scsi_is_sdev_device(dev))
 		return 0;
-
-	if ((device_name = dev_name(dev)) == NULL)
+	device_name = dev_name(dev);
+	if (device_name == NULL)
 		return 0;
 	len = strlen(device_name);
 
@@ -2558,7 +2560,7 @@ static int __init eio_init(void)
 	INIT_WORK(&_kcached_wq, eio_do_work);
 
 	eio_module_procfs_init();
-	eio_control = kmalloc(sizeof *eio_control, GFP_KERNEL);
+	eio_control = kmalloc(sizeof(*eio_control), GFP_KERNEL);
 	if (eio_control == NULL) {
 		pr_err("init: Cannot allocate memory for eio_control");
 		(void)eio_delete_misc_device();

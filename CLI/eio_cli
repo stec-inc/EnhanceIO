@@ -28,16 +28,17 @@ import re
 
 #TBD : Change ioctl numbers to comply with linux kernel convention
 EIODEV = '/dev/eiodev'
-EIO_IOC_CREATE = 0x4500
-EIO_IOC_DELETE = 0x4501
-EIO_IOC_ENABLE = 0x4502
-EIO_IOC_EDIT = 0x4504
-EIO_IOC_NCACHES = 0x4505
-EIO_IOC_CACHE_LIST = 0x4506
-EIO_IOC_SSD_ADD = 0x4507
-EIO_IOC_SSD_REMOVE = 0x4508
-EIO_IOC_SRC_ADD = 0x4509
-EIO_IOC_SRC_REMOVE = 0x450a
+EIO_IOC_CREATE = 1104168192 
+EIO_IOC_DELETE = 1104168193
+EIO_IOC_ENABLE = 1104168194
+EIO_IOC_DISABLE = 1104168195
+EIO_IOC_EDIT = 1104168196
+EIO_IOC_NCACHES = 1104168197
+EIO_IOC_CACHE_LIST = 1104168198
+EIO_IOC_SSD_ADD = 1104168199
+EIO_IOC_SSD_REMOVE = 1104168200
+EIO_IOC_SRC_ADD = 1104168201
+EIO_IOC_SRC_REMOVE = 1104168202
 IOC_BLKGETSIZE64 = 0x80081272
 IOC_SECTSIZE = 0x1268
 SUCCESS=0
@@ -95,7 +96,7 @@ PROGRAM="/bin/sh -c 'echo $links > \
 TEST=="/proc/enhanceio/<cache_name>",\
 PROGRAM="/bin/grep 'state\s*failed' /proc/enhanceio/<cache_name>/config", \
 PROGRAM="/bin/grep 'no_source_dev\s*1' /proc/enhanceio/<cache_name>/errors", \
-RUN+="/sbin/eio_admin notify -a add -d /dev/$kernel -c <cache_name>", NAME="", \
+RUN+="/sbin/eio_cli notify -a add -d /dev/$kernel -c <cache_name>", NAME="", \
 GOTO="EIO_EOF"
 
 TEST!="/proc/enhanceio/<cache_name>", \

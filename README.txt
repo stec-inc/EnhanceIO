@@ -41,7 +41,7 @@
 	HDD asynchronously. Reads are handled similar to Read-only and
 	Write-through modes.
 
-2. WHAT HAS ENHANCEIO ADDED TO FLASHCACHE?
+2. WHAT HAS ENHANCEIO CHANGED TO FLASHCACHE?
 
 2.1. A new write-back engine
 
@@ -94,7 +94,7 @@
 	RAM for each SSD cache block. In this case, RAM usage is 0.2% (2/1000)
 	of SSD capacity for a cache block size of 4K.
 
-2.4. Loadable Replacement Policies
+2.5. Loadable Replacement Policies
 
 	Since the SSD cache size is typically 10%-20% of the source volume
 	size, the set-associative nature of EnhanceIO necessitates cache
@@ -124,13 +124,13 @@
 		FIFO	4 bytes per cache set
 		LRU	4 bytes per cache set + 4 bytes per cache block
 
-2.5. Optimal Alignment of Data Blocks on SSD
+2.6. Optimal Alignment of Data Blocks on SSD
 
 	EnhanceIO writes all meta data and data blocks on 4K-aligned blocks
 	on the SSD. This minimizes write amplification and flash wear.
 	It also improves performance.
 
-2.6. Improved device failure handling
+2.7. Improved device failure handling
 
 	Failure of an SSD device in read-only and write-through modes is
 	handled gracefully by allowing I/O to continue to/from the
@@ -152,6 +152,13 @@
 	read-only cache modes, splitting of a single large spinlock, and more.
 	Most of the code paths in flashcache have been substantially
 	restructured.
+
+2.9 Sequential I/O bypass
+
+	EnhanceIO has removed the bypass of sequential IO available in flashcache.
+	The sequential detection logic has a limited use case, espescially in a
+	reasonably multithreaded scenario.
+
 
 3. EnhanceIO usage
 
@@ -184,6 +191,30 @@
 	In case an SSD does not come up during a bootup, access to HDD should
 	stopped. It should be enabled only after SSD comes-up and a cache is
 	enabled.
+	
+	Write-back cache needs to perform clean operation in order to flush the
+	dirty data to the source device(HDD). The clean can be either trigerred
+	by the user or automatically initiated, based on preconfigured
+	thresholds. These thresholds are described below. They can be set using 
+	sysctl calls.
+
+	a) Dirty high threshold (%) : The upper limit on percentage of dirty
+	   blocks in the entire cache.
+	b) Dirty low threshold (%) : The lower limit on percentage of dirty
+	   blocks in the entire cache.
+	c) Dirty set high threshold (%) : The upper limit on percentage of dirty
+	   blocks in a set.
+	d) Dirty set low threshold (%) : The lower limit on percentage of dirty
+	   blocks in a set.	
+	e) Automatic clean-up threshold : An automatic clean-up of the cache
+	   will occur only if the number of outstanding I/O requests from the
+	   HDD is below the threshold.
+	f) Time based clean-up interval (minutes) : This option allows you to
+	   specify an interval between each clean-up process.
+
+	Clean is trigerred when one of the upper thresholds or time based clean 
+	threshold is met and stops when all the lower thresholds are met.  
+
 
 4. ACKNOWLEDGEMENTS
 

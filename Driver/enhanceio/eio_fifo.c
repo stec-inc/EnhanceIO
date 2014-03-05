@@ -77,8 +77,7 @@ int eio_fifo_cache_sets_init(struct eio_policy *p_ops)
 	order = (dmc->size >> dmc->consecutive_shift) *
 		sizeof(struct eio_fifo_cache_set);
 
-	dmc->sp_cache_set =
-		(struct eio_fifo_cache_set *)vmalloc((size_t)order);
+	dmc->sp_cache_set = vmalloc((size_t)order);
 	if (dmc->sp_cache_set == NULL)
 		return -ENOMEM;
 
@@ -178,7 +177,7 @@ struct eio_policy *eio_fifo_instance_init(void)
 {
 	struct eio_policy *new_instance;
 
-	new_instance = (struct eio_policy *)vmalloc(sizeof(struct eio_policy));
+	new_instance = vmalloc(sizeof(struct eio_policy));
 	if (new_instance == NULL) {
 		pr_err("ssdscache_fifo_instance_init: vmalloc failed");
 		return NULL;

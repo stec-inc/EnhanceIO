@@ -951,35 +951,35 @@ static int eio_version_open(struct inode *inode, struct file *file);
 static int eio_config_show(struct seq_file *seq, void *v);
 static int eio_config_open(struct inode *inode, struct file *file);
 
-static struct file_operations eio_version_operations = {
+static const struct file_operations eio_version_operations = {
 	.open		= eio_version_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
 
-static struct file_operations eio_stats_operations = {
+static const struct file_operations eio_stats_operations = {
 	.open		= eio_stats_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
 
-static struct file_operations eio_errors_operations = {
+static const struct file_operations eio_errors_operations = {
 	.open		= eio_errors_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
 
-static struct file_operations eio_iosize_hist_operations = {
+static const struct file_operations eio_iosize_hist_operations = {
 	.open		= eio_iosize_hist_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
 
-static struct file_operations eio_config_operations = {
+static const struct file_operations eio_config_operations = {
 	.open		= eio_config_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
@@ -1020,17 +1020,17 @@ static struct sysctl_table_dir {
 	}, .dev	= {
 	}, .dir	= {
 		{
-			.procname = PROC_SYS_DIR_NAME,
-			.maxlen = 0,
-			.mode =	S_IRUGO | S_IXUGO,
-			.child = sysctl_template_dir.dev,
+			.procname	= PROC_SYS_DIR_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_dir.dev,
 		},
 	}, .root = {
 		{
-			.procname = PROC_SYS_ROOT_NAME,
-			.maxlen = 0,
-			.mode =	0555,
-			.child = sysctl_template_dir.dir,
+			.procname	= PROC_SYS_ROOT_NAME,
+			.maxlen		= 0,
+			.mode		= 0555,
+			.child		= sysctl_template_dir.dir,
 		},
 	},
 };
@@ -1046,40 +1046,41 @@ static struct sysctl_table_common {
 } sysctl_template_common = {
 	.vars = {
 		{               /* 1 */
-			.procname = "zero_stats",
-			.maxlen = sizeof(int),
-			.mode = 0644,
-			.proc_handler = &eio_zerostats_sysctl,
+			.procname	= "zero_stats",
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= &eio_zerostats_sysctl,
 		}, {            /* 2 */
-			.procname = "mem_limit_pct",
-			.maxlen = sizeof(int), .mode = 0644,
-			.proc_handler = &eio_mem_limit_pct_sysctl,
+			.procname	= "mem_limit_pct",
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= &eio_mem_limit_pct_sysctl,
 		}, {            /* 3 */
-			.procname = "control",
-			.maxlen = sizeof(int),
-			.mode = 0644,
-			.proc_handler = &eio_control_sysctl,
+			.procname	= "control",
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= &eio_control_sysctl,
 		},
-	}, .dev = {
+	}, .dev	= {
 		{
-			.procname = PROC_SYS_CACHE_NAME,
-			.maxlen = 0,
-			.mode =	S_IRUGO | S_IXUGO,
-			.child = sysctl_template_common.vars,
+			.procname	= PROC_SYS_CACHE_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_common.vars,
 		},
-	}, .dir = {
+	}, .dir	= {
 		{
-			.procname = PROC_SYS_DIR_NAME,
-			.maxlen = 0,
-			.mode = S_IRUGO | S_IXUGO,
-			.child = sysctl_template_common.dev,
+			.procname	= PROC_SYS_DIR_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_common.dev,
 		},
 	}, .root = {
 		{
-			.procname = PROC_SYS_ROOT_NAME,
-			.maxlen = 0,
-			.mode = 0555,
-			.child = sysctl_template_common.dir,
+			.procname	= PROC_SYS_ROOT_NAME,
+			.maxlen		= 0,
+			.mode		= 0555,
+			.child		= sysctl_template_common.dir,
 		},
 	},
 };
@@ -1095,66 +1096,70 @@ static struct sysctl_table_writeback {
 } sysctl_template_writeback = {
 	.vars = {
 		{               /* 1 */
-			.procname = "do_clean",
-			.maxlen = sizeof(int),
-			.mode = 0644,
-			.proc_handler = &eio_clean_sysctl,
+			.procname	= "do_clean",
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= &eio_clean_sysctl,
 		}, {            /* 2 */
-			.procname = "time_based_clean_interval",
-			.maxlen = sizeof(unsigned int),
-			.mode = 0644,
-			.proc_handler = &eio_time_based_clean_interval_sysctl,
+			.procname	= "time_based_clean_interval",
+			.maxlen		= sizeof(unsigned int),
+			.mode		= 0644,
+			.proc_handler	= &eio_time_based_clean_interval_sysctl,
 		}, {            /* 3 */
-			.procname = "autoclean_threshold",
-			.maxlen = sizeof(int),
-			.mode = 0644,
-			.proc_handler = &eio_autoclean_threshold_sysctl,
+			.procname	= "autoclean_threshold",
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= &eio_autoclean_threshold_sysctl,
 		}, {            /* 4 */
-			.procname = "dirty_high_threshold",
-			.maxlen = sizeof(uint32_t),
-			.mode = 0644,
-			.proc_handler = &eio_dirty_high_threshold_sysctl,
+			.procname	= "dirty_high_threshold",
+			.maxlen		= sizeof(uint32_t),
+			.mode		= 0644,
+			.proc_handler	= &eio_dirty_high_threshold_sysctl,
 		}
 		, {             /* 5 */
-			.procname = "dirty_low_threshold",
-			.maxlen = sizeof(uint32_t),
-			.mode = 0644,
-			.proc_handler = &eio_dirty_low_threshold_sysctl,
+			.procname	= "dirty_low_threshold",
+			.maxlen		= sizeof(uint32_t),
+			.mode		= 0644,
+			.proc_handler	= &eio_dirty_low_threshold_sysctl,
 		}
 		, {             /* 6 */
-			.procname = "dirty_set_high_threshold",
-			.maxlen = sizeof(uint32_t),
-			.mode = 0644,
-			.proc_handler = &eio_dirty_set_high_threshold_sysctl,
+			.procname	= "dirty_set_high_threshold",
+			.maxlen		= sizeof(uint32_t),
+			.mode		= 0644,
+			.proc_handler	= &eio_dirty_set_high_threshold_sysctl,
 		}
 		, {             /* 7 */
-			.procname = "dirty_set_low_threshold",
-			.maxlen = sizeof(uint32_t),
-			.mode = 0644,
-			.proc_handler = &eio_dirty_set_low_threshold_sysctl,
+			.procname	= "dirty_set_low_threshold",
+			.maxlen		= sizeof(uint32_t),
+			.mode		= 0644,
+			.proc_handler	= &eio_dirty_set_low_threshold_sysctl,
 		}
 		,
 	}
 	, .dev = {
 		{
-			.procname = PROC_SYS_CACHE_NAME, .maxlen = 0, .mode =
-				S_IRUGO | S_IXUGO, .child =
-				sysctl_template_writeback.vars,
+			.procname	= PROC_SYS_CACHE_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_writeback.vars,
 		}
 		,
 	}
 	, .dir = {
 		{
-			.procname = PROC_SYS_DIR_NAME, .maxlen = 0, .mode =
-				S_IRUGO | S_IXUGO, .child =
-				sysctl_template_writeback.dev,
+			.procname	= PROC_SYS_DIR_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_writeback.dev,
 		}
 		,
 	}
-	, .root = {
+	, .root	= {
 		{
-			.procname = PROC_SYS_ROOT_NAME, .maxlen = 0, .mode =
-				0555, .child = sysctl_template_writeback.dir,
+			.procname	= PROC_SYS_ROOT_NAME,
+			.maxlen		= 0,
+			.mode		= 0555,
+			.child		= sysctl_template_writeback.dir,
 		}
 		,
 	}
@@ -1170,36 +1175,38 @@ static struct sysctl_table_invalidate {
 	ctl_table root[1 + 1];
 } sysctl_template_invalidate = {
 	.vars = {
-		{        /* 1 */
-			.procname = "invalidate",
-			.maxlen = sizeof(u_int64_t), 
-			.mode = 0644,
-			.proc_handler = &eio_invalidate_sysctl,
+		{	/* 1 */
+			.procname	= "invalidate",
+			.maxlen		= sizeof(u_int64_t),
+			.mode		= 0644,
+			.proc_handler	= &eio_invalidate_sysctl,
 		}
 		,
 	}
 	, .dev = {
 		{
-			.procname = PROC_SYS_CACHE_NAME, .maxlen = 0, .mode =
-				S_IRUGO | S_IXUGO, .child =
-				sysctl_template_invalidate.vars,
+			.procname	= PROC_SYS_CACHE_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_invalidate.vars,
 		}
 		,
 	}
 	, .dir = {
 		{
-			.procname = PROC_SYS_DIR_NAME, .maxlen = 0, .mode =
-				S_IRUGO | S_IXUGO, .child =
-				sysctl_template_invalidate.dev,
+			.procname	= PROC_SYS_DIR_NAME,
+			.maxlen		= 0,
+			.mode		= S_IRUGO | S_IXUGO,
+			.child		= sysctl_template_invalidate.dev,
 		}
 		,
 	}
-	, .root = {
+	, .root	= {
 		{
-			.procname = PROC_SYS_ROOT_NAME,
-			.maxlen = 0,
-			.mode = 0555,
-			.child = sysctl_template_invalidate.dir,
+			.procname	= PROC_SYS_ROOT_NAME,
+			.maxlen		= 0,
+			.mode		= 0555,
+			.child		= sysctl_template_invalidate.dir,
 		}
 		,
 	}
@@ -1214,9 +1221,8 @@ void eio_module_procfs_init(void)
 	struct proc_dir_entry *entry;
 
 	if (proc_mkdir(PROC_STR, NULL)) {
-		entry = create_proc_entry(PROC_VER_STR, 0, NULL);
-		if (entry)
-			entry->proc_fops = &eio_version_operations;
+		entry = proc_create_data(PROC_VER_STR, 0, NULL,
+				&eio_version_operations, NULL);
 	}
 	eio_sysctl_register_dir();
 }
@@ -1249,35 +1255,19 @@ void eio_procfs_ctr(struct cache_c *dmc)
 	}
 
 	s = eio_cons_procfs_cachename(dmc, PROC_STATS);
-	entry = create_proc_entry(s, 0, NULL);
-	if (entry) {
-		entry->proc_fops = &eio_stats_operations;
-		entry->data = dmc;
-	}
+	entry = proc_create_data(s, 0, NULL, &eio_stats_operations, dmc);
 	kfree(s);
 
 	s = eio_cons_procfs_cachename(dmc, PROC_ERRORS);
-	entry = create_proc_entry(s, 0, NULL);
-	if (entry) {
-		entry->proc_fops = &eio_errors_operations;
-		entry->data = dmc;
-	}
+	entry = proc_create_data(s, 0, NULL, &eio_errors_operations, dmc);
 	kfree(s);
 
 	s = eio_cons_procfs_cachename(dmc, PROC_IOSZ_HIST);
-	entry = create_proc_entry(s, 0, NULL);
-	if (entry) {
-		entry->proc_fops = &eio_iosize_hist_operations;
-		entry->data = dmc;
-	}
+	entry = proc_create_data(s, 0, NULL, &eio_iosize_hist_operations, dmc);
 	kfree(s);
 
 	s = eio_cons_procfs_cachename(dmc, PROC_CONFIG);
-	entry = create_proc_entry(s, 0, NULL);
-	if (entry) {
-		entry->proc_fops = &eio_config_operations;
-		entry->data = dmc;
-	}
+	entry = proc_create_data(s, 0, NULL, &eio_config_operations, dmc);
 	kfree(s);
 
 	eio_sysctl_register_common(dmc);
@@ -1486,7 +1476,7 @@ static void eio_sysctl_register_dir(void)
 	struct sysctl_table_dir *dir;
 
 	dir =
-		kmemdup(&sysctl_template_dir, sizeof sysctl_template_dir,
+		kmemdup(&sysctl_template_dir, sizeof(sysctl_template_dir),
 			GFP_KERNEL);
 	if (unlikely(dir == NULL)) {
 		pr_err("Failed to allocate memory for dir sysctl");
@@ -1525,7 +1515,7 @@ static void eio_sysctl_register_common(struct cache_c *dmc)
 	struct sysctl_table_common *common;
 
 	common =
-		kmemdup(&sysctl_template_common, sizeof sysctl_template_common,
+		kmemdup(&sysctl_template_common, sizeof(sysctl_template_common),
 			GFP_KERNEL);
 	if (common == NULL) {
 		pr_err("Failed to allocate memory for common sysctl");
@@ -1580,7 +1570,7 @@ static void eio_sysctl_register_writeback(struct cache_c *dmc)
 
 	writeback =
 		kmemdup(&sysctl_template_writeback,
-			sizeof sysctl_template_writeback, GFP_KERNEL);
+			sizeof(sysctl_template_writeback), GFP_KERNEL);
 	if (writeback == NULL) {
 		pr_err("Failed to allocate memory for writeback sysctl");
 		return;
@@ -1634,7 +1624,7 @@ static void eio_sysctl_register_invalidate(struct cache_c *dmc)
 
 	invalidate =
 		kmemdup(&sysctl_template_invalidate,
-			sizeof sysctl_template_invalidate, GFP_KERNEL);
+			sizeof(sysctl_template_invalidate), GFP_KERNEL);
 	if (invalidate == NULL) {
 		pr_err("Failed to allocate memory for invalidate sysctl");
 		return;
@@ -1689,20 +1679,21 @@ static int eio_stats_show(struct seq_file *seq, void *v)
 	unsigned read_hit_pct, write_hit_pct, dirty_write_hit_pct;
 
 	if (atomic64_read(&stats->reads) > 0)
-		read_hit_pct =
-		EIO_CALCULATE_PERCENTAGE(atomic64_read(&stats->read_hits),
-			atomic64_read(&stats->reads));
+		read_hit_pct = EIO_CALCULATE_PERCENTAGE(
+				atomic64_read(&stats->read_hits),
+				atomic64_read(&stats->reads));
 	else
 		read_hit_pct = 0;
 
 	if (atomic64_read(&stats->writes) > 0) {
 		write_hit_pct =
-		EIO_CALCULATE_PERCENTAGE(atomic64_read(&stats->write_hits),
-			atomic64_read(&stats->writes));
-
+		EIO_CALCULATE_PERCENTAGE(
+				atomic64_read(&stats->write_hits),
+				atomic64_read(&stats->writes));
 		dirty_write_hit_pct =
-		EIO_CALCULATE_PERCENTAGE(atomic64_read(&stats->dirty_write_hits),
-			atomic64_read(&stats->writes));
+			EIO_CALCULATE_PERCENTAGE(
+				atomic64_read(&stats->dirty_write_hits),
+				atomic64_read(&stats->writes));
 	} else {
 		write_hit_pct = 0;
 		dirty_write_hit_pct = 0;
@@ -1809,7 +1800,7 @@ static int eio_stats_show(struct seq_file *seq, void *v)
  */
 static int eio_stats_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, &eio_stats_show, PDE(inode)->data);
+	return single_open(file, &eio_stats_show, PDE_DATA(inode));
 }
 
 /*
@@ -1842,7 +1833,7 @@ static int eio_errors_show(struct seq_file *seq, void *v)
  */
 static int eio_errors_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, &eio_errors_show, PDE(inode)->data);
+	return single_open(file, &eio_errors_show, PDE_DATA(inode));
 }
 
 /*
@@ -1877,7 +1868,7 @@ static int eio_iosize_hist_show(struct seq_file *seq, void *v)
 static int eio_iosize_hist_open(struct inode *inode, struct file *file)
 {
 
-	return single_open(file, &eio_iosize_hist_show, PDE(inode)->data);
+	return single_open(file, &eio_iosize_hist_show, PDE_DATA(inode));
 }
 
 /*
@@ -1887,8 +1878,8 @@ static int eio_version_show(struct seq_file *seq, void *v)
 {
 	char buf[128];
 
-	memset(buf, 0, sizeof buf);
-	eio_version_query(sizeof buf, buf);
+	memset(buf, 0, sizeof(buf));
+	eio_version_query(sizeof(buf), buf);
 	seq_printf(seq, "%s\n", buf);
 
 	return 0;
@@ -1899,7 +1890,7 @@ static int eio_version_show(struct seq_file *seq, void *v)
  */
 static int eio_version_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, &eio_version_show, PDE(inode)->data);
+	return single_open(file, &eio_version_show, PDE_DATA(inode));
 }
 
 /*
@@ -1936,5 +1927,5 @@ static int eio_config_show(struct seq_file *seq, void *v)
 static int eio_config_open(struct inode *inode, struct file *file)
 {
 
-	return single_open(file, &eio_config_show, PDE(inode)->data);
+	return single_open(file, &eio_config_show, PDE_DATA(inode));
 }

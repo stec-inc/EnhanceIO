@@ -90,7 +90,7 @@ void eio_push_ssdread_failures(struct kcached_job *job)
 }
 
 static void
-eio_process_jobs(struct list_head *jobs, void (*fn)(struct kcached_job *))
+eio_process_jobs(struct list_head *jobs, void (*fn) (struct kcached_job *))
 {
 	struct kcached_job *job;
 
@@ -114,14 +114,13 @@ static void eio_process_ssd_rm_list(void)
 
 	while (!list_empty(&ssd_rm_list)) {
 		ssd_list_ptr =
-			list_entry(ssd_rm_list.next, struct ssd_rm_list, list);
+		    list_entry(ssd_rm_list.next, struct ssd_rm_list, list);
 		if (ssd_list_ptr->action == BUS_NOTIFY_DEL_DEVICE)
 			eio_suspend_caching(ssd_list_ptr->dmc,
 					    ssd_list_ptr->note);
 		else
-			pr_err
-				("eio_process_ssd_rm_list: Unknown status (0x%x)\n",
-				ssd_list_ptr->action);
+			pr_err("eio_process_ssd_rm_list:"
+			       "Unknown status (0x%x)\n", ssd_list_ptr->action);
 		list_del(&ssd_list_ptr->list);
 		kfree(ssd_list_ptr);
 	}
@@ -165,15 +164,16 @@ struct kcached_job *eio_new_job(struct cache_c *dmc, struct eio_bio *bio,
 		job->job_io_regions.cache.bdev = dmc->cache_dev->bdev;
 		if (bio) {
 			job->job_io_regions.cache.sector =
-				(index << dmc->block_shift) + dmc->md_sectors +
-				(bio->eb_sector -
-				 EIO_ROUND_SECTOR(dmc, bio->eb_sector));
-			EIO_ASSERT(eio_to_sector(bio->eb_size) <= dmc->block_size);
+			    (index << dmc->block_shift) + dmc->md_sectors +
+			    (bio->eb_sector -
+			     EIO_ROUND_SECTOR(dmc, bio->eb_sector));
+			EIO_ASSERT(eio_to_sector(bio->eb_size) <=
+				   dmc->block_size);
 			job->job_io_regions.cache.count =
-				eio_to_sector(bio->eb_size);
+			    eio_to_sector(bio->eb_size);
 		} else {
 			job->job_io_regions.cache.sector =
-				(index << dmc->block_shift) + dmc->md_sectors;
+			    (index << dmc->block_shift) + dmc->md_sectors;
 			job->job_io_regions.cache.count = dmc->block_size;
 		}
 	}
@@ -331,25 +331,23 @@ void eio_suspend_caching(struct cache_c *dmc, enum dev_notifier note)
 			 */
 			EIO_ASSERT(!CACHE_DEGRADED_IS_SET(dmc));
 			dmc->cache_flags |= CACHE_FLAGS_FAILED;
-			pr_info
-				("suspend caching: SSD Device Removed."
-				"Cache \"%s\" is in Failed mode.\n",
-				dmc->cache_name);
+			pr_info("suspend caching: SSD Device Removed.\
+				 Cache \"%s\" is in Failed mode.\n", dmc->cache_name);
 		} else {
 			if (CACHE_DEGRADED_IS_SET(dmc) ||
 			    CACHE_SSD_ADD_INPROG_IS_SET(dmc)) {
 				spin_unlock_irqrestore(&dmc->cache_spin_lock,
-						       dmc->cache_spin_lock_flags);
-				pr_err("suspend_caching: Cache "
-				       "\"%s\" is either degraded"
-				       "or device add in progress, exiting.\n",
-				       dmc->cache_name);
+						       dmc->
+						       cache_spin_lock_flags);
+				pr_err("suspend_caching: Cache \
+				       \"%s\" is either degraded \
+				       or device add in progress, exiting.\n", dmc->cache_name);
 				return;
 			}
 			dmc->cache_flags |= CACHE_FLAGS_DEGRADED;
 			atomic64_set(&dmc->eio_stats.cached_blocks, 0);
-			pr_info("suspend caching: Cache \"%s\" "
-				"is in Degraded mode.\n", dmc->cache_name);
+			pr_info("suspend caching: Cache \"%s\" \
+				is in Degraded mode.\n", dmc->cache_name);
 		}
 		dmc->eio_errors.no_cache_dev = 1;
 		break;
@@ -409,7 +407,7 @@ void eio_resume_caching(struct cache_c *dmc, char *dev)
 		    CACHE_SSD_ADD_INPROG_IS_SET(dmc)) {
 			pr_err("resume_caching: Cache \"%s\" "
 			       "is either in failed mode or "
-			       "cache device add in progress, ignoring. \n ",
+			       "cache device add in progress, ignoring.\n ",
 			       dmc->cache_name);
 			spin_unlock_irqrestore(&dmc->cache_spin_lock,
 					       dmc->cache_spin_lock_flags);
@@ -423,7 +421,7 @@ void eio_resume_caching(struct cache_c *dmc, char *dev)
 	r = eio_ctr_ssd_add(dmc, dev);
 	if (r) {
 		/* error */
-		pr_debug(" resume caching: returned error: %d \n ", r);
+		pr_debug(" resume caching: returned error: %d\n ", r);
 		spin_lock_irqsave(&dmc->cache_spin_lock,
 				  dmc->cache_spin_lock_flags);
 		dmc->cache_flags &= ~CACHE_FLAGS_SSD_ADD_INPROG;
