@@ -369,26 +369,48 @@ re_lookup:
 			origmfn = dmc1->origmfn;
 
 		/* I/O perfectly fit within cached partition */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+		if ((bio->bi_iter.bi_sector >= dmc1->dev_start_sect) &&
+		    ((bio->bi_iter.bi_sector + eio_to_sector(bio->bi_iter.bi_size) - 1) <=
+		     dmc1->dev_end_sect)) {
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 		if ((bio->bi_sector >= dmc1->dev_start_sect) &&
 		    ((bio->bi_sector + eio_to_sector(bio->bi_size) - 1) <=
 		     dmc1->dev_end_sect)) {
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 			EIO_ASSERT(overlap == 0);
 			dmc = dmc1;     /* found cached partition */
 			break;
 		}
 
 		/* Check if I/O is overlapping with cached partitions */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+		if (((bio->bi_iter.bi_sector >= dmc1->dev_start_sect) &&
+		     (bio->bi_iter.bi_sector <= dmc1->dev_end_sect)) ||
+		    ((bio->bi_iter.bi_sector + eio_to_sector(bio->bi_iter.bi_size) - 1 >=
+		      dmc1->dev_start_sect) &&
+		     (bio->bi_iter.bi_sector + eio_to_sector(bio->bi_iter.bi_size) - 1 <=
+		      dmc1->dev_end_sect))) {
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 		if (((bio->bi_sector >= dmc1->dev_start_sect) &&
 		     (bio->bi_sector <= dmc1->dev_end_sect)) ||
 		    ((bio->bi_sector + eio_to_sector(bio->bi_size) - 1 >=
 		      dmc1->dev_start_sect) &&
 		     (bio->bi_sector + eio_to_sector(bio->bi_size) - 1 <=
 		      dmc1->dev_end_sect))) {
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 			overlap = 1;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+			pr_err
+				("Overlapping I/O detected on %s cache at sector: %llu, size: %u\n",
+				dmc1->cache_name, (uint64_t)bio->bi_iter.bi_sector,
+				bio->bi_iter.bi_size);
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 			pr_err
 				("Overlapping I/O detected on %s cache at sector: %llu, size: %u\n",
 				dmc1->cache_name, (uint64_t)bio->bi_sector,
 				bio->bi_size);
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 			break;
 		}
 	}
@@ -410,14 +432,24 @@ re_lookup:
 		 * Map start of the partition to zero reference.
 		 */
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+		if (bio->bi_iter.bi_sector) {
+			EIO_ASSERT(bio->bi_iter.bi_sector >= dmc->dev_start_sect);
+			bio->bi_iter.bi_sector -= dmc->dev_start_sect;
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 		if (bio->bi_sector) {
 			EIO_ASSERT(bio->bi_sector >= dmc->dev_start_sect);
 			bio->bi_sector -= dmc->dev_start_sect;
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 		}
 		ret = eio_map(dmc, q, bio);
 		if (ret)
 			/* Error case: restore the start sector of bio */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+			bio->bi_iter.bi_sector += dmc->dev_start_sect;
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 			bio->bi_sector += dmc->dev_start_sect;
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 	}
 
 	if (!overlap)
@@ -644,11 +676,19 @@ static int eio_dispatch_io_pages(struct cache_c *dmc,
 			min_t(int, bio_get_nr_vecs(where->bdev), remaining_bvecs);
 		bio = bio_alloc(GFP_NOIO, num_bvecs);
 		bio->bi_bdev = where->bdev;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+		bio->bi_iter.bi_sector = where->sector + (where->count - remaining);
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 		bio->bi_sector = where->sector + (where->count - remaining);
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 
 		/* Remap the start sector of partition */
 		if (hddio)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+			bio->bi_iter.bi_sector += dmc->dev_start_sect;
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 			bio->bi_sector += dmc->dev_start_sect;
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 		bio->bi_rw |= rw;
 		bio->bi_end_io = eio_endio;
 		bio->bi_private = io;
@@ -708,11 +748,19 @@ static int eio_dispatch_io(struct cache_c *dmc, struct eio_io_region *where,
 			min_t(int, bio_get_nr_vecs(where->bdev), remaining_bvecs);
 		bio = bio_alloc(GFP_NOIO, num_bvecs);
 		bio->bi_bdev = where->bdev;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+		bio->bi_iter.bi_sector = where->sector + (where->count - remaining);
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 		bio->bi_sector = where->sector + (where->count - remaining);
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 
 		/* Remap the start sector of partition */
 		if (hddio)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+			bio->bi_iter.bi_sector += dmc->dev_start_sect;
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 			bio->bi_sector += dmc->dev_start_sect;
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 		bio->bi_rw |= rw;
 		bio->bi_end_io = eio_endio;
 		bio->bi_private = io;
@@ -864,7 +912,11 @@ void eio_process_zero_size_bio(struct cache_c *dmc, struct bio *origbio)
 	/* Extract bio flags from original bio */
 	rw_flags = origbio->bi_rw;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+	EIO_ASSERT(origbio->bi_iter.bi_size == 0);
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 	EIO_ASSERT(origbio->bi_size == 0);
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 	EIO_ASSERT(rw_flags != 0);
 
 	eio_issue_empty_barrier_flush(dmc->cache_dev->bdev, NULL,
@@ -1566,8 +1618,13 @@ static int eio_overlap_split_bio(struct request_queue *q, struct bio *bio)
 	unsigned bvec_idx;
 	unsigned bvec_consumed;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+	nbios = bio->bi_iter.bi_size >> SECTOR_SHIFT;
+	snum = bio->bi_iter.bi_sector;
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 	nbios = bio->bi_size >> SECTOR_SHIFT;
 	snum = bio->bi_sector;
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 
 	bioptr = kmalloc(nbios * (sizeof(void *)), GFP_KERNEL);
 	if (!bioptr) {
@@ -1585,7 +1642,11 @@ static int eio_overlap_split_bio(struct request_queue *q, struct bio *bio)
 	bc->bc_bio = bio;
 	bc->bc_error = 0;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+	bvec_idx = bio->bi_iter.bi_idx;
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 	bvec_idx = bio->bi_idx;
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 	bvec_consumed = 0;
 	for (i = 0; i < nbios; i++) {
 		bioptr[i] =
@@ -1639,12 +1700,21 @@ static struct bio *eio_split_new_bio(struct bio *bio, struct bio_container *bc,
 	cbio->bi_io_vec[0].bv_len = iosize;
 	*bvec_consumed += iosize;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+	cbio->bi_iter.bi_sector = snum;
+	cbio->bi_iter.bi_size = iosize;
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 	cbio->bi_sector = snum;
 	cbio->bi_size = iosize;
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 	cbio->bi_bdev = bio->bi_bdev;
 	cbio->bi_rw = bio->bi_rw;
 	cbio->bi_vcnt = 1;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+	cbio->bi_iter.bi_idx = 0;
+#else /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 	cbio->bi_idx = 0;
+#endif /* #else #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) */
 	cbio->bi_end_io = eio_split_endio;
 	cbio->bi_private = bc;
 	return cbio;
