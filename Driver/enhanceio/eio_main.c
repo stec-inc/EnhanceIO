@@ -2525,6 +2525,12 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 	if (unlikely(CACHE_DEGRADED_IS_SET(dmc))) {
 		EIO_ASSERT(dmc->mode != CACHE_MODE_WB);
 		force_uncached = 1;
+	} else if (data_dir == WRITE && dmc->mode == CACHE_MODE_RO) {
+		if (to_sector(bio->bi_size) != dmc->block_size)
+			atomic64_inc(&dmc->eio_stats.uncached_map_size);
+		else
+			atomic64_inc(&dmc->eio_stats.uncached_map_uncacheable);
+		force_uncached = 1;
 	}
 
 	/*
