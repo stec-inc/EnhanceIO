@@ -2611,7 +2611,11 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 		EIO_ASSERT(dmc->mode != CACHE_MODE_WB);
 		force_uncached = 1;
 	} else if (data_dir == WRITE && dmc->mode == CACHE_MODE_RO) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+		if (to_sector(bio->bi_iter.bi_size) != dmc->block_size)
+#else
 		if (to_sector(bio->bi_size) != dmc->block_size)
+#endif
 			atomic64_inc(&dmc->eio_stats.uncached_map_size);
 		else
 			atomic64_inc(&dmc->eio_stats.uncached_map_uncacheable);
