@@ -1676,11 +1676,10 @@ static int eio_stats_show(struct seq_file *seq, void *v)
 {
 	struct cache_c *dmc = seq->private;
 	struct eio_stats *stats = &dmc->eio_stats;
-	int read_hit_pct, write_hit_pct, dirty_write_hit_pct;
+	unsigned read_hit_pct, write_hit_pct, dirty_write_hit_pct;
 
 	if (atomic64_read(&stats->reads) > 0)
-		read_hit_pct =
-			EIO_CALCULATE_PERCENTAGE(
+		read_hit_pct = EIO_CALCULATE_PERCENTAGE(
 				atomic64_read(&stats->read_hits),
 				atomic64_read(&stats->reads));
 	else
@@ -1688,7 +1687,7 @@ static int eio_stats_show(struct seq_file *seq, void *v)
 
 	if (atomic64_read(&stats->writes) > 0) {
 		write_hit_pct =
-			EIO_CALCULATE_PERCENTAGE(
+		EIO_CALCULATE_PERCENTAGE(
 				atomic64_read(&stats->write_hits),
 				atomic64_read(&stats->writes));
 		dirty_write_hit_pct =
@@ -1707,7 +1706,7 @@ static int eio_stats_show(struct seq_file *seq, void *v)
 
 	seq_printf(seq, "%-26s %12lld\n", "read_hits",
 		   (int64_t)atomic64_read(&stats->read_hits));
-	seq_printf(seq, "%-26s %12d\n", "read_hit_pct", read_hit_pct);
+	seq_printf(seq, "%-26s %12u\n", "read_hit_pct", read_hit_pct);
 
 	seq_printf(seq, "%-26s %12lld\n", "write_hits",
 		   (int64_t)atomic64_read(&stats->write_hits));
@@ -1715,7 +1714,7 @@ static int eio_stats_show(struct seq_file *seq, void *v)
 
 	seq_printf(seq, "%-26s %12lld\n", "dirty_write_hits",
 		   (int64_t)atomic64_read(&stats->dirty_write_hits));
-	seq_printf(seq, "%-26s %12d\n", "dirty_write_hit_pct",
+	seq_printf(seq, "%-26s %12u\n", "dirty_write_hit_pct",
 		   dirty_write_hit_pct);
 
 	if ((int64_t)(atomic64_read(&stats->cached_blocks)) < 0)
