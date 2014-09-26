@@ -315,6 +315,7 @@ int eio_sb_store(struct cache_c *dmc)
 	sb->sbf.time_based_clean_interval =
 		cpu_to_le32(dmc->sysctl_active.time_based_clean_interval);
 	sb->sbf.autoclean_threshold = cpu_to_le32(dmc->sysctl_active.autoclean_threshold);
+	sb->sbf.cache_wronly = cpu_to_le32(dmc->sysctl_active.cache_wronly);
 
 	/* write out to ssd */
 	where.bdev = dmc->cache_dev->bdev;
@@ -1142,6 +1143,7 @@ static int eio_md_load(struct cache_c *dmc)
 		le32_to_cpu(header->sbf.dirty_set_high_threshold);
 	dmc->sysctl_active.dirty_set_low_threshold =
 		le32_to_cpu(header->sbf.dirty_set_low_threshold);
+	dmc->sysctl_active.cache_wronly = le32_to_cpu(header->sbf.cache_wronly);
 	dmc->sysctl_active.time_based_clean_interval =
 		le32_to_cpu(header->sbf.time_based_clean_interval);
 	dmc->sysctl_active.autoclean_threshold =

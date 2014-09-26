@@ -265,6 +265,7 @@ union eio_superblock {
 		__le32 dirty_low_threshold;
 		__le32 dirty_set_high_threshold;
 		__le32 dirty_set_low_threshold;
+		__le32 cache_wronly;
 		__le32 time_based_clean_interval;
 		__le32 autoclean_threshold;
 	} sbf;
@@ -666,6 +667,7 @@ struct eio_sysctl {
 	int32_t autoclean_threshold;
 	int32_t mem_limit_pct;
 	int32_t control;
+	int32_t cache_wronly;
 	u_int64_t invalidate;
 };
 

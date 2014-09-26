@@ -594,6 +594,69 @@ eio_dirty_set_low_threshold_sysctl(ctl_table *table, int write,
 	return 0;
 }
 
+static int
+eio_cache_wronly_sysctl(ctl_table *table, int write,
+				   void __user *buffer, size_t *length,
+				   loff_t *ppos)
+{
+	struct cache_c *dmc = (struct cache_c *)table->extra1;
+	unsigned long flags = 0;
+
+	/* fetch the new tunable value or post the existing value */
+
+	if (!write) {
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
+		dmc->sysctl_pending.cache_wronly =
+			dmc->sysctl_active.cache_wronly;
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
+	}
+
+	proc_dointvec(table, write, buffer, length, ppos);
+
+	/* do write processing */
+
+	if (write) {
+		int error;
+		uint32_t old_value;
+
+		/* do sanity check */
+
+		if (dmc->mode != CACHE_MODE_WB) {
+			pr_err
+				("cache_wronly is valid only for writeback cache");
+			return -EINVAL;
+		}
+
+		if (dmc->sysctl_pending.cache_wronly ==
+		    dmc->sysctl_active.cache_wronly)
+			/* new is same as old value. No need to take any action */
+			return 0;
+
+		/* update the active value with the new tunable value */
+		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
+		old_value = dmc->sysctl_active.cache_wronly;
+		dmc->sysctl_active.cache_wronly =
+			dmc->sysctl_pending.cache_wronly;
+		spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
+
+		/* apply the new tunable value */
+
+		/* Store the change persistently */
+		error = eio_sb_store(dmc);
+		if (error) {
+			/* restore back the old value and return error */
+			spin_lock_irqsave(&dmc->cache_spin_lock, flags);
+			dmc->sysctl_active.cache_wronly = old_value;
+			spin_unlock_irqrestore(&dmc->cache_spin_lock, flags);
+
+			return error;
+		}
+	}
+
+	return 0;
+}
+
+
 /*
  * eio_autoclean_threshold_sysctl
  */
@@ -1085,7 +1148,7 @@ static struct sysctl_table_common {
 	},
 };
 
-#define NUM_WRITEBACK_SYSCTLS   7
+#define NUM_WRITEBACK_SYSCTLS   8
 
 static struct sysctl_table_writeback {
 	struct ctl_table_header *sysctl_header;
@@ -1133,6 +1196,12 @@ static struct sysctl_table_writeback {
 			.maxlen		= sizeof(uint32_t),
 			.mode		= 0644,
 			.proc_handler	= &eio_dirty_set_low_threshold_sysctl,
+		}
+		, {		/* 8 */
+			.procname	= "cache_wronly",
+			.maxlen		= sizeof(uint32_t),
+			.mode		= 0644,
+			.proc_handler	= &eio_cache_wronly_sysctl,
 		}
 		,
 	}
@@ -1404,6 +1473,8 @@ static void *eio_find_sysctl_data(struct cache_c *dmc, ctl_table *vars)
 		return (void *)&dmc->sysctl_pending.dirty_set_high_threshold;
 	if (strcmp(vars->procname, "dirty_set_low_threshold") == 0)
 		return (void *)&dmc->sysctl_pending.dirty_set_low_threshold;
+	if (strcmp(vars->procname, "cache_wronly") == 0)
+		return (void *)&dmc->sysctl_pending.cache_wronly;
 	if (strcmp(vars->procname, "autoclean_threshold") == 0)
 		return (void *)&dmc->sysctl_pending.autoclean_threshold;
 	if (strcmp(vars->procname, "zero_stats") == 0)

@@ -2819,8 +2819,9 @@ static int eio_read_peek(struct cache_c *dmc, struct eio_bio *ebio)
 			goto out;
 		}
 
-		/* cache is marked readonly. Do not allow READFILL on SSD */
-		if (unlikely(dmc->cache_rdonly))
+		/* cache is marked readonly or set to wronly mode. */
+		/* Do not allow READFILL on SSD */
+		if (dmc->cache_rdonly || dmc->sysctl_active.cache_wronly)
 			goto out;
 
 		/*
@@ -2839,9 +2840,10 @@ static int eio_read_peek(struct cache_c *dmc, struct eio_bio *ebio)
 		goto out;
 	}
 	EIO_ASSERT(res == INVALID);
-
-	/* cache is marked readonly. Do not allow READFILL on SSD */
-	if (unlikely(dmc->cache_rdonly))
+	
+	/* cache is marked readonly or set to wronly mode. */
+	/* Do not allow READFILL on SSD */
+	if (dmc->cache_rdonly || dmc->sysctl_active.cache_wronly)
 		goto out;
 	/*
 	 * Found an invalid block to be used.
