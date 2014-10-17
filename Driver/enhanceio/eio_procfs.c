@@ -1083,6 +1083,9 @@ static struct sysctl_table_dir {
 	}, .dev	= {
 	}, .dir	= {
 		{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= PROC_SYS_DIR_NAME,
 			.maxlen		= 0,
 			.mode		= S_IRUGO | S_IXUGO,
@@ -1090,6 +1093,9 @@ static struct sysctl_table_dir {
 		},
 	}, .root = {
 		{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_DEV,
+#endif
 			.procname	= PROC_SYS_ROOT_NAME,
 			.maxlen		= 0,
 			.mode		= 0555,
@@ -1109,16 +1115,25 @@ static struct sysctl_table_common {
 } sysctl_template_common = {
 	.vars = {
 		{               /* 1 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= "zero_stats",
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.proc_handler	= &eio_zerostats_sysctl,
 		}, {            /* 2 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= "mem_limit_pct",
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.proc_handler	= &eio_mem_limit_pct_sysctl,
 		}, {            /* 3 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= "control",
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
@@ -1126,6 +1141,9 @@ static struct sysctl_table_common {
 		},
 	}, .dev	= {
 		{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= PROC_SYS_CACHE_NAME,
 			.maxlen		= 0,
 			.mode		= S_IRUGO | S_IXUGO,
@@ -1133,6 +1151,9 @@ static struct sysctl_table_common {
 		},
 	}, .dir	= {
 		{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= PROC_SYS_DIR_NAME,
 			.maxlen		= 0,
 			.mode		= S_IRUGO | S_IXUGO,
@@ -1140,6 +1161,9 @@ static struct sysctl_table_common {
 		},
 	}, .root = {
 		{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_DEV,
+#endif
 			.procname	= PROC_SYS_ROOT_NAME,
 			.maxlen		= 0,
 			.mode		= 0555,
@@ -1159,45 +1183,69 @@ static struct sysctl_table_writeback {
 } sysctl_template_writeback = {
 	.vars = {
 		{               /* 1 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= "do_clean",
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.proc_handler	= &eio_clean_sysctl,
 		}, {            /* 2 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= "time_based_clean_interval",
 			.maxlen		= sizeof(unsigned int),
 			.mode		= 0644,
 			.proc_handler	= &eio_time_based_clean_interval_sysctl,
 		}, {            /* 3 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= "autoclean_threshold",
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.proc_handler	= &eio_autoclean_threshold_sysctl,
 		}, {            /* 4 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= "dirty_high_threshold",
 			.maxlen		= sizeof(uint32_t),
 			.mode		= 0644,
 			.proc_handler	= &eio_dirty_high_threshold_sysctl,
 		}
 		, {             /* 5 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= "dirty_low_threshold",
 			.maxlen		= sizeof(uint32_t),
 			.mode		= 0644,
 			.proc_handler	= &eio_dirty_low_threshold_sysctl,
 		}
 		, {             /* 6 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= "dirty_set_high_threshold",
 			.maxlen		= sizeof(uint32_t),
 			.mode		= 0644,
 			.proc_handler	= &eio_dirty_set_high_threshold_sysctl,
 		}
 		, {             /* 7 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= "dirty_set_low_threshold",
 			.maxlen		= sizeof(uint32_t),
 			.mode		= 0644,
 			.proc_handler	= &eio_dirty_set_low_threshold_sysctl,
 		}
 		, {		/* 8 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= "cache_wronly",
 			.maxlen		= sizeof(uint32_t),
 			.mode		= 0644,
@@ -1207,6 +1255,9 @@ static struct sysctl_table_writeback {
 	}
 	, .dev = {
 		{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= PROC_SYS_CACHE_NAME,
 			.maxlen		= 0,
 			.mode		= S_IRUGO | S_IXUGO,
@@ -1216,6 +1267,9 @@ static struct sysctl_table_writeback {
 	}
 	, .dir = {
 		{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= PROC_SYS_DIR_NAME,
 			.maxlen		= 0,
 			.mode		= S_IRUGO | S_IXUGO,
@@ -1225,6 +1279,9 @@ static struct sysctl_table_writeback {
 	}
 	, .root	= {
 		{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_DEV,
+#endif
 			.procname	= PROC_SYS_ROOT_NAME,
 			.maxlen		= 0,
 			.mode		= 0555,
@@ -1245,6 +1302,9 @@ static struct sysctl_table_invalidate {
 } sysctl_template_invalidate = {
 	.vars = {
 		{	/* 1 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= "invalidate",
 			.maxlen		= sizeof(u_int64_t),
 			.mode		= 0644,
@@ -1254,6 +1314,9 @@ static struct sysctl_table_invalidate {
 	}
 	, .dev = {
 		{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= PROC_SYS_CACHE_NAME,
 			.maxlen		= 0,
 			.mode		= S_IRUGO | S_IXUGO,
@@ -1263,6 +1326,9 @@ static struct sysctl_table_invalidate {
 	}
 	, .dir = {
 		{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_UNNUMBERED,
+#endif
 			.procname	= PROC_SYS_DIR_NAME,
 			.maxlen		= 0,
 			.mode		= S_IRUGO | S_IXUGO,
@@ -1272,6 +1338,9 @@ static struct sysctl_table_invalidate {
 	}
 	, .root	= {
 		{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+			.ctl_name       = CTL_DEV,
+#endif
 			.procname	= PROC_SYS_ROOT_NAME,
 			.maxlen		= 0,
 			.mode		= 0555,

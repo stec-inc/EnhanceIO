@@ -24,10 +24,12 @@
 #include <stdint.h>
 #endif                          /* __KERNEL__ */
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0))
 static inline bool bio_rw_flagged(struct bio *bio, int flag)
 {
 	return (bio->bi_rw & flag) != 0;
 }
+#endif
 
 /*
  * Whether the cached (source) device is a partition or a whole device.

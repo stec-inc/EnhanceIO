@@ -36,7 +36,11 @@ static struct list_head eio_ttc_list[EIO_HASHTBL_SIZE];
 
 int eio_reboot_notified;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,0))
 static void eio_make_request_fn(struct request_queue *, struct bio *);
+#else
+static int eio_make_request_fn(struct request_queue *, struct bio *);
+#endif
 static void eio_cache_rec_fill(struct cache_c *, struct cache_rec_short *);
 static void eio_bio_end_empty_barrier(struct bio *, int);
 static void eio_issue_empty_barrier_flush(struct block_device *, struct bio *,
@@ -49,6 +53,28 @@ static int eio_overlap_split_bio(struct request_queue *, struct bio *);
 static struct bio *eio_split_new_bio(struct bio *, struct bio_container *,
 				     unsigned *, unsigned *, sector_t);
 static void eio_split_endio(struct bio *, int);
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
+#else
+struct block_device *blkdev_get_by_path(const char *path, fmode_t mode,
+					void *holder)
+{
+	struct block_device *bdev;
+	int err;
+
+	bdev = lookup_bdev(path);
+	if (IS_ERR(bdev))
+		return bdev;
+	err = blkdev_get(bdev, mode);
+	if (err)
+		return ERR_PTR(err);
+       if ((mode & FMODE_WRITE) && bdev_read_only(bdev)) {
+                blkdev_put(bdev, mode);
+		return ERR_PTR(-EACCES);
+	}
+	return bdev;
+}
+#endif
 
 static int eio_open(struct inode *ip, struct file *filp)
 {
@@ -335,7 +361,11 @@ void eio_ttc_init(void)
  * 4. Race condition:
  */
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,0))
 static void eio_make_request_fn(struct request_queue *q, struct bio *bio)
+#else
+static int eio_make_request_fn(struct request_queue *q, struct bio *bio)
+#endif
 {
 	int ret;
 	int overlap;
@@ -456,7 +486,11 @@ re_lookup:
 		up_read(&eio_ttc_lock[index]);
 
 	if (overlap || dmc)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,0))
 		return;
+#else
+		return 0;
+#endif
 
 	/*
 	 * Race condition:-
@@ -476,7 +510,12 @@ re_lookup:
 		goto re_lookup;
 
 	origmfn(q, bio);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,0))
 	return;
+#else
+	return 0;
+#endif
+
 }
 
 uint64_t eio_get_cache_count(void)
