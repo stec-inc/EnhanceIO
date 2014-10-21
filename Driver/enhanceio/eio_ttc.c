@@ -31,6 +31,11 @@
 #include <linux/miscdevice.h>
 #include "eio.h"
 #include "eio_ttc.h"
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,17,0))
+#define wait_on_bit_lock_action wait_on_bit_lock
+#endif
+
 static struct rw_semaphore eio_ttc_lock[EIO_HASHTBL_SIZE];
 static struct list_head eio_ttc_list[EIO_HASHTBL_SIZE];
 
@@ -1497,7 +1502,7 @@ int eio_reboot_handling(void)
 	if (eio_reboot_notified == EIO_REBOOT_HANDLING_DONE)
 		return 0;
 
-	(void)wait_on_bit_lock((void *)&eio_control->synch_flags,
+	(void)wait_on_bit_lock_action((void *)&eio_control->synch_flags,
 			       EIO_HANDLE_REBOOT, eio_wait_schedule,
 			       TASK_UNINTERRUPTIBLE);
 	if (eio_reboot_notified == EIO_REBOOT_HANDLING_DONE) {
