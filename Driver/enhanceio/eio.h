@@ -128,7 +128,11 @@ struct eio_control_s {
 	unsigned long synch_flags;
 };
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0))
+int eio_wait_schedule(struct wait_bit_key *unused);
+#else
 int eio_wait_schedule(void *unused);
+#endif
 
 struct eio_event {
 	struct task_struct *process;    /* handle of the sleeping process */
