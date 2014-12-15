@@ -101,6 +101,10 @@ int eio_wait_schedule(void *unused)
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,15,0))
+#define smp_mb__after_atomic smp_mb__after_clear_bit
+#endif
+
 /*
  * Check if the System RAM threshold > requested memory, don't care
  * if threshold is set to 0. Return value is 0 for fail and 1 for success.
@@ -1853,7 +1857,7 @@ init:
 	dmc->next_cache = cache_list_head;
 	cache_list_head = dmc;
 	clear_bit(EIO_UPDATE_LIST, (void *)&eio_control->synch_flags);
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_bit((void *)&eio_control->synch_flags, EIO_UPDATE_LIST);
 
 	prev_set = -1;
@@ -1918,7 +1922,7 @@ bad6:
 		nodepp = &((*nodepp)->next_cache);
 	}
 	clear_bit(EIO_UPDATE_LIST, (void *)&eio_control->synch_flags);
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_bit((void *)&eio_control->synch_flags, EIO_UPDATE_LIST);
 bad5:
 	eio_kcached_client_destroy(dmc);
@@ -2072,7 +2076,7 @@ force_delete:
 		nodepp = &((*nodepp)->next_cache);
 	}
 	clear_bit(EIO_UPDATE_LIST, &eio_control->synch_flags);
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_bit((void *)&eio_control->synch_flags, EIO_UPDATE_LIST);
 
 out:
@@ -2397,7 +2401,7 @@ eio_notify_reboot(struct notifier_block *this, unsigned long code, void *x)
 			       TASK_UNINTERRUPTIBLE);
 	if (eio_reboot_notified == EIO_REBOOT_HANDLING_DONE) {
 		clear_bit(EIO_HANDLE_REBOOT, (void *)&eio_control->synch_flags);
-		smp_mb__after_clear_bit();
+		smp_mb__after_atomic();
 		wake_up_bit((void *)&eio_control->synch_flags,
 			    EIO_HANDLE_REBOOT);
 		return NOTIFY_DONE;
@@ -2425,12 +2429,12 @@ eio_notify_reboot(struct notifier_block *this, unsigned long code, void *x)
 		eio_md_store(dmc);
 	}
 	clear_bit(EIO_UPDATE_LIST, (void *)&eio_control->synch_flags);
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_bit((void *)&eio_control->synch_flags, EIO_UPDATE_LIST);
 
 	eio_reboot_notified = EIO_REBOOT_HANDLING_DONE;
 	clear_bit(EIO_HANDLE_REBOOT, (void *)&eio_control->synch_flags);
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_bit((void *)&eio_control->synch_flags, EIO_HANDLE_REBOOT);
 	return NOTIFY_DONE;
 }

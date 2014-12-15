@@ -36,6 +36,11 @@
 #define wait_on_bit_lock_action wait_on_bit_lock
 #endif
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,15,0))
+#define smp_mb__after_atomic smp_mb__after_clear_bit
+#endif
+
+
 static struct rw_semaphore eio_ttc_lock[EIO_HASHTBL_SIZE];
 static struct list_head eio_ttc_list[EIO_HASHTBL_SIZE];
 
@@ -1507,7 +1512,7 @@ int eio_reboot_handling(void)
 			       TASK_UNINTERRUPTIBLE);
 	if (eio_reboot_notified == EIO_REBOOT_HANDLING_DONE) {
 		clear_bit(EIO_HANDLE_REBOOT, (void *)&eio_control->synch_flags);
-		smp_mb__after_clear_bit();
+		smp_mb__after_atomic();
 		wake_up_bit((void *)&eio_control->synch_flags,
 			    EIO_HANDLE_REBOOT);
 		return 0;
@@ -1609,7 +1614,7 @@ int eio_reboot_handling(void)
 
 	eio_reboot_notified = EIO_REBOOT_HANDLING_DONE;
 	clear_bit(EIO_HANDLE_REBOOT, (void *)&eio_control->synch_flags);
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_bit((void *)&eio_control->synch_flags, EIO_HANDLE_REBOOT);
 	return 0;
 }
