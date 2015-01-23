@@ -52,7 +52,7 @@ static struct sysctl_table_dir *sysctl_handle_dir;
  * eio_zerostats_sysctl
  */
 static int
-eio_zerostats_sysctl(ctl_table *table, int write, void __user *buffer,
+eio_zerostats_sysctl(struct ctl_table *table, int write, void __user *buffer,
 		     size_t *length, loff_t *ppos)
 {
 	struct cache_c *dmc = (struct cache_c *)table->extra1;
@@ -120,7 +120,7 @@ eio_zerostats_sysctl(ctl_table *table, int write, void __user *buffer,
  * - sets the eio sysctl mem_limit_pct value
  */
 static int
-eio_mem_limit_pct_sysctl(ctl_table *table, int write, void __user *buffer,
+eio_mem_limit_pct_sysctl(struct ctl_table *table, int write, void __user *buffer,
 			 size_t *length, loff_t *ppos)
 {
 	struct cache_c *dmc = (struct cache_c *)table->extra1;
@@ -167,7 +167,7 @@ eio_mem_limit_pct_sysctl(ctl_table *table, int write, void __user *buffer,
  * eio_clean_sysctl
  */
 static int
-eio_clean_sysctl(ctl_table *table, int write, void __user *buffer,
+eio_clean_sysctl(struct ctl_table *table, int write, void __user *buffer,
 		 size_t *length, loff_t *ppos)
 {
 	struct cache_c *dmc = (struct cache_c *)table->extra1;
@@ -249,7 +249,7 @@ eio_clean_sysctl(ctl_table *table, int write, void __user *buffer,
  * eio_dirty_high_threshold_sysctl
  */
 static int
-eio_dirty_high_threshold_sysctl(ctl_table *table, int write,
+eio_dirty_high_threshold_sysctl(struct ctl_table *table, int write,
 				void __user *buffer, size_t *length,
 				loff_t *ppos)
 {
@@ -331,7 +331,7 @@ eio_dirty_high_threshold_sysctl(ctl_table *table, int write,
  * eio_dirty_low_threshold_sysctl
  */
 static int
-eio_dirty_low_threshold_sysctl(ctl_table *table, int write,
+eio_dirty_low_threshold_sysctl(struct ctl_table *table, int write,
 			       void __user *buffer, size_t *length,
 			       loff_t *ppos)
 {
@@ -419,7 +419,7 @@ eio_dirty_low_threshold_sysctl(ctl_table *table, int write,
  * eio_dirty_set_high_threshold_sysctl
  */
 static int
-eio_dirty_set_high_threshold_sysctl(ctl_table *table, int write,
+eio_dirty_set_high_threshold_sysctl(struct ctl_table *table, int write,
 				    void __user *buffer, size_t *length,
 				    loff_t *ppos)
 {
@@ -505,7 +505,7 @@ eio_dirty_set_high_threshold_sysctl(ctl_table *table, int write,
  * eio_dirty_set_low_threshold_sysctl
  */
 static int
-eio_dirty_set_low_threshold_sysctl(ctl_table *table, int write,
+eio_dirty_set_low_threshold_sysctl(struct ctl_table *table, int write,
 				   void __user *buffer, size_t *length,
 				   loff_t *ppos)
 {
@@ -598,7 +598,7 @@ eio_dirty_set_low_threshold_sysctl(ctl_table *table, int write,
  * eio_autoclean_threshold_sysctl
  */
 static int
-eio_autoclean_threshold_sysctl(ctl_table *table, int write,
+eio_autoclean_threshold_sysctl(struct ctl_table *table, int write,
 			       void __user *buffer, size_t *length,
 			       loff_t *ppos)
 {
@@ -674,7 +674,7 @@ eio_autoclean_threshold_sysctl(ctl_table *table, int write,
  * eio_time_based_clean_interval_sysctl
  */
 static int
-eio_time_based_clean_interval_sysctl(ctl_table *table, int write,
+eio_time_based_clean_interval_sysctl(struct ctl_table *table, int write,
 				     void __user *buffer, size_t *length,
 				     loff_t *ppos)
 {
@@ -768,7 +768,7 @@ static void eio_sysctl_unregister_invalidate(struct cache_c *dmc);
  * eio_control_sysctl
  */
 int
-eio_control_sysctl(ctl_table *table, int write, void __user *buffer,
+eio_control_sysctl(struct ctl_table *table, int write, void __user *buffer,
 		   size_t *length, loff_t *ppos)
 {
 	int rv = 0;
@@ -929,10 +929,10 @@ eio_control_sysctl(ctl_table *table, int write, void __user *buffer,
 #define PROC_IOSZ_HIST          "io_hist"
 #define PROC_CONFIG             "config"
 
-static int eio_invalidate_sysctl(ctl_table *table, int write,
+static int eio_invalidate_sysctl(struct ctl_table *table, int write,
 				 void __user *buffer, size_t *length,
 				 loff_t *ppos);
-static void *eio_find_sysctl_data(struct cache_c *dmc, ctl_table *vars);
+static void *eio_find_sysctl_data(struct cache_c *dmc, struct ctl_table *vars);
 static char *eio_cons_sysctl_devname(struct cache_c *dmc);
 static char *eio_cons_procfs_cachename(struct cache_c *dmc,
 				       char *path_component);
@@ -1011,10 +1011,10 @@ static const struct file_operations eio_config_operations = {
  */
 static struct sysctl_table_dir {
 	struct ctl_table_header *sysctl_header;
-	ctl_table vars[0 + 1];
-	ctl_table dev[0 + 1];
-	ctl_table dir[1 + 1];
-	ctl_table root[1 + 1];
+	struct ctl_table vars[0 + 1];
+	struct ctl_table dev[0 + 1];
+	struct ctl_table dir[1 + 1];
+	struct ctl_table root[1 + 1];
 } sysctl_template_dir = {
 	.vars = {
 	}, .dev	= {
@@ -1039,10 +1039,10 @@ static struct sysctl_table_dir {
 
 static struct sysctl_table_common {
 	struct ctl_table_header *sysctl_header;
-	ctl_table vars[NUM_COMMON_SYSCTLS + 1];
-	ctl_table dev[1 + 1];
-	ctl_table dir[1 + 1];
-	ctl_table root[1 + 1];
+	struct ctl_table vars[NUM_COMMON_SYSCTLS + 1];
+	struct ctl_table dev[1 + 1];
+	struct ctl_table dir[1 + 1];
+	struct ctl_table root[1 + 1];
 } sysctl_template_common = {
 	.vars = {
 		{               /* 1 */
@@ -1089,10 +1089,10 @@ static struct sysctl_table_common {
 
 static struct sysctl_table_writeback {
 	struct ctl_table_header *sysctl_header;
-	ctl_table vars[NUM_WRITEBACK_SYSCTLS + 1];
-	ctl_table dev[1 + 1];
-	ctl_table dir[1 + 1];
-	ctl_table root[1 + 1];
+	struct ctl_table vars[NUM_WRITEBACK_SYSCTLS + 1];
+	struct ctl_table dev[1 + 1];
+	struct ctl_table dir[1 + 1];
+	struct ctl_table root[1 + 1];
 } sysctl_template_writeback = {
 	.vars = {
 		{               /* 1 */
@@ -1169,10 +1169,10 @@ static struct sysctl_table_writeback {
 #define NUM_INVALIDATE_SYSCTLS          (1)
 static struct sysctl_table_invalidate {
 	struct ctl_table_header *sysctl_header;
-	ctl_table vars[NUM_INVALIDATE_SYSCTLS + 1];
-	ctl_table dev[1 + 1];
-	ctl_table dir[1 + 1];
-	ctl_table root[1 + 1];
+	struct ctl_table vars[NUM_INVALIDATE_SYSCTLS + 1];
+	struct ctl_table dev[1 + 1];
+	struct ctl_table dir[1 + 1];
+	struct ctl_table root[1 + 1];
 } sysctl_template_invalidate = {
 	.vars = {
 		{	/* 1 */
@@ -1317,7 +1317,7 @@ static spinlock_t invalidate_spin_lock;
  * eio_invalidate_sysctl
  */
 static int
-eio_invalidate_sysctl(ctl_table *table, int write, void __user *buffer,
+eio_invalidate_sysctl(struct ctl_table *table, int write, void __user *buffer,
 		      size_t *length, loff_t *ppos)
 {
 	static int have_sector;
@@ -1389,7 +1389,7 @@ eio_invalidate_sysctl(ctl_table *table, int write, void __user *buffer,
 /*
  * eio_find_sysctl_data
  */
-static void *eio_find_sysctl_data(struct cache_c *dmc, ctl_table *vars)
+static void *eio_find_sysctl_data(struct cache_c *dmc, struct ctl_table *vars)
 {
 
 	if (strcmp(vars->procname, "do_clean") == 0)
