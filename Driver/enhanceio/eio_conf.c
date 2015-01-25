@@ -89,12 +89,21 @@ static struct notifier_block eio_ssd_rm_notifier = {
 	.priority	= 0,
 };
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0))
+int eio_wait_schedule(struct wait_bit_key *unused)
+#else
+#define wait_on_bit_lock_action wait_on_bit_lock
 int eio_wait_schedule(void *unused)
+#endif
 {
 
 	schedule();
 	return 0;
 }
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,15,0))
+#define smp_mb__after_atomic smp_mb__after_clear_bit
+#endif
 
 /*
  * Check if the System RAM threshold > requested memory, don't care
@@ -1844,13 +1853,13 @@ init:
 
 	dmc->sysctl_active.mem_limit_pct = 75;
 
-	(void)wait_on_bit_lock((void *)&eio_control->synch_flags,
+	(void)wait_on_bit_lock_action((void *)&eio_control->synch_flags,
 			       EIO_UPDATE_LIST, eio_wait_schedule,
 			       TASK_UNINTERRUPTIBLE);
 	dmc->next_cache = cache_list_head;
 	cache_list_head = dmc;
 	clear_bit(EIO_UPDATE_LIST, (void *)&eio_control->synch_flags);
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_bit((void *)&eio_control->synch_flags, EIO_UPDATE_LIST);
 
 	prev_set = -1;
@@ -1903,7 +1912,7 @@ bad6:
 	vfree((void *)dmc->cache_sets);
 	vfree((void *)EIO_CACHE(dmc));
 
-	(void)wait_on_bit_lock((void *)&eio_control->synch_flags,
+	(void)wait_on_bit_lock_action((void *)&eio_control->synch_flags,
 			       EIO_UPDATE_LIST, eio_wait_schedule,
 			       TASK_UNINTERRUPTIBLE);
 	nodepp = &cache_list_head;
@@ -1915,7 +1924,7 @@ bad6:
 		nodepp = &((*nodepp)->next_cache);
 	}
 	clear_bit(EIO_UPDATE_LIST, (void *)&eio_control->synch_flags);
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_bit((void *)&eio_control->synch_flags, EIO_UPDATE_LIST);
 bad5:
 	eio_kcached_client_destroy(dmc);
@@ -2057,7 +2066,7 @@ force_delete:
 	vfree((void *)dmc->cache_sets);
 	eio_ttc_put_device(&dmc->disk_dev);
 	eio_put_cache_device(dmc);
-	(void)wait_on_bit_lock((void *)&eio_control->synch_flags,
+	(void)wait_on_bit_lock_action((void *)&eio_control->synch_flags,
 			       EIO_UPDATE_LIST, eio_wait_schedule,
 			       TASK_UNINTERRUPTIBLE);
 	nodepp = &cache_list_head;
@@ -2069,7 +2078,7 @@ force_delete:
 		nodepp = &((*nodepp)->next_cache);
 	}
 	clear_bit(EIO_UPDATE_LIST, &eio_control->synch_flags);
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_bit((void *)&eio_control->synch_flags, EIO_UPDATE_LIST);
 
 out:
@@ -2389,12 +2398,12 @@ eio_notify_reboot(struct notifier_block *this, unsigned long code, void *x)
 	if (eio_reboot_notified == EIO_REBOOT_HANDLING_DONE)
 		return NOTIFY_DONE;
 
-	(void)wait_on_bit_lock((void *)&eio_control->synch_flags,
+	(void)wait_on_bit_lock_action((void *)&eio_control->synch_flags,
 			       EIO_HANDLE_REBOOT, eio_wait_schedule,
 			       TASK_UNINTERRUPTIBLE);
 	if (eio_reboot_notified == EIO_REBOOT_HANDLING_DONE) {
 		clear_bit(EIO_HANDLE_REBOOT, (void *)&eio_control->synch_flags);
-		smp_mb__after_clear_bit();
+		smp_mb__after_atomic();
 		wake_up_bit((void *)&eio_control->synch_flags,
 			    EIO_HANDLE_REBOOT);
 		return NOTIFY_DONE;
@@ -2402,7 +2411,7 @@ eio_notify_reboot(struct notifier_block *this, unsigned long code, void *x)
 	EIO_ASSERT(eio_reboot_notified == 0);
 	eio_reboot_notified = EIO_REBOOT_HANDLING_INPROG;
 
-	(void)wait_on_bit_lock((void *)&eio_control->synch_flags,
+	(void)wait_on_bit_lock_action((void *)&eio_control->synch_flags,
 			       EIO_UPDATE_LIST, eio_wait_schedule,
 			       TASK_UNINTERRUPTIBLE);
 	for (dmc = cache_list_head; dmc != NULL; dmc = dmc->next_cache) {
@@ -2422,12 +2431,12 @@ eio_notify_reboot(struct notifier_block *this, unsigned long code, void *x)
 		eio_md_store(dmc);
 	}
 	clear_bit(EIO_UPDATE_LIST, (void *)&eio_control->synch_flags);
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_bit((void *)&eio_control->synch_flags, EIO_UPDATE_LIST);
 
 	eio_reboot_notified = EIO_REBOOT_HANDLING_DONE;
 	clear_bit(EIO_HANDLE_REBOOT, (void *)&eio_control->synch_flags);
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_bit((void *)&eio_control->synch_flags, EIO_HANDLE_REBOOT);
 	return NOTIFY_DONE;
 }
