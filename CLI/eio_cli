@@ -572,6 +572,11 @@ def create_parser():
 			          required=True, help="name of the ssd device")
 	parser_sanity.add_argument("-d", action="store", dest="hdd",\
 				  required=True, help="name of the source device")
+
+	#disable
+	parser_disable = parser.add_parser('disable', help='used to disable cache')
+	parser_disable.add_argument("-c", action="store", dest="cache", required=True)
+
 	return mainparser
 
 def main():
@@ -629,6 +634,10 @@ def main():
 				mode = args.mode, blksize = args.blksize, persistence = 1)
 
 		cache.do_eio_ioctl(EIO_IOC_ENABLE)
+
+	elif sys.argv[1] == "disable":
+		cache = Cache_rec(name = args.cache)
+		cache.do_eio_ioctl(EIO_IOC_DISABLE)
 
 	elif sys.argv[1] == "notify":
 		# This command will be fired by udev rule on SSD/Source addition
