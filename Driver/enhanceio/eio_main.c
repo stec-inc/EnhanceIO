@@ -1468,7 +1468,6 @@ static void eio_post_mdupdate(struct work_struct *work)
 /* Enqueue metadata update for marking dirty blocks on-disk/in-core */
 static void eio_enq_mdupdate(struct bio_container *bc)
 {
-	unsigned long flags = 0;
 	index_t set_index;
 	struct eio_bio *ebio;
 	struct cache_c *dmc = bc->bc_dmc;
@@ -1483,7 +1482,7 @@ static void eio_enq_mdupdate(struct bio_container *bc)
 		if (ebio->eb_cacheset != set_index) {
 			set_index = ebio->eb_cacheset;
 			set = &dmc->cache_sets[set_index];
-			spin_lock_irqsave(&set->cs_lock, flags);
+			spin_lock(&set->cs_lock);
 		}
 		EIO_ASSERT(ebio->eb_cacheset == set_index);
 
@@ -1510,7 +1509,7 @@ static void eio_enq_mdupdate(struct bio_container *bc)
 
 		ebio = bc->bc_mdlist;
 		if (!ebio || ebio->eb_cacheset != set_index) {
-			spin_unlock_irqrestore(&set->cs_lock, flags);
+			spin_unlock(&set->cs_lock);
 			if (do_schedule) {
 				INIT_WORK(&mdreq->work, eio_do_mdupdate);
 				queue_work(dmc->mdupdate_q, &mdreq->work);
@@ -1530,7 +1529,6 @@ void eio_md_write(struct kcached_job *job)
 	struct eio_bio *pebio;
 	struct bio_container *bc = ebio->eb_bc;
 	unsigned long flags;
-	int enqueue = 0;
 
 	/*
 	 * ebios are stored in ascending order of cache sets.
@@ -1553,13 +1551,10 @@ void eio_md_write(struct kcached_job *job)
 		pebio->eb_next = ebio;
 	bc->bc_mdwait--;
 	if (bc->bc_mdwait == 0)
-		enqueue = 1;
+		eio_enq_mdupdate(bc);
 	spin_unlock_irqrestore(&bc->bc_lock, flags);
 
 	eio_free_cache_job(job);
-
-	if (enqueue)
-		eio_enq_mdupdate(bc);
 }
 
 /* Ensure cache level dirty thresholds compliance. If required, trigger cache-wide clean */
