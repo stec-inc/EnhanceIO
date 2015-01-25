@@ -839,7 +839,7 @@ struct job_io_regions {
 #define GET_BIO_FLAGS(ebio)             ((ebio)->eb_bc->bc_bio->bi_rw)
 #define VERIFY_BIO_FLAGS(ebio)          EIO_ASSERT((ebio) && (ebio)->eb_bc && (ebio)->eb_bc->bc_bio)
 
-#if (RHEL_MAJOR == 6)
+#if defined(RHEL_MAJOR) && (RHEL_MAJOR == 6)
 #define SET_BARRIER_FLAGS(rw_flags) (rw_flags |= (REQ_WRITE | BIO_FLUSH))
 #else
 #define SET_BARRIER_FLAGS(rw_flags) (rw_flags |= (REQ_WRITE | REQ_FLUSH))

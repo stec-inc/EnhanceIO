@@ -595,7 +595,7 @@ eio_dirty_set_low_threshold_sysctl(struct ctl_table *table, int write,
 }
 
 static int
-eio_cache_wronly_sysctl(ctl_table *table, int write,
+eio_cache_wronly_sysctl(struct ctl_table *table, int write,
 				   void __user *buffer, size_t *length,
 				   loff_t *ppos)
 {
