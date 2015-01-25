@@ -1392,7 +1392,7 @@ int eio_alloc_wb_bvecs(struct bio_vec *bvec, int max, int blksize)
 
 			if ((i % 2) == 0) {
 				/* Allocate page only for even bio vector */
-				page = alloc_page(GFP_KERNEL | __GFP_ZERO);
+				page = alloc_page(GFP_NOIO | __GFP_ZERO);
 				if (unlikely(!page)) {
 					pr_err
 						("eio_alloc_wb_bvecs: System memory too low.\n");
@@ -1417,7 +1417,7 @@ int eio_alloc_wb_bvecs(struct bio_vec *bvec, int max, int blksize)
 
 		case BLKSIZE_4K:
 		case BLKSIZE_8K:
-			page = alloc_page(GFP_KERNEL | __GFP_ZERO);
+			page = alloc_page(GFP_NOIO | __GFP_ZERO);
 			if (unlikely(!page)) {
 				pr_err("eio_alloc_wb_bvecs:" \
 				       " System memory too low.\n");
