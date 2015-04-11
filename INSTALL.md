@@ -22,6 +22,9 @@ Run following commands as **root**
 
         make && make install
 
+    The use of `sudo` is currently not supported and will fail with error
+    `No rule to make target `arch/x86/syscalls/syscall_32.tbl', needed by `arch/x86/syscalls/../include/generated/asm/syscalls_32.h'.  Stop.`.
+
   4. manually load modules by running
   
         modprobe enhanceio_fifo
