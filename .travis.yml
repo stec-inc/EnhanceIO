@@ -1,0 +1,7 @@
+language: c
+sudo: true
+
+script:
+  - cd Driver/enhanceio/
+  - make -j16
+  - sudo make install
