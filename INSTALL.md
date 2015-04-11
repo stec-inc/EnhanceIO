@@ -10,7 +10,8 @@ Run following commands as **root**
 
   1. `eio_cli` installation
 
-        cp CLI/eio_cli /sbin/ chmod 700 CLI/eio_cli	
+        cp CLI/eio_cli /sbin/
+        chmod 700 /sbin/eio_cli
 
   2. Man page
     Copy the `eio_cli.8` file under the `man8` subdirectory of the `man` directory
