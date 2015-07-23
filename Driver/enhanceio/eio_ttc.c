@@ -1089,30 +1089,6 @@ int eio_cache_edit(char *cache_name, u_int32_t mode, u_int32_t policy)
 		restart_async_task = 1;
 	}
 
-	/* Wait for nr_dirty to drop to zero */
-	if (dmc->mode == CACHE_MODE_WB && mode != CACHE_MODE_WB) {
-		if (CACHE_FAILED_IS_SET(dmc)) {
-			pr_err
-				("cache_edit:  Can not proceed with edit for Failed cache \"%s\".",
-				dmc->cache_name);
-			error = -EINVAL;
-			goto out;
-		}
-
-		error = eio_finish_nrdirty(dmc);
-		/* This error can mostly occur due to Device removal */
-		if (unlikely(error)) {
-			pr_err
-				("cache_edit: nr_dirty FAILED to finish for cache \"%s\".",
-				dmc->cache_name);
-			goto out;
-		}
-		EIO_ASSERT((dmc->sysctl_active.do_clean & EIO_CLEAN_KEEP) &&
-			   !(dmc->sysctl_active.do_clean & EIO_CLEAN_START));
-		EIO_ASSERT(dmc->sysctl_active.fast_remove ||
-			   (atomic64_read(&dmc->nr_dirty) == 0));
-	}
-
 	index = EIO_HASH_BDEV(dmc->disk_dev->bdev->bd_contains->bd_dev);
 	down_write(&eio_ttc_lock[index]);
 
