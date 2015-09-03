@@ -654,7 +654,7 @@ def main():
 			elif args.hdd:
 				cache = Cache_rec(name = args.cache,\
 						ssd_name = args.hdd, persistence = 1)
-				cache.do_eio_ioctl(EIO_IOC_HDD_ADD)
+				cache.do_eio_ioctl(EIO_IOC_SRC_ADD)
 
 		elif args.action == "remove":
 			if args.ssd:
@@ -664,7 +664,7 @@ def main():
 			elif args.hdd:
 				cache = Cache_rec(name = args.cache, hdd_name = args.hdd,\
 						persistence = 1)
-				cache.do_eio_ioctl(EIO_HDD_REMOVE)
+				cache.do_eio_ioctl(EIO_SRC_REMOVE)
 
 		pass
 
