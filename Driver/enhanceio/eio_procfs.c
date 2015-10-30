@@ -35,18 +35,8 @@
 #endif                          /* !ENHANCEIO_GIT_COMMIT_HASH */
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 9, 0))
-#define PROC_CREATE(ent, name, mode, parent, fops, data)         \
-	(ent = proc_create_data(name, mode, parent, fops, data))
 #define KPDE_DATA(idxnode)       PDE_DATA(idxnode)
 #else
-#define PROC_CREATE(ent, name, mode, parent, fops, data)         \
-do {                                                             \
-	ent = create_proc_entry(name, mode, parent)              \
-	if (ent) {                                               \
-		ent->proc_fops = &fops;                          \
-		ent->data = data;                                \
-	}                                                        \
-} while (0)
 #define KPDE_DATA(idxnode)       PDE(idxnode)->data
 #endif
 
@@ -1238,8 +1228,8 @@ void eio_module_procfs_init(void)
 	struct proc_dir_entry *entry;
 
 	if (proc_mkdir(PROC_STR, NULL)) {
-		PROC_CREATE(entry, PROC_VER_STR, 0, NULL,
-			&eio_version_operations, NULL);
+		entry = proc_create_data(PROC_VER_STR, 0, NULL,
+				&eio_version_operations, NULL);
 	}
 	eio_sysctl_register_dir();
 }
@@ -1272,19 +1262,19 @@ void eio_procfs_ctr(struct cache_c *dmc)
 	}
 
 	s = eio_cons_procfs_cachename(dmc, PROC_STATS);
-	PROC_CREATE(entry, s, 0, NULL, &eio_stats_operations, dmc);
+	entry = proc_create_data(s, 0, NULL, &eio_stats_operations, dmc);
 	kfree(s);
 
 	s = eio_cons_procfs_cachename(dmc, PROC_ERRORS);
-	PROC_CREATE(entry, s, 0, NULL, &eio_errors_operations, dmc);
+	entry = proc_create_data(s, 0, NULL, &eio_errors_operations, dmc);
 	kfree(s);
 
 	s = eio_cons_procfs_cachename(dmc, PROC_IOSZ_HIST);
-	PROC_CREATE(entry, s, 0, NULL, &eio_iosize_hist_operations, dmc);
+	entry = proc_create_data(s, 0, NULL, &eio_iosize_hist_operations, dmc);
 	kfree(s);
 
 	s = eio_cons_procfs_cachename(dmc, PROC_CONFIG);
-	PROC_CREATE(entry, s, 0, NULL, &eio_config_operations, dmc);
+	entry = proc_create_data(s, 0, NULL, &eio_config_operations, dmc);
 	kfree(s);
 
 	eio_sysctl_register_common(dmc);
