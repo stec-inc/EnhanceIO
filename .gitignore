@@ -1,1 +1,15 @@
+# git related
 *.orig
+
+# C related
+*.o
+*.ko
+*.o.cmd
+*.ko.cmd
+Driver/enhanceio/.tmp_versions/
+Driver/enhanceio/Module.symvers
+Driver/enhanceio/enhanceio.mod.c
+Driver/enhanceio/enhanceio_fifo.mod.c
+Driver/enhanceio/enhanceio_lru.mod.c
+Driver/enhanceio/enhanceio_rand.mod.c
+Driver/enhanceio/modules.order
