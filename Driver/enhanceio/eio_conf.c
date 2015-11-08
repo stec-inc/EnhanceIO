@@ -1431,7 +1431,11 @@ static void eio_init_ssddev_props(struct cache_c *dmc)
 
 	rq = bdev_get_queue(dmc->cache_dev->bdev);
 	max_hw_sectors = to_bytes(queue_max_hw_sectors(rq)) / PAGE_SIZE;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0))
+	max_nr_pages = BIO_MAX_PAGES;
+#else
 	max_nr_pages = (u_int32_t)bio_get_nr_vecs(dmc->cache_dev->bdev);
+#endif
 	nr_pages = min_t(u_int32_t, max_hw_sectors, max_nr_pages);
 	dmc->bio_nr_pages = nr_pages;
 

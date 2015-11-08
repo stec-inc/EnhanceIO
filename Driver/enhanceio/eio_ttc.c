@@ -683,7 +683,13 @@ static int eio_dispatch_io_pages(struct cache_c *dmc,
 		/* Verify that num_vecs should not cross the threshhold */
 		/* Check how many max bvecs bdev supports */
 		num_bvecs =
-			min_t(int, bio_get_nr_vecs(where->bdev), remaining_bvecs);
+			min_t(int,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0))
+                            BIO_MAX_PAGES,
+#else
+                            bio_get_nr_vecs(where->bdev),
+#endif
+                            remaining_bvecs);
 		bio = bio_alloc(GFP_NOIO, num_bvecs);
 		bio->bi_bdev = where->bdev;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
@@ -755,7 +761,13 @@ static int eio_dispatch_io(struct cache_c *dmc, struct eio_io_region *where,
 		/* Verify that num_vecs should not cross the threshhold */
 		/* Check how many max bvecs bdev supports */
 		num_bvecs =
-			min_t(int, bio_get_nr_vecs(where->bdev), remaining_bvecs);
+			min_t(int,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0))
+                            BIO_MAX_PAGES,
+#else
+                            bio_get_nr_vecs(where->bdev),
+#endif
+                            remaining_bvecs);
 		bio = bio_alloc(GFP_NOIO, num_bvecs);
 		bio->bi_bdev = where->bdev;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
