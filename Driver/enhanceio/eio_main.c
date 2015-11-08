@@ -109,7 +109,7 @@ static void bc_put(struct bio_container *bc, unsigned int doneio)
 		else
 			atomic64_add(elapsed, &dmc->eio_stats.wrtime_ms);
 
-		bio_endio(bc->bc_bio, bc->bc_error);
+		eio_bio_endio(bc->bc_bio, bc->bc_error);
 		atomic64_dec(&bc->bc_dmc->nr_ios);
 		kfree(bc);
 	}
@@ -2558,7 +2558,7 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 			(unsigned long)bio->bi_sector,
 			(int)eio_to_sector(bio->bi_size));
 #endif 
-		bio_endio(bio, 0);
+		eio_bio_endio(bio, 0);
 		pr_err
 			("eio_map: I/O with Discard flag received. Discard flag is not supported.\n");
 		return 0;
@@ -2566,7 +2566,7 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 
 	if (unlikely(dmc->cache_rdonly)) {
 		if (data_dir != READ) {
-			bio_endio(bio, -EPERM);
+			eio_bio_endio(bio, -EPERM);
 			pr_debug
 				("eio_map: cache is read only, write not permitted\n");
 			return 0;
@@ -2601,7 +2601,7 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 		/* Source device is not available. */
 		CTRACE
 			("eio_map:2 source device is not present. Cache is in Failed state\n");
-		bio_endio(bio, -ENODEV);
+		eio_bio_endio(bio, -ENODEV);
 		bio = NULL;
 		return DM_MAPIO_SUBMITTED;
 	}
@@ -2639,7 +2639,7 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 
 	bc = kzalloc(sizeof(struct bio_container), GFP_NOWAIT);
 	if (!bc) {
-		bio_endio(bio, -ENOMEM);
+		eio_bio_endio(bio, -ENOMEM);
 		return DM_MAPIO_SUBMITTED;
 	}
 	bc->bc_iotime = jiffies;
@@ -2670,7 +2670,7 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 		 */
 		ret = eio_acquire_set_locks(dmc, bc);
 		if (ret) {
-			bio_endio(bio, ret);
+			eio_bio_endio(bio, ret);
 			kfree(bc);
 			return DM_MAPIO_SUBMITTED;
 		}

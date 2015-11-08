@@ -24,6 +24,15 @@
 #include <stdint.h>
 #endif                          /* __KERNEL__ */
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0))
+static inline void eio_bio_endio(struct bio *bio, int err) {
+  if (err) bio->bi_error = err;
+  bio_endio(bio);
+}
+#else
+#define eio_bio_endio bio_endio
+#endif
+
 static inline bool bio_rw_flagged(struct bio *bio, int flag)
 {
 	return (bio->bi_rw & flag) != 0;
