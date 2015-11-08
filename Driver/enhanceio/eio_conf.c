@@ -2566,7 +2566,7 @@ static int __init eio_init(void)
 
 	r = eio_jobs_init();
 	if (r) {
-		(void)eio_delete_misc_device();
+		eio_delete_misc_device();
 		return r;
 	}
 	atomic_set(&nr_cache_jobs, 0);
@@ -2576,7 +2576,7 @@ static int __init eio_init(void)
 	eio_control = kmalloc(sizeof(*eio_control), GFP_KERNEL);
 	if (eio_control == NULL) {
 		pr_err("init: Cannot allocate memory for eio_control");
-		(void)eio_delete_misc_device();
+		eio_delete_misc_device();
 		return -ENOMEM;
 	}
 	eio_control->synch_flags = 0;
@@ -2585,7 +2585,7 @@ static int __init eio_init(void)
 	r = bus_register_notifier(&scsi_bus_type, &eio_ssd_rm_notifier);
 	if (r) {
 		pr_err("init: bus register notifier failed %d", r);
-		(void)eio_delete_misc_device();
+		eio_delete_misc_device();
 	}
 	return r;
 }
@@ -2610,7 +2610,7 @@ static void eio_exit(void)
 		kfree(eio_control);
 		eio_control = NULL;
 	}
-	(void)eio_delete_misc_device();
+	eio_delete_misc_device();
 }
 
 /*

@@ -106,7 +106,7 @@ enum eio_cache_state {
  */
 
 extern int eio_create_misc_device(void);
-extern int eio_delete_misc_device(void);
+extern void eio_delete_misc_device(void);
 
 extern int eio_ttc_get_device(const char *, fmode_t, struct eio_bdev **);
 extern void eio_ttc_put_device(struct eio_bdev **);

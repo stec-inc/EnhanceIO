@@ -91,9 +91,9 @@ int eio_create_misc_device()
 	return misc_register(&eio_misc);
 }
 
-int eio_delete_misc_device()
+void eio_delete_misc_device()
 {
-	return misc_deregister(&eio_misc);
+	misc_deregister(&eio_misc);
 }
 
 int eio_ttc_get_device(const char *path, fmode_t mode, struct eio_bdev **result)
