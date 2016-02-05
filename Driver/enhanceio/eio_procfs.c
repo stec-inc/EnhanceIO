@@ -1255,11 +1255,12 @@ void eio_procfs_ctr(struct cache_c *dmc)
 
 	s = eio_cons_procfs_cachename(dmc, "");
 	entry = proc_mkdir(s, NULL);
-	kfree(s);
 	if (entry == NULL) {
 		pr_err("Failed to create /proc/%s", s);
+		kfree(s);
 		return;
 	}
+	kfree(s);
 
 	s = eio_cons_procfs_cachename(dmc, PROC_STATS);
 	entry = proc_create_data(s, 0, NULL, &eio_stats_operations, dmc);
