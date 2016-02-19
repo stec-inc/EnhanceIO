@@ -34,7 +34,14 @@
 #define ENHANCEIO_GIT_COMMIT_HASH "unknown-git-version"
 #endif                          /* !ENHANCEIO_GIT_COMMIT_HASH */
 
-int eio_version_query(size_t buf_sz, char *bufp)
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 9, 0))
+#define KPDE_DATA(idxnode)       PDE_DATA(idxnode)
+#else
+#define KPDE_DATA(idxnode)       PDE(idxnode)->data
+#endif
+
+int
+eio_version_query(size_t buf_sz, char *bufp)
 {
 	if (unlikely(buf_sz == 0) || unlikely(bufp == NULL))
 		return -EINVAL;
@@ -1386,11 +1393,12 @@ void eio_procfs_ctr(struct cache_c *dmc)
 
 	s = eio_cons_procfs_cachename(dmc, "");
 	entry = proc_mkdir(s, NULL);
-	kfree(s);
 	if (entry == NULL) {
 		pr_err("Failed to create /proc/%s", s);
+		kfree(s);
 		return;
 	}
+	kfree(s);
 
 	s = eio_cons_procfs_cachename(dmc, PROC_STATS);
 	entry = proc_create_data(s, 0, NULL, &eio_stats_operations, dmc);
@@ -1940,7 +1948,7 @@ static int eio_stats_show(struct seq_file *seq, void *v)
  */
 static int eio_stats_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, &eio_stats_show, PDE_DATA(inode));
+	return single_open(file, &eio_stats_show, KPDE_DATA(inode));
 }
 
 /*
@@ -1973,7 +1981,7 @@ static int eio_errors_show(struct seq_file *seq, void *v)
  */
 static int eio_errors_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, &eio_errors_show, PDE_DATA(inode));
+	return single_open(file, &eio_errors_show, KPDE_DATA(inode));
 }
 
 /*
@@ -2008,7 +2016,7 @@ static int eio_iosize_hist_show(struct seq_file *seq, void *v)
 static int eio_iosize_hist_open(struct inode *inode, struct file *file)
 {
 
-	return single_open(file, &eio_iosize_hist_show, PDE_DATA(inode));
+	return single_open(file, &eio_iosize_hist_show, KPDE_DATA(inode));
 }
 
 /*
@@ -2030,7 +2038,7 @@ static int eio_version_show(struct seq_file *seq, void *v)
  */
 static int eio_version_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, &eio_version_show, PDE_DATA(inode));
+	return single_open(file, &eio_version_show, KPDE_DATA(inode));
 }
 
 /*
@@ -2067,5 +2075,5 @@ static int eio_config_show(struct seq_file *seq, void *v)
 static int eio_config_open(struct inode *inode, struct file *file)
 {
 
-	return single_open(file, &eio_config_show, PDE_DATA(inode));
+	return single_open(file, &eio_config_show, KPDE_DATA(inode));
 }
