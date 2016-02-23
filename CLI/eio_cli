@@ -198,6 +198,12 @@ def make_udev_match_expr(dev_path, cache_name):
 		match_expr= 'ENV{DM_NAME}!="' + cache_name + \
 		'", ENV{ID_FS_UUID}=="' + dict_udev["ID_FS_UUID"] + '"'
 		return match_expr
+		
+	# Fall through, use device names only
+	if dict_udev["DEVTYPE"] == "disk":
+		match_expr='KERNEL=="'+ dev_path.split('/')[-1] + \
+		'", ENV{DEVTYPE}=="'+ dict_udev["DEVTYPE"] +'"'
+		return match_expr
 
 
 def run_cmd(cmd):
