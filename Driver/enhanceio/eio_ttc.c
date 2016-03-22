@@ -122,6 +122,37 @@ int eio_delete_misc_device()
 	return misc_deregister(&eio_misc);
 }
 
+
+/* In newer kernels, calling the queue's make_request_fn() always submits
+ * the IO. In older kernels however, there is a possibility for the request
+ * function to return 1 and expect us to handle the IO redirection (see raid0
+ * implementation in kernel 2.6.32). We must check the return value
+ * and potentionally resubmit the IO.
+ */
+static inline
+void hdd_make_request(make_request_fn *origmfn, struct bio *bio)
+{
+	struct request_queue *q = NULL;
+	int ret;
+	
+	q = bdev_get_queue(bio->bi_bdev);
+	if (unlikely(!q)) {
+		pr_err("EIO: Trying to access nonexistent block-device\n");
+		bio_endio(bio, -EIO);
+		return;
+	}
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,0))
+	origmfn(q, bio);
+#else
+	ret = origmfn(q, bio);
+	if (ret) {
+		generic_make_request(bio);
+	}
+#endif
+}
+
+
 int eio_ttc_get_device(const char *path, fmode_t mode, struct eio_bdev **result)
 {
 	struct block_device *bdev;
@@ -519,7 +550,7 @@ re_lookup:
 	if (origmfn == eio_make_request_fn)
 		goto re_lookup;
 
-	origmfn(q, bio);
+	hdd_make_request(origmfn, bio);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,0))
 	return;
 #else
@@ -759,7 +790,7 @@ static int eio_dispatch_io_pages(struct cache_c *dmc,
 
 		atomic_inc(&io->count);
 		if (hddio)
-			dmc->origmfn(bdev_get_queue(bio->bi_bdev), bio);
+			hdd_make_request(dmc->origmfn, bio);
 
 		else
 			submit_bio(rw, bio);
@@ -832,7 +863,7 @@ static int eio_dispatch_io(struct cache_c *dmc, struct eio_io_region *where,
 
 		atomic_inc(&io->count);
 		if (hddio)
-			dmc->origmfn(bdev_get_queue(bio->bi_bdev), bio);
+			hdd_make_request(dmc->origmfn, bio);
 		else
 			submit_bio(rw, bio);
 
@@ -1000,7 +1031,7 @@ static void eio_issue_empty_barrier_flush(struct block_device *bdev,
 
 	bio_get(bio);
 	if (device == EIO_HDD_DEVICE)
-		origmfn(bdev_get_queue(bio->bi_bdev), bio);
+		hdd_make_request(origmfn, bio);
 
 	else
 		submit_bio(0, bio);
