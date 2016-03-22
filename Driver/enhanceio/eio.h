@@ -43,6 +43,7 @@
 #include <linux/hash.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
+#include <linux/completion.h>
 #include <linux/pagemap.h>
 #include <linux/random.h>
 #include <linux/hardirq.h>
@@ -576,13 +577,16 @@ struct mdupdate_request {
 
 #define SETFLAG_CLEAN_INPROG    0x00000001      /* clean in progress on a set */
 #define SETFLAG_CLEAN_WHOLE     0x00000002      /* clean the set fully */
+#define SETFLAG_CLEAN_ACTIVE    0x00000004      /* cache set is being cleaned up */
 
 /* Structure used for doing operations and storing cache set level info */
 struct cache_set {
 	struct list_head list;
 	u_int32_t nr_dirty;             /* number of dirty blocks */
 	spinlock_t cs_lock;             /* spin lock to protect struct fields */
-	struct rw_semaphore rw_lock;    /* reader-writer lock used for clean */
+	atomic_t pending;               /* pending I/Os on cache set */
+	struct completion clean_done;   /* Clean operation on set has been completed */
+	struct completion io_done;      /* all IO operations on set have been completed */
 	unsigned int flags;             /* misc cache set specific flags */
 	struct mdupdate_request *mdreq; /* metadata update request pointer */
 };
@@ -890,7 +894,8 @@ struct bio_container {
 
 /* structure used as callback context during synchronous I/O */
 struct sync_io_context {
-	struct rw_semaphore sio_lock;
+	atomic_t pending;
+	struct completion done;
 	unsigned long sio_error;
 };
 
