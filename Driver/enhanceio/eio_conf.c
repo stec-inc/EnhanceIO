@@ -1594,6 +1594,7 @@ int eio_cache_create(struct cache_rec_short *cache)
 		}
 	}
 
+	spin_lock_init(&dmc->cache_spin_lock);
 	/*
 	 * We need to determine the requested cache mode before we call
 	 * eio_md_load becuase it examines dmc->mode. The cache mode is
@@ -1774,7 +1775,6 @@ int eio_cache_create(struct cache_rec_short *cache)
 	dmc->sysctl_active.time_based_clean_interval =
 		TIME_BASED_CLEAN_INTERVAL_DEF(dmc);
 
-	spin_lock_init(&dmc->cache_spin_lock);
 	if (persistence == CACHE_CREATE) {
 		error = eio_md_create(dmc, /* force */ 0, /* cold */ 1);
 		if (error) {
@@ -2569,6 +2569,7 @@ static int __init eio_init(void)
 	}
 	atomic_set(&nr_cache_jobs, 0);
 	INIT_WORK(&_kcached_wq, eio_do_work);
+	spin_lock_init(&ssd_rm_list_lock);
 
 	eio_module_procfs_init();
 	eio_control = kmalloc(sizeof(*eio_control), GFP_KERNEL);
