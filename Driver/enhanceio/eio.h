@@ -43,6 +43,7 @@
 #include <linux/hash.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
+#include <linux/completion.h>
 #include <linux/pagemap.h>
 #include <linux/random.h>
 #include <linux/hardirq.h>
@@ -269,6 +270,7 @@ union eio_superblock {
 		__le32 dirty_low_threshold;
 		__le32 dirty_set_high_threshold;
 		__le32 dirty_set_low_threshold;
+		__le32 cache_wronly;
 		__le32 time_based_clean_interval;
 		__le32 autoclean_threshold;
 	} sbf;
@@ -575,13 +577,16 @@ struct mdupdate_request {
 
 #define SETFLAG_CLEAN_INPROG    0x00000001      /* clean in progress on a set */
 #define SETFLAG_CLEAN_WHOLE     0x00000002      /* clean the set fully */
+#define SETFLAG_CLEAN_ACTIVE    0x00000004      /* cache set is being cleaned up */
 
 /* Structure used for doing operations and storing cache set level info */
 struct cache_set {
 	struct list_head list;
 	u_int32_t nr_dirty;             /* number of dirty blocks */
 	spinlock_t cs_lock;             /* spin lock to protect struct fields */
-	struct rw_semaphore rw_lock;    /* reader-writer lock used for clean */
+	atomic_t pending;               /* pending I/Os on cache set */
+	struct completion clean_done;   /* Clean operation on set has been completed */
+	struct completion io_done;      /* all IO operations on set have been completed */
 	unsigned int flags;             /* misc cache set specific flags */
 	struct mdupdate_request *mdreq; /* metadata update request pointer */
 };
@@ -670,6 +675,7 @@ struct eio_sysctl {
 	int32_t autoclean_threshold;
 	int32_t mem_limit_pct;
 	int32_t control;
+	int32_t cache_wronly;
 	u_int64_t invalidate;
 };
 
@@ -837,7 +843,11 @@ struct job_io_regions {
 #define GET_BIO_FLAGS(ebio)             ((ebio)->eb_bc->bc_bio->bi_rw)
 #define VERIFY_BIO_FLAGS(ebio)          EIO_ASSERT((ebio) && (ebio)->eb_bc && (ebio)->eb_bc->bc_bio)
 
+#if defined(RHEL_MAJOR) && (RHEL_MAJOR == 6)
+#define SET_BARRIER_FLAGS(rw_flags) (rw_flags |= (REQ_WRITE | BIO_FLUSH))
+#else
 #define SET_BARRIER_FLAGS(rw_flags) (rw_flags |= (REQ_WRITE | REQ_FLUSH))
+#endif
 
 struct eio_bio {
 	int eb_iotype;
@@ -884,7 +894,8 @@ struct bio_container {
 
 /* structure used as callback context during synchronous I/O */
 struct sync_io_context {
-	struct rw_semaphore sio_lock;
+	atomic_t pending;
+	struct completion done;
 	unsigned long sio_error;
 };
 
@@ -1152,3 +1163,21 @@ extern sector_t eio_get_device_start_sect(struct eio_bdev *);
 #define EIO_CACHE(dmc)          (EIO_MD8(dmc) ? (void *)dmc->cache_md8 : (void *)dmc->cache)
 
 #endif                          /* !EIO_INC_H */
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
+static inline long atomic64_dec_if_positive(atomic64_t *v)
+{
+	long c, old, dec;
+	c = atomic64_read(v);
+	for (;;) {
+		dec = c - 1;
+		if (unlikely(dec < 0))
+			 break;
+		 old = atomic64_cmpxchg((v), c, dec);
+		if (likely(old == c))
+			break;
+		c = old;
+	}
+	return dec;
+}
+#endif

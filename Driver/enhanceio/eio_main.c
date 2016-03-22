@@ -1468,7 +1468,6 @@ static void eio_post_mdupdate(struct work_struct *work)
 /* Enqueue metadata update for marking dirty blocks on-disk/in-core */
 static void eio_enq_mdupdate(struct bio_container *bc)
 {
-	unsigned long flags = 0;
 	index_t set_index;
 	struct eio_bio *ebio;
 	struct cache_c *dmc = bc->bc_dmc;
@@ -1483,7 +1482,7 @@ static void eio_enq_mdupdate(struct bio_container *bc)
 		if (ebio->eb_cacheset != set_index) {
 			set_index = ebio->eb_cacheset;
 			set = &dmc->cache_sets[set_index];
-			spin_lock_irqsave(&set->cs_lock, flags);
+			spin_lock(&set->cs_lock);
 		}
 		EIO_ASSERT(ebio->eb_cacheset == set_index);
 
@@ -1510,7 +1509,7 @@ static void eio_enq_mdupdate(struct bio_container *bc)
 
 		ebio = bc->bc_mdlist;
 		if (!ebio || ebio->eb_cacheset != set_index) {
-			spin_unlock_irqrestore(&set->cs_lock, flags);
+			spin_unlock(&set->cs_lock);
 			if (do_schedule) {
 				INIT_WORK(&mdreq->work, eio_do_mdupdate);
 				queue_work(dmc->mdupdate_q, &mdreq->work);
@@ -1530,7 +1529,6 @@ void eio_md_write(struct kcached_job *job)
 	struct eio_bio *pebio;
 	struct bio_container *bc = ebio->eb_bc;
 	unsigned long flags;
-	int enqueue = 0;
 
 	/*
 	 * ebios are stored in ascending order of cache sets.
@@ -1553,13 +1551,10 @@ void eio_md_write(struct kcached_job *job)
 		pebio->eb_next = ebio;
 	bc->bc_mdwait--;
 	if (bc->bc_mdwait == 0)
-		enqueue = 1;
+		eio_enq_mdupdate(bc);
 	spin_unlock_irqrestore(&bc->bc_lock, flags);
 
 	eio_free_cache_job(job);
-
-	if (enqueue)
-		eio_enq_mdupdate(bc);
 }
 
 /* Ensure cache level dirty thresholds compliance. If required, trigger cache-wide clean */
@@ -2309,6 +2304,7 @@ static int eio_acquire_set_locks(struct cache_c *dmc, struct bio_container *bc)
 	index_t i;
 	struct set_seq *cur_seq;
 	struct set_seq *next_seq;
+	unsigned long flags;
 	int error;
 
 	/*
@@ -2376,10 +2372,29 @@ static int eio_acquire_set_locks(struct cache_c *dmc, struct bio_container *bc)
 	}
 
 	/* Acquire read locks on the sets in the set span */
-	for (cur_seq = bc->bc_setspan; cur_seq; cur_seq = cur_seq->next)
-		for (i = cur_seq->first_set; i <= cur_seq->last_set; i++)
-			down_read(&dmc->cache_sets[i].rw_lock);
-
+	for (cur_seq = bc->bc_setspan; cur_seq; cur_seq = cur_seq->next) {
+		for (i = cur_seq->first_set; i <= cur_seq->last_set; i++) {
+			struct cache_set *set = &dmc->cache_sets[i];
+			spin_lock_irqsave(&set->cs_lock, flags);
+			if (set->flags & SETFLAG_CLEAN_ACTIVE) {
+				spin_unlock_irqrestore(&set->cs_lock, flags);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+				wait_for_completion_io(&set->clean_done);
+#else
+				wait_for_completion(&set->clean_done);
+#endif
+				spin_lock_irqsave(&set->cs_lock, flags);
+			}
+			atomic_inc(&set->pending);
+			if (atomic_read(&set->pending) == 1)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0))
+				reinit_completion(&(set->io_done));
+#else
+				INIT_COMPLETION(set->io_done);
+#endif
+			spin_unlock_irqrestore(&set->cs_lock, flags);
+		}
+	}
 	return 0;
 
 err_out:
@@ -2484,9 +2499,12 @@ eio_release_io_resources(struct cache_c *dmc, struct bio_container *bc)
 	struct set_seq *next_seq;
 
 	/* Release read locks on the sets in the set span */
-	for (cur_seq = bc->bc_setspan; cur_seq; cur_seq = cur_seq->next)
-		for (i = cur_seq->first_set; i <= cur_seq->last_set; i++)
-			up_read(&dmc->cache_sets[i].rw_lock);
+	for (cur_seq = bc->bc_setspan; cur_seq; cur_seq = cur_seq->next) {
+		for (i = cur_seq->first_set; i <= cur_seq->last_set; i++) {
+			if (atomic_dec_and_test(&dmc->cache_sets[i].pending))
+				complete(&dmc->cache_sets[i].io_done);
+		}
+	}
 
 	/* Free the seqs in the set span, unless it is single span */
 	if (bc->bc_setspan != &bc->bc_singlesspan) {
@@ -2546,7 +2564,11 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 
 	pr_debug("this needs to be removed immediately\n");
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
 	if (bio_rw_flagged(bio, REQ_DISCARD)) {
+#else
+	if (bio_rw_flagged(bio, BIO_DISCARD)) {
+#endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
 		pr_debug
 			("eio_map: Discard IO received. Invalidate incore start=%lu totalsectors=%d.\n",
@@ -2637,7 +2659,7 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 
 	/* Create a bio container */
 
-	bc = kzalloc(sizeof(struct bio_container), GFP_NOWAIT);
+	bc = kzalloc(sizeof(struct bio_container), GFP_NOWAIT | GFP_NOIO);
 	if (!bc) {
 		bio_endio(bio, -ENOMEM);
 		return DM_MAPIO_SUBMITTED;
@@ -2819,8 +2841,9 @@ static int eio_read_peek(struct cache_c *dmc, struct eio_bio *ebio)
 			goto out;
 		}
 
-		/* cache is marked readonly. Do not allow READFILL on SSD */
-		if (unlikely(dmc->cache_rdonly))
+		/* cache is marked readonly or set to wronly mode. */
+		/* Do not allow READFILL on SSD */
+		if (dmc->cache_rdonly || dmc->sysctl_active.cache_wronly)
 			goto out;
 
 		/*
@@ -2839,9 +2862,10 @@ static int eio_read_peek(struct cache_c *dmc, struct eio_bio *ebio)
 		goto out;
 	}
 	EIO_ASSERT(res == INVALID);
-
-	/* cache is marked readonly. Do not allow READFILL on SSD */
-	if (unlikely(dmc->cache_rdonly))
+	
+	/* cache is marked readonly or set to wronly mode. */
+	/* Do not allow READFILL on SSD */
+	if (dmc->cache_rdonly || dmc->sysctl_active.cache_wronly)
 		goto out;
 	/*
 	 * Found an invalid block to be used.
@@ -3238,7 +3262,8 @@ static void eio_sync_io_callback(int error, void *context)
 
 	if (error)
 		sioc->sio_error = error;
-	up_read(&sioc->sio_lock);
+	if (atomic_dec_and_test(&sioc->pending))
+		complete(&sioc->done);
 }
 
 /*
@@ -3332,7 +3357,24 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 	end_index = start_index + dmc->assoc;
 
 	/* 1. exclusive lock. Let the ongoing writes to finish. Pause new writes */
-	down_write(&dmc->cache_sets[set].rw_lock);
+	spin_lock_irqsave(&dmc->cache_sets[set].cs_lock, flags);
+	dmc->cache_sets[set].flags |= SETFLAG_CLEAN_ACTIVE;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0))
+	reinit_completion(&dmc->cache_sets[set].clean_done);
+#else
+	INIT_COMPLETION(dmc->cache_sets[set].clean_done);
+#endif
+	spin_unlock_irqrestore(&dmc->cache_sets[set].cs_lock, flags);
+
+	/* wait for any pending IO */
+	if (atomic_read(&dmc->cache_sets[set].pending)) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+		wait_for_completion_io(&dmc->cache_sets[set].io_done);
+#else
+		wait_for_completion(&dmc->cache_sets[set].io_done);
+#endif
+	}
+	/* now, no new IO can begin and all pending IOs have been processed */
 
 	/* 2. Return if there are no dirty blocks to clean */
 	if (dmc->cache_sets[set].nr_dirty == 0)
@@ -3361,7 +3403,8 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 
 	/* 4. read cache set data */
 
-	init_rwsem(&sioc.sio_lock);
+	atomic_set(&sioc.pending, 1);
+	init_completion(&sioc.done);
 	sioc.sio_error = 0;
 
 	for (i = start_index; i < end_index; i++) {
@@ -3391,14 +3434,14 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 
 			SECTOR_STATS(dmc->eio_stats.ssd_reads,
 				     to_bytes(where.count));
-			down_read(&sioc.sio_lock);
+			atomic_inc(&sioc.pending);
 			error =
 				eio_io_async_bvec(dmc, &where, READ, bvecs,
 						  nr_bvecs, eio_sync_io_callback,
 						  &sioc, 0);
 			if (error) {
 				sioc.sio_error = error;
-				up_read(&sioc.sio_lock);
+				atomic_dec(&sioc.pending);
 			}
 
 			bvecs = NULL;
@@ -3413,9 +3456,13 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 	eio_unplug_cache_device(dmc);
 
 	/* wait for all I/Os to complete and release sync lock */
-	down_write(&sioc.sio_lock);
-	up_write(&sioc.sio_lock);
-
+	if (!atomic_dec_and_test(&sioc.pending)) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+		wait_for_completion_io(&sioc.done);
+#else
+		wait_for_completion(&sioc.done);
+#endif
+	}
 	error = sioc.sio_error;
 	if (error)
 		goto err_out3;
@@ -3426,6 +3473,12 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 	 * BIO_RW_SYNC flag to hint higher priority for these
 	 * I/Os.
 	 */
+	atomic_set(&sioc.pending, 1);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0))
+	reinit_completion(&sioc.done);
+#else
+	INIT_COMPLETION(sioc.done);
+#endif
 	for (i = start_index; i < end_index; i++) {
 		if (EIO_CACHE_STATE_GET(dmc, i) == CLEAN_INPROG) {
 
@@ -3444,7 +3497,7 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 
 			SECTOR_STATS(dmc->eio_stats.disk_writes,
 				     to_bytes(where.count));
-			down_read(&sioc.sio_lock);
+			atomic_inc(&sioc.pending);
 			error = eio_io_async_bvec(dmc, &where, WRITE | REQ_SYNC,
 						  bvecs, nr_bvecs,
 						  eio_sync_io_callback, &sioc,
@@ -3452,15 +3505,20 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 
 			if (error) {
 				sioc.sio_error = error;
-				up_read(&sioc.sio_lock);
+				atomic_dec(&sioc.pending);
 			}
 			bvecs = NULL;
 		}
 	}
 
 	/* wait for all I/Os to complete and release sync lock */
-	down_write(&sioc.sio_lock);
-	up_write(&sioc.sio_lock);
+	if (!atomic_dec_and_test(&sioc.pending)) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+		wait_for_completion_io(&sioc.done);
+#else
+		wait_for_completion(&sioc.done);
+#endif
+	}
 
 	error = sioc.sio_error;
 	if (error)
@@ -3541,7 +3599,10 @@ err_out3:
 
 err_out2:
 
-	up_write(&dmc->cache_sets[set].rw_lock);
+	spin_lock_irqsave(&dmc->cache_sets[set].cs_lock, flags);
+	dmc->cache_sets[set].flags &= ~SETFLAG_CLEAN_ACTIVE;
+	spin_unlock_irqrestore(&dmc->cache_sets[set].cs_lock, flags);
+	complete_all(&dmc->cache_sets[set].clean_done);
 
 err_out1:
 
