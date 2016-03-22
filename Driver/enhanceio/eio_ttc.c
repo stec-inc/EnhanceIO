@@ -489,7 +489,11 @@ re_lookup:
 	if (unlikely(overlap)) {
 		up_read(&eio_ttc_lock[index]);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
 		if (bio_rw_flagged(bio, REQ_DISCARD)) {
+#else
+		if (bio_rw_flagged(bio, BIO_DISCARD)) {
+#endif
 			pr_err
 				("eio_mfn: Overlap I/O with Discard flag." \
 				" Discard flag is not supported.\n");

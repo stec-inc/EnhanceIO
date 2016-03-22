@@ -2564,7 +2564,11 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 
 	pr_debug("this needs to be removed immediately\n");
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
 	if (bio_rw_flagged(bio, REQ_DISCARD)) {
+#else
+	if (bio_rw_flagged(bio, BIO_DISCARD)) {
+#endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
 		pr_debug
 			("eio_map: Discard IO received. Invalidate incore start=%lu totalsectors=%d.\n",
