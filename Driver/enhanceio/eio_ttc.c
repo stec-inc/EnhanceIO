@@ -52,7 +52,11 @@ static void eio_make_request_fn(struct request_queue *, struct bio *);
 static int eio_make_request_fn(struct request_queue *, struct bio *);
 #endif
 static void eio_cache_rec_fill(struct cache_c *, struct cache_rec_short *);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0))
+static void eio_bio_end_empty_barrier(struct bio *);
+#else
 static void eio_bio_end_empty_barrier(struct bio *, int);
+#endif
 static void eio_issue_empty_barrier_flush(struct block_device *, struct bio *,
 					  int, make_request_fn *, int rw_flags);
 static int eio_finish_nrdirty(struct cache_c *);
@@ -62,7 +66,11 @@ static int eio_policy_switch(struct cache_c *, u_int32_t);
 static int eio_overlap_split_bio(struct request_queue *, struct bio *);
 static struct bio *eio_split_new_bio(struct bio *, struct bio_container *,
 				     unsigned *, unsigned *, sector_t);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0))
+static void eio_split_endio(struct bio *);
+#else
 static void eio_split_endio(struct bio *, int);
+#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
 #else
@@ -117,9 +125,9 @@ int eio_create_misc_device()
 	return misc_register(&eio_misc);
 }
 
-int eio_delete_misc_device()
+void eio_delete_misc_device()
 {
-	return misc_deregister(&eio_misc);
+	misc_deregister(&eio_misc);
 }
 
 
@@ -497,7 +505,7 @@ re_lookup:
 			pr_err
 				("eio_mfn: Overlap I/O with Discard flag." \
 				" Discard flag is not supported.\n");
-			bio_endio(bio, -EOPNOTSUPP);
+			eio_bio_endio(bio, -EOPNOTSUPP);
 		} else
 			ret = eio_overlap_split_bio(q, bio);
 	} else if (dmc) {       /* found cached partition or device */
@@ -725,8 +733,14 @@ static void eio_dec_count(struct eio_context *io, int error)
 	}
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0))
+static void eio_endio(struct bio *bio)
+{
+	int error = bio->bi_error;
+#else
 static void eio_endio(struct bio *bio, int error)
 {
+#endif
 	struct eio_context *io;
 
 	io = bio->bi_private;
@@ -757,7 +771,13 @@ static int eio_dispatch_io_pages(struct cache_c *dmc,
 		/* Verify that num_vecs should not cross the threshhold */
 		/* Check how many max bvecs bdev supports */
 		num_bvecs =
-			min_t(int, bio_get_nr_vecs(where->bdev), remaining_bvecs);
+			min_t(int,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0))
+                            BIO_MAX_PAGES,
+#else
+                            bio_get_nr_vecs(where->bdev),
+#endif
+                            remaining_bvecs);
 		bio = bio_alloc(GFP_NOIO, num_bvecs);
 		bio->bi_bdev = where->bdev;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
@@ -829,7 +849,13 @@ static int eio_dispatch_io(struct cache_c *dmc, struct eio_io_region *where,
 		/* Verify that num_vecs should not cross the threshhold */
 		/* Check how many max bvecs bdev supports */
 		num_bvecs =
-			min_t(int, bio_get_nr_vecs(where->bdev), remaining_bvecs);
+			min_t(int,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0))
+                            BIO_MAX_PAGES,
+#else
+                            bio_get_nr_vecs(where->bdev),
+#endif
+                            remaining_bvecs);
 		bio = bio_alloc(GFP_NOIO, num_bvecs);
 		bio->bi_bdev = where->bdev;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
@@ -1009,10 +1035,16 @@ void eio_process_zero_size_bio(struct cache_c *dmc, struct bio *origbio)
 				      EIO_HDD_DEVICE, dmc->origmfn, rw_flags);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0))
+static void eio_bio_end_empty_barrier(struct bio *bio)
+{
+	int err = bio->bi_error;
+#else
 static void eio_bio_end_empty_barrier(struct bio *bio, int err)
 {
+#endif
 	if (bio->bi_private)
-		bio_endio(bio->bi_private, err);
+		eio_bio_endio(bio->bi_private, err);
 	bio_put(bio);
 	return;
 }
@@ -1027,7 +1059,7 @@ static void eio_issue_empty_barrier_flush(struct block_device *bdev,
 	bio = bio_alloc(GFP_KERNEL, 0);
 	if (!bio)
 		if (orig_bio)
-			bio_endio(orig_bio, -ENOMEM);
+			eio_bio_endio(orig_bio, -ENOMEM);
 	bio->bi_end_io = eio_bio_end_empty_barrier;
 	bio->bi_private = orig_bio;
 	bio->bi_bdev = bdev;
@@ -1712,12 +1744,12 @@ static int eio_overlap_split_bio(struct request_queue *q, struct bio *bio)
 
 	bioptr = kmalloc(nbios * (sizeof(void *)), GFP_KERNEL);
 	if (!bioptr) {
-		bio_endio(bio, -ENOMEM);
+		eio_bio_endio(bio, -ENOMEM);
 		return 0;
 	}
 	bc = kmalloc(sizeof(struct bio_container), GFP_NOWAIT);
 	if (!bc) {
-		bio_endio(bio, -ENOMEM);
+		eio_bio_endio(bio, -ENOMEM);
 		kfree(bioptr);
 		return 0;
 	}
@@ -1745,7 +1777,7 @@ static int eio_overlap_split_bio(struct request_queue *q, struct bio *bio)
 	if (i < nbios) {
 		for (i--; i >= 0; i--)
 			bio_put(bioptr[i]);
-		bio_endio(bio, -ENOMEM);
+		eio_bio_endio(bio, -ENOMEM);
 		kfree(bc);
 		goto out;
 	}
@@ -1804,15 +1836,21 @@ static struct bio *eio_split_new_bio(struct bio *bio, struct bio_container *bc,
 	return cbio;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0))
+static void eio_split_endio(struct bio *bio)
+{
+	int error = bio->bi_error;
+#else
 static void eio_split_endio(struct bio *bio, int error)
 {
+#endif
 	struct bio_container *bc = bio->bi_private;
 
 	if (error)
 		bc->bc_error = error;
 	bio_put(bio);
 	if (atomic_dec_and_test(&bc->bc_holdcount)) {
-		bio_endio(bc->bc_bio, bc->bc_error);
+		eio_bio_endio(bc->bc_bio, bc->bc_error);
 		kfree(bc);
 	}
 	return;
