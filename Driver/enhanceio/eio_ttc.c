@@ -141,8 +141,9 @@ static inline
 void hdd_make_request(make_request_fn *origmfn, struct bio *bio)
 {
 	struct request_queue *q = NULL;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,2,0))
 	int ret;
-	
+#endif
 	q = bdev_get_queue(bio->bi_bdev);
 	if (unlikely(!q)) {
 		pr_err("EIO: Trying to access nonexistent block-device\n");
