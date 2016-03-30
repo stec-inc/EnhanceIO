@@ -147,7 +147,7 @@ void hdd_make_request(make_request_fn *origmfn, struct bio *bio)
 	q = bdev_get_queue(bio->bi_bdev);
 	if (unlikely(!q)) {
 		pr_err("EIO: Trying to access nonexistent block-device\n");
-		bio_endio(bio, -EIO);
+		eio_bio_endio(bio, -EIO);
 		return;
 	}
 
