@@ -2385,8 +2385,7 @@ static int eio_acquire_set_locks(struct cache_c *dmc, struct bio_container *bc)
 #endif
 				spin_lock_irqsave(&set->cs_lock, flags);
 			}
-			atomic_inc(&set->pending);
-			if (atomic_read(&set->pending) == 1)
+			if (atomic_inc_return(&set->pending) == 1)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0))
 				reinit_completion(&(set->io_done));
 #else
