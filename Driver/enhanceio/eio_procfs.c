@@ -1056,7 +1056,7 @@ static struct sysctl_table_common {
 		{               /* 1 */
 			.procname	= "zero_stats",
 			.maxlen		= sizeof(int),
-			.mode		= 0644,
+			.mode		= 0200,
 			.proc_handler	= &eio_zerostats_sysctl,
 		}, {            /* 2 */
 			.procname	= "mem_limit_pct",
