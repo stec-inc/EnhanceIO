@@ -42,7 +42,7 @@ enhanceio_lru-y	+= eio_lru.o
 all: modules 
 .PHONY:    modules
 modules: $(RHEL5_SETUP)
-	make -C $(KERNEL_TREE) M=$(PWD) modules V=0
+	make -C $(KERNEL_TREE) M=$(shell pwd) modules V=0
 .PHONY: modules_install
 modules_install: modules
 	install -o root -g root -m 0755 -d $(DESTDIR)/lib/modules/$(KERNEL_SOURCE_VERSION)/extra/enhanceio/
@@ -55,7 +55,7 @@ modules_install: modules
 install: modules_install
 .PHONY: clean
 clean:
-	make -C $(KERNEL_TREE) M=$(PWD) clean
+	make -C $(KERNEL_TREE) M=$(shell pwd) clean
 .PHONY: rhel5-setup
 rhel5-setup: $(RHEL5_TREE)
 	make -C $(RHEL5_TREE) oldconfig ; \
