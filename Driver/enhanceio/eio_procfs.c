@@ -87,11 +87,12 @@ eio_zerostats_sysctl(struct ctl_table *table, int write, void __user *buffer,
 				("0 or 1 are the only valid values for zerostats");
 			return -EINVAL;
 		}
-
-		if (dmc->sysctl_pending.zerostats ==
-		    dmc->sysctl_active.zerostats)
-			/* same value. Nothing to work */
-			return 0;
+		
+		if (!dmc->sysctl_pending.zerostats)
+			if (dmc->sysctl_pending.zerostats ==
+		    	dmc->sysctl_active.zerostats)
+				/* same value. Nothing to work */
+				return 0;
 
 		/* Copy to active */
 		spin_lock_irqsave(&dmc->cache_spin_lock, flags);
@@ -1055,7 +1056,7 @@ static struct sysctl_table_common {
 		{               /* 1 */
 			.procname	= "zero_stats",
 			.maxlen		= sizeof(int),
-			.mode		= 0644,
+			.mode		= 0200,
 			.proc_handler	= &eio_zerostats_sysctl,
 		}, {            /* 2 */
 			.procname	= "mem_limit_pct",
