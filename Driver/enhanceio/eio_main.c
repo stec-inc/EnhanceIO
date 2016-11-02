@@ -2434,7 +2434,7 @@ static int eio_alloc_mdreqs(struct cache_c *dmc, struct bio_container *bc)
 				mdreq->mdblk_bvecs =
 					(struct bio_vec *)
 					kmalloc(sizeof(struct bio_vec) * nr_bvecs,
-						GFP_KERNEL);
+						GFP_NOFS);
 				if (mdreq->mdblk_bvecs) {
 
 					ret =
