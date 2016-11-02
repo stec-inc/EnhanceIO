@@ -2658,7 +2658,7 @@ int eio_map(struct cache_c *dmc, struct request_queue *rq, struct bio *bio)
 
 	/* Create a bio container */
 
-	bc = kzalloc(sizeof(struct bio_container), GFP_NOWAIT | GFP_NOIO);
+	bc = kzalloc(sizeof(struct bio_container), GFP_NOWAIT);
 	if (!bc) {
 		eio_bio_endio(bio, -ENOMEM);
 		return DM_MAPIO_SUBMITTED;
