@@ -1816,9 +1816,7 @@ init:
 	for (i = 0; i < (dmc->size >> dmc->consecutive_shift); i++) {
 		dmc->cache_sets[i].nr_dirty = 0;
 		spin_lock_init(&dmc->cache_sets[i].cs_lock);
-		atomic_set(&dmc->cache_sets[i].pending, 0);
-		init_completion(&dmc->cache_sets[i].clean_done);
-		init_completion(&dmc->cache_sets[i].io_done);
+		init_rwsem(&dmc->cache_sets[i].rw_lock);
 		dmc->cache_sets[i].mdreq = NULL;
 		dmc->cache_sets[i].flags = 0;
 	}

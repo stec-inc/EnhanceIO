@@ -2304,7 +2304,6 @@ static int eio_acquire_set_locks(struct cache_c *dmc, struct bio_container *bc)
 	index_t i;
 	struct set_seq *cur_seq;
 	struct set_seq *next_seq;
-	unsigned long flags;
 	int error;
 
 	/*
@@ -2371,29 +2370,9 @@ static int eio_acquire_set_locks(struct cache_c *dmc, struct bio_container *bc)
 			goto err_out;
 	}
 
-	/* Acquire read locks on the sets in the set span */
-	for (cur_seq = bc->bc_setspan; cur_seq; cur_seq = cur_seq->next) {
-		for (i = cur_seq->first_set; i <= cur_seq->last_set; i++) {
-			struct cache_set *set = &dmc->cache_sets[i];
-			spin_lock_irqsave(&set->cs_lock, flags);
-			if (set->flags & SETFLAG_CLEAN_ACTIVE) {
-				spin_unlock_irqrestore(&set->cs_lock, flags);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
-				wait_for_completion_io(&set->clean_done);
-#else
-				wait_for_completion(&set->clean_done);
-#endif
-				spin_lock_irqsave(&set->cs_lock, flags);
-			}
-			if (atomic_inc_return(&set->pending) == 1)
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0))
-				reinit_completion(&(set->io_done));
-#else
-				INIT_COMPLETION(set->io_done);
-#endif
-			spin_unlock_irqrestore(&set->cs_lock, flags);
-		}
-	}
+	for (cur_seq = bc->bc_setspan; cur_seq; cur_seq = cur_seq->next)
+		for (i = cur_seq->first_set; i <= cur_seq->last_set; i++)
+			down_read(&dmc->cache_sets[i].rw_lock);
 	return 0;
 
 err_out:
@@ -2499,10 +2478,8 @@ eio_release_io_resources(struct cache_c *dmc, struct bio_container *bc)
 
 	/* Release read locks on the sets in the set span */
 	for (cur_seq = bc->bc_setspan; cur_seq; cur_seq = cur_seq->next) {
-		for (i = cur_seq->first_set; i <= cur_seq->last_set; i++) {
-			if (atomic_dec_and_test(&dmc->cache_sets[i].pending))
-				complete(&dmc->cache_sets[i].io_done);
-		}
+		for (i = cur_seq->first_set; i <= cur_seq->last_set; i++)
+			up_read(&dmc->cache_sets[i].rw_lock);
 	}
 
 	/* Free the seqs in the set span, unless it is single span */
@@ -3356,24 +3333,9 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 	end_index = start_index + dmc->assoc;
 
 	/* 1. exclusive lock. Let the ongoing writes to finish. Pause new writes */
-	spin_lock_irqsave(&dmc->cache_sets[set].cs_lock, flags);
-	dmc->cache_sets[set].flags |= SETFLAG_CLEAN_ACTIVE;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0))
-	reinit_completion(&dmc->cache_sets[set].clean_done);
-#else
-	INIT_COMPLETION(dmc->cache_sets[set].clean_done);
-#endif
-	spin_unlock_irqrestore(&dmc->cache_sets[set].cs_lock, flags);
+	down_write(&dmc->cache_sets[set].rw_lock);
 
-	/* wait for any pending IO */
-	if (atomic_read(&dmc->cache_sets[set].pending)) {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
-		wait_for_completion_io(&dmc->cache_sets[set].io_done);
-#else
-		wait_for_completion(&dmc->cache_sets[set].io_done);
-#endif
-	}
-	/* now, no new IO can begin and all pending IOs have been processed */
+    /* now, no new IO can begin and all pending IOs have been processed */
 
 	/* 2. Return if there are no dirty blocks to clean */
 	if (dmc->cache_sets[set].nr_dirty == 0)
@@ -3473,7 +3435,7 @@ eio_clean_set(struct cache_c *dmc, index_t set, int whole, int force)
 	 * I/Os.
 	 */
 	atomic_set(&sioc.pending, 1);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,16,0))
 	reinit_completion(&sioc.done);
 #else
 	INIT_COMPLETION(sioc.done);
@@ -3598,10 +3560,7 @@ err_out3:
 
 err_out2:
 
-	spin_lock_irqsave(&dmc->cache_sets[set].cs_lock, flags);
-	dmc->cache_sets[set].flags &= ~SETFLAG_CLEAN_ACTIVE;
-	spin_unlock_irqrestore(&dmc->cache_sets[set].cs_lock, flags);
-	complete_all(&dmc->cache_sets[set].clean_done);
+	up_write(&dmc->cache_sets[set].rw_lock);
 
 err_out1:
 
