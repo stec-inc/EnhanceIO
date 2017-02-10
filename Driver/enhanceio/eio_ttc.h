@@ -24,10 +24,20 @@
 #include <stdint.h>
 #endif                          /* __KERNEL__ */
 
-static inline bool bio_rw_flagged(struct bio *bio, int flag)
-{
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0))
+static inline void eio_bio_endio(struct bio *bio, int err) {
+  if (err) bio->bi_error = err;
+  bio_endio(bio);
+}
+#else
+#define eio_bio_endio bio_endio
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0))
+static inline bool bio_rw_flagged(struct bio *bio, int flag) {
 	return (bio->bi_rw & flag) != 0;
 }
+#endif
 
 /*
  * Whether the cached (source) device is a partition or a whole device.
@@ -106,7 +116,7 @@ enum eio_cache_state {
  */
 
 extern int eio_create_misc_device(void);
-extern int eio_delete_misc_device(void);
+extern void eio_delete_misc_device(void);
 
 extern int eio_ttc_get_device(const char *, fmode_t, struct eio_bdev **);
 extern void eio_ttc_put_device(struct eio_bdev **);

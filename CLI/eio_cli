@@ -572,6 +572,11 @@ def create_parser():
 			          required=True, help="name of the ssd device")
 	parser_sanity.add_argument("-d", action="store", dest="hdd",\
 				  required=True, help="name of the source device")
+
+	#disable
+	parser_disable = parser.add_parser('disable', help='used to disable cache')
+	parser_disable.add_argument("-c", action="store", dest="cache", required=True)
+
 	return mainparser
 
 def main():
@@ -630,6 +635,10 @@ def main():
 
 		cache.do_eio_ioctl(EIO_IOC_ENABLE)
 
+	elif sys.argv[1] == "disable":
+		cache = Cache_rec(name = args.cache)
+		cache.do_eio_ioctl(EIO_IOC_DISABLE)
+
 	elif sys.argv[1] == "notify":
 		# This command will be fired by udev rule on SSD/Source addition
 		if args.action == "reboot":
@@ -644,18 +653,18 @@ def main():
 				
 			elif args.hdd:
 				cache = Cache_rec(name = args.cache,\
-						ssd_name = args.hdd, persistence = 1)
-				cache.do_eio_ioctl(EIO_IOC_HDD_ADD)
+						src_name = args.hdd, persistence = 1)
+				cache.do_eio_ioctl(EIO_IOC_SRC_ADD)
 
 		elif args.action == "remove":
 			if args.ssd:
 				cache = Cache_rec(name = args.cache, ssd_name = args.ssd,\
 						persistence = 1)
-				cache.do_eio_ioctl(EIO_SSD_REMOVE)
+				cache.do_eio_ioctl(EIO_IOC_SSD_REMOVE)
 			elif args.hdd:
-				cache = Cache_rec(name = args.cache, hdd_name = args.hdd,\
+				cache = Cache_rec(name = args.cache, src_name = args.hdd,\
 						persistence = 1)
-				cache.do_eio_ioctl(EIO_HDD_REMOVE)
+				cache.do_eio_ioctl(EIO_IOC_SRC_REMOVE)
 
 		pass
 

@@ -101,7 +101,7 @@ int eio_wait_schedule(void *unused)
 	return 0;
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,15,0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0)) && !defined(smp_mb__after_atomic)
 #define smp_mb__after_atomic smp_mb__after_clear_bit
 #endif
 
@@ -324,6 +324,7 @@ int eio_sb_store(struct cache_c *dmc)
 	sb->sbf.time_based_clean_interval =
 		cpu_to_le32(dmc->sysctl_active.time_based_clean_interval);
 	sb->sbf.autoclean_threshold = cpu_to_le32(dmc->sysctl_active.autoclean_threshold);
+	sb->sbf.cache_wronly = cpu_to_le32(dmc->sysctl_active.cache_wronly);
 
 	/* write out to ssd */
 	where.bdev = dmc->cache_dev->bdev;
@@ -1151,6 +1152,7 @@ static int eio_md_load(struct cache_c *dmc)
 		le32_to_cpu(header->sbf.dirty_set_high_threshold);
 	dmc->sysctl_active.dirty_set_low_threshold =
 		le32_to_cpu(header->sbf.dirty_set_low_threshold);
+	dmc->sysctl_active.cache_wronly = le32_to_cpu(header->sbf.cache_wronly);
 	dmc->sysctl_active.time_based_clean_interval =
 		le32_to_cpu(header->sbf.time_based_clean_interval);
 	dmc->sysctl_active.autoclean_threshold =
@@ -1431,7 +1433,11 @@ static void eio_init_ssddev_props(struct cache_c *dmc)
 
 	rq = bdev_get_queue(dmc->cache_dev->bdev);
 	max_hw_sectors = to_bytes(queue_max_hw_sectors(rq)) / PAGE_SIZE;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0))
+	max_nr_pages = BIO_MAX_PAGES;
+#else
 	max_nr_pages = (u_int32_t)bio_get_nr_vecs(dmc->cache_dev->bdev);
+#endif
 	nr_pages = min_t(u_int32_t, max_hw_sectors, max_nr_pages);
 	dmc->bio_nr_pages = nr_pages;
 
@@ -1592,6 +1598,7 @@ int eio_cache_create(struct cache_rec_short *cache)
 		}
 	}
 
+	spin_lock_init(&dmc->cache_spin_lock);
 	/*
 	 * We need to determine the requested cache mode before we call
 	 * eio_md_load becuase it examines dmc->mode. The cache mode is
@@ -1772,7 +1779,6 @@ int eio_cache_create(struct cache_rec_short *cache)
 	dmc->sysctl_active.time_based_clean_interval =
 		TIME_BASED_CLEAN_INTERVAL_DEF(dmc);
 
-	spin_lock_init(&dmc->cache_spin_lock);
 	if (persistence == CACHE_CREATE) {
 		error = eio_md_create(dmc, /* force */ 0, /* cold */ 1);
 		if (error) {
@@ -2562,17 +2568,18 @@ static int __init eio_init(void)
 
 	r = eio_jobs_init();
 	if (r) {
-		(void)eio_delete_misc_device();
+		eio_delete_misc_device();
 		return r;
 	}
 	atomic_set(&nr_cache_jobs, 0);
 	INIT_WORK(&_kcached_wq, eio_do_work);
+	spin_lock_init(&ssd_rm_list_lock);
 
 	eio_module_procfs_init();
 	eio_control = kmalloc(sizeof(*eio_control), GFP_KERNEL);
 	if (eio_control == NULL) {
 		pr_err("init: Cannot allocate memory for eio_control");
-		(void)eio_delete_misc_device();
+		eio_delete_misc_device();
 		return -ENOMEM;
 	}
 	eio_control->synch_flags = 0;
@@ -2581,7 +2588,7 @@ static int __init eio_init(void)
 	r = bus_register_notifier(&scsi_bus_type, &eio_ssd_rm_notifier);
 	if (r) {
 		pr_err("init: bus register notifier failed %d", r);
-		(void)eio_delete_misc_device();
+		eio_delete_misc_device();
 	}
 	return r;
 }
@@ -2606,7 +2613,7 @@ static void eio_exit(void)
 		kfree(eio_control);
 		eio_control = NULL;
 	}
-	(void)eio_delete_misc_device();
+	eio_delete_misc_device();
 }
 
 /*
